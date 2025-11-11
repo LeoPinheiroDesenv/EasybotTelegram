@@ -1,0 +1,76 @@
+import axios from 'axios';
+
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+
+const api = axios.create({
+  baseURL: API_URL,
+});
+
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('token');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
+const contactService = {
+  async getAllContacts(botId, filters = {}, pagination = {}) {
+    const response = await api.get('/contacts', {
+      params: {
+        botId,
+        ...filters,
+        ...pagination
+      }
+    });
+    return response.data;
+  },
+
+  async getContactById(id, botId) {
+    const response = await api.get(`/contacts/${id}`, {
+      params: { botId }
+    });
+    return response.data.contact;
+  },
+
+  async createContact(contactData) {
+    const response = await api.post('/contacts', contactData);
+    return response.data.contact;
+  },
+
+  async updateContact(id, contactData) {
+    const response = await api.put(`/contacts/${id}`, contactData);
+    return response.data.contact;
+  },
+
+  async deleteContact(id, botId) {
+    const response = await api.delete(`/contacts/${id}`, {
+      params: { botId }
+    });
+    return response.data;
+  },
+
+  async blockContact(id, botId) {
+    const response = await api.post(`/contacts/${id}/block`, null, {
+      params: { botId }
+    });
+    return response.data;
+  },
+
+  async getStats(botId) {
+    const response = await api.get('/contacts/stats', {
+      params: { botId }
+    });
+    return response.data.stats;
+  },
+
+  async getLatest(botId, limit = 10) {
+    const response = await api.get('/contacts/latest', {
+      params: { botId, limit }
+    });
+    return response.data.contacts;
+  }
+};
+
+export default contactService;
+

@@ -1,0 +1,38 @@
+:root {
+  /* Paleta de cores principal */
+  --color-dark-green: #1e7e34;
+  --color-light-green: #22c55e;
+  --color-white: #ffffff;
+  --color-black: #000000;
+  
+  /* Variações e tons auxiliares */
+  --color-dark-green-hover: #155724;
+  --color-dark-green-light: #28a745;
+  --color-light-green-hover: #16a34a;
+  --color-light-green-dark: #15803d;
+  
+  /* Cores de texto */
+  --text-primary: #000000;
+  --text-secondary: #333333;
+  --text-light: #666666;
+  --text-on-dark: #ffffff;
+  --text-on-green: #ffffff;
+  
+  /* Cores de fundo */
+  --bg-primary: #ffffff;
+  --bg-secondary: #f5f5f5;
+  --bg-dark-green: #1e7e34;
+  --bg-light-green: #22c55e;
+  
+  /* Cores de borda */
+  --border-light: #e5e7eb;
+  --border-medium: #d1d5db;
+  --border-dark: #9ca3af;
+  
+  /* Estados */
+  --color-success: #22c55e;
+  --color-error: #dc3545;
+  --color-warning: #ffc107;
+  --color-info: #17a2b8;
+}
+

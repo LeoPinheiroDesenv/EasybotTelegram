@@ -1,0 +1,28 @@
+.marketing-page {
+  padding: 24px;
+  min-height: 100vh;
+  background-color: #f9fafb;
+}
+
+.marketing-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  background-color: #ffffff;
+  border-radius: 12px;
+  padding: 48px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.marketing-title {
+  font-size: 32px;
+  font-weight: 700;
+  color: #9333ea;
+  margin-bottom: 16px;
+}
+
+.marketing-description {
+  font-size: 16px;
+  color: #6b7280;
+  line-height: 1.6;
+}
+
