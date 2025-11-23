@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faUpload, faTrash } from '@fortawesome/free-solid-svg-icons';
 import Layout from '../components/Layout';
 import botService from '../services/botService';
 import './WelcomeMessage.css';
@@ -163,11 +165,7 @@ const WelcomeMessage = () => {
                 onClick={() => handleMediaUpdate(1)}
                 className={`btn-media ${formData.media_1_url ? 'has-media' : ''}`}
               >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                  <polyline points="17 8 12 3 7 8"></polyline>
-                  <line x1="12" y1="3" x2="12" y2="15"></line>
-                </svg>
+                <FontAwesomeIcon icon={faUpload} />
                 Atualizar mídia
               </button>
               {formData.media_1_url && (
@@ -176,10 +174,7 @@ const WelcomeMessage = () => {
                   className="btn-delete-media"
                   title="Remover mídia"
                 >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <polyline points="3 6 5 6 21 6"></polyline>
-                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                  </svg>
+                  <FontAwesomeIcon icon={faTrash} />
                 </button>
               )}
             </div>
@@ -188,11 +183,7 @@ const WelcomeMessage = () => {
               onClick={() => handleMediaUpdate(2)}
               className="btn-media"
             >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                <polyline points="17 8 12 3 7 8"></polyline>
-                <line x1="12" y1="3" x2="12" y2="15"></line>
-              </svg>
+              <FontAwesomeIcon icon={faUpload} />
               Atualizar mídia
             </button>
 
@@ -200,11 +191,7 @@ const WelcomeMessage = () => {
               onClick={() => handleMediaUpdate(3)}
               className="btn-media"
             >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                <polyline points="17 8 12 3 7 8"></polyline>
-                <line x1="12" y1="3" x2="12" y2="15"></line>
-              </svg>
+              <FontAwesomeIcon icon={faUpload} />
               Atualizar mídia
             </button>
           </div>

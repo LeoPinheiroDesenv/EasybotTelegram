@@ -1,0 +1,157 @@
+/* Form Styles from Modelo */
+
+.form-label {
+  margin-bottom: 0.5rem;
+  color: #4B5563;
+  font-size: 0.875rem;
+  line-height: 1.5rem;
+  text-transform: capitalize;
+  display: block;
+  width: 100%;
+  font-weight: 400;
+}
+
+.text-control {
+  background-color: white;
+  transition: all 0.3s ease-in-out;
+  border: 1px solid #E9EAF0;
+  border-radius: 0.25rem;
+  padding: 0.625rem 0.75rem;
+  font-size: 0.875rem;
+  color: #111827;
+  width: 100%;
+  display: block;
+}
+
+.text-control:focus {
+  border-color: #6366f1;
+  outline: none;
+  box-shadow: 0 0 0 1px #6366f1;
+}
+
+.text-control::placeholder {
+  color: #9CA3AF;
+  font-weight: 400;
+}
+
+.text-control:disabled {
+  cursor: not-allowed;
+  background-color: rgba(243, 244, 246, 0.7);
+  color: #1f2937;
+}
+
+.text-control:disabled::placeholder {
+  opacity: 0.6;
+}
+
+.input-help {
+  display: block;
+  color: #6B7280;
+  font-weight: 300;
+  line-height: 1rem;
+  font-size: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.textfiled-wrapper {
+  position: relative;
+}
+
+.textfiled-wrapper.is-error .text-control {
+  border-color: #ef4444;
+  box-shadow: 0 0 0 1px #ef4444;
+}
+
+.textfiled-wrapper.is-valid .text-control {
+  border-color: #10b981;
+  box-shadow: 0 0 0 1px #10b981;
+}
+
+/* File input */
+.file-control {
+  background-color: transparent;
+  transition: all 0.3s ease-in-out;
+  border: 1px solid #E9EAF0;
+  border-radius: 0.25rem;
+  font-size: 0.875rem;
+  padding-left: 0.75rem;
+  padding-right: 0.75rem;
+  font-weight: 400;
+}
+
+.file-control:focus {
+  outline: none;
+  box-shadow: 0 0 0 1px #111827;
+  border-color: #111827;
+}
+
+.badge-title {
+  background-color: #111827;
+  color: white;
+  padding: 0.1875rem 0.5rem;
+  border-radius: 0.25rem;
+  font-size: 0.875rem;
+}
+
+/* Textarea */
+textarea.text-control {
+  resize: vertical;
+  min-height: 100px;
+}
+
+/* Select */
+select.text-control {
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3E%3C/svg%3E");
+  background-position: right 0.5rem center;
+  background-repeat: no-repeat;
+  background-size: 1.5em 1.5em;
+  padding-right: 2.5rem;
+}
+
+/* Checkbox and Radio */
+input[type="checkbox"],
+input[type="radio"] {
+  width: 1rem;
+  height: 1rem;
+  cursor: pointer;
+}
+
+input[type="checkbox"]:checked,
+input[type="radio"]:checked {
+  accent-color: #6366f1;
+}
+
+/* Switch/Toggle */
+input[type="checkbox"].switch {
+  width: 2.5rem;
+  height: 1.25rem;
+  appearance: none;
+  background-color: #d1d5db;
+  border-radius: 9999px;
+  position: relative;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+input[type="checkbox"].switch:checked {
+  background-color: #6366f1;
+}
+
+input[type="checkbox"].switch::before {
+  content: '';
+  position: absolute;
+  width: 1rem;
+  height: 1rem;
+  border-radius: 50%;
+  background-color: white;
+  top: 0.125rem;
+  left: 0.125rem;
+  transition: transform 0.2s;
+}
+
+input[type="checkbox"].switch:checked::before {
+  transform: translateX(1.25rem);
+}
+

@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faChevronRight, faRobot, faPlus } from '@fortawesome/free-solid-svg-icons';
 import Layout from '../components/Layout';
 import botService from '../services/botService';
 import './UpdateBot.css';
@@ -22,6 +24,8 @@ const UpdateBot = () => {
   const [loadingData, setLoadingData] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [validating, setValidating] = useState(false);
+  const [validationResult, setValidationResult] = useState(null);
 
   useEffect(() => {
     loadBots();
@@ -131,6 +135,49 @@ const UpdateBot = () => {
     navigate('/bot/create');
   };
 
+  const handleValidate = async () => {
+    if (!formData.token) {
+      setError('Por favor, preencha o token do bot antes de validar.');
+      return;
+    }
+
+    setValidating(true);
+    setError('');
+    setSuccess('');
+    setValidationResult(null);
+
+    try {
+      const result = await botService.validateTokenAndGroup(
+        formData.token,
+        formData.telegram_group_id || null
+      );
+
+      setValidationResult(result);
+
+      if (result.valid) {
+        setSuccess('Token e grupo validados com sucesso!');
+        setTimeout(() => setSuccess(''), 5000);
+      } else {
+        const errors = result.errors || [];
+        if (result.token_valid === false) {
+          setError('Token inválido. Verifique se o token está correto.');
+        } else if (result.group_valid === false && formData.telegram_group_id) {
+          setError('Grupo inválido ou bot não tem acesso ao grupo. ' + (errors.join(' ') || ''));
+        } else {
+          setError(errors.join(' ') || 'Validação falhou.');
+        }
+      }
+    } catch (err) {
+      setError(err.response?.data?.error || 'Erro ao validar token e grupo');
+      setValidationResult({
+        valid: false,
+        error: err.response?.data?.error || 'Erro ao validar'
+      });
+    } finally {
+      setValidating(false);
+    }
+  };
+
   if (loadingData) {
     return (
       <Layout>
@@ -187,6 +234,9 @@ const UpdateBot = () => {
                   onChange={handleChange}
                   placeholder="ID do grupo"
                 />
+                <small style={{ color: '#666', marginTop: '5px', display: 'block' }}>
+                  ID numérico do grupo (ex: -1001234567890). O bot deve ser membro do grupo.
+                </small>
               </div>
 
               <div className="form-field-card">
@@ -198,8 +248,128 @@ const UpdateBot = () => {
                   onChange={handleChange}
                   placeholder="Token do bot"
                 />
+                <small style={{ color: '#666', marginTop: '5px', display: 'block' }}>
+                  Token do bot obtido em @BotFather no Telegram
+                </small>
               </div>
             </div>
+
+            {/* Botão de validação */}
+            <div style={{ marginTop: '20px', marginBottom: '20px' }}>
+              <button
+                onClick={handleValidate}
+                className="btn btn-primary"
+                disabled={validating || !formData.token}
+                style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '8px',
+                  backgroundColor: '#9333ea',
+                  color: 'white',
+                  border: 'none',
+                  padding: '10px 20px',
+                  borderRadius: '8px',
+                  cursor: validating || !formData.token ? 'not-allowed' : 'pointer',
+                  opacity: validating || !formData.token ? 0.6 : 1
+                }}
+              >
+                {validating ? (
+                  <>
+                    <span className="spinner" style={{ 
+                      width: '16px', 
+                      height: '16px', 
+                      border: '2px solid rgba(255,255,255,0.3)',
+                      borderTopColor: 'white',
+                      borderRadius: '50%',
+                      animation: 'spin 0.8s linear infinite',
+                      display: 'inline-block'
+                    }}></span>
+                    Validando...
+                  </>
+                ) : (
+                  <>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <polyline points="20 6 9 17 4 12"></polyline>
+                    </svg>
+                    Validar Token e Grupo
+                  </>
+                )}
+              </button>
+            </div>
+
+            {/* Resultado da validação */}
+            {validationResult && (
+              <div style={{ 
+                marginTop: '15px', 
+                padding: '15px', 
+                borderRadius: '8px',
+                backgroundColor: validationResult.valid ? '#d1fae5' : '#fee2e2',
+                border: `1px solid ${validationResult.valid ? '#10b981' : '#ef4444'}`
+              }}>
+                <h4 style={{ 
+                  margin: '0 0 10px 0', 
+                  color: validationResult.valid ? '#065f46' : '#991b1b',
+                  fontSize: '14px',
+                  fontWeight: '600'
+                }}>
+                  Resultado da Validação:
+                </h4>
+                
+                <div style={{ fontSize: '13px', color: validationResult.valid ? '#065f46' : '#991b1b' }}>
+                  <div style={{ marginBottom: '5px' }}>
+                    <strong>Token:</strong> {validationResult.token_valid ? '✅ Válido' : '❌ Inválido'}
+                  </div>
+                  
+                  {formData.telegram_group_id && (
+                    <div style={{ marginBottom: '5px' }}>
+                      <strong>Grupo:</strong> {validationResult.group_valid ? '✅ Válido' : '❌ Inválido'}
+                    </div>
+                  )}
+
+                  {validationResult.bot_info && (
+                    <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid rgba(0,0,0,0.1)' }}>
+                      <strong>Informações do Bot:</strong>
+                      <ul style={{ margin: '5px 0', paddingLeft: '20px' }}>
+                        <li>Nome: {validationResult.bot_info.first_name || 'N/A'}</li>
+                        <li>Username: @{validationResult.bot_info.username || 'N/A'}</li>
+                        <li>ID: {validationResult.bot_info.id}</li>
+                      </ul>
+                    </div>
+                  )}
+
+                  {validationResult.group_info && validationResult.group_valid && (
+                    <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid rgba(0,0,0,0.1)' }}>
+                      <strong>Informações do Grupo:</strong>
+                      <ul style={{ margin: '5px 0', paddingLeft: '20px' }}>
+                        <li>Título: {validationResult.group_info.title || 'N/A'}</li>
+                        <li>Tipo: {validationResult.group_info.type || 'N/A'}</li>
+                        {validationResult.group_info.member_count && (
+                          <li>Membros: {validationResult.group_info.member_count}</li>
+                        )}
+                        {validationResult.group_info.permissions && (
+                          <li>
+                            Permissões: 
+                            {validationResult.group_info.permissions.can_restrict_members ? ' ✅ Pode restringir membros' : ' ❌ Não pode restringir'}
+                            {validationResult.group_info.permissions.can_invite_users ? ' ✅ Pode convidar' : ' ❌ Não pode convidar'}
+                          </li>
+                        )}
+                      </ul>
+                    </div>
+                  )}
+
+                  {validationResult.errors && validationResult.errors.length > 0 && (
+                    <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid rgba(0,0,0,0.1)' }}>
+                      <strong>Erros:</strong>
+                      <ul style={{ margin: '5px 0', paddingLeft: '20px' }}>
+                        {validationResult.errors.map((err, idx) => (
+                          <li key={idx}>{err}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Configurações de privacidade */}
@@ -300,9 +470,7 @@ const UpdateBot = () => {
               <h2 className="sidebar-title">Meus bots ativos</h2>
               <a href="/configuracoes" className="sidebar-link">
                 Configurações
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <polyline points="9 18 15 12 9 6"></polyline>
-                </svg>
+                <FontAwesomeIcon icon={faChevronRight} />
               </a>
             </div>
 
@@ -310,12 +478,7 @@ const UpdateBot = () => {
               {bots.map((bot) => (
                 <div key={bot.id} className="bot-list-item">
                   <div className="bot-icon">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#9333ea" strokeWidth="2">
-                      <rect x="6" y="4" width="12" height="16" rx="2"></rect>
-                      <circle cx="10" cy="10" r="2"></circle>
-                      <circle cx="14" cy="10" r="2"></circle>
-                      <path d="M9 16h6"></path>
-                    </svg>
+                    <FontAwesomeIcon icon={faRobot} style={{ color: '#9333ea' }} />
                   </div>
                   <div className="bot-info">
                     <span className="bot-name">{bot.name}</span>
@@ -331,10 +494,7 @@ const UpdateBot = () => {
             </div>
 
             <button onClick={handleCreateBot} className="btn-create-new">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <line x1="12" y1="5" x2="12" y2="19"></line>
-                <line x1="5" y1="12" x2="19" y2="12"></line>
-              </svg>
+              <FontAwesomeIcon icon={faPlus} />
               Criar novo bot
             </button>
           </div>

@@ -1,7 +1,7 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
-import PrivateRoute from './components/PrivateRoute';
+import ProtectedRoute from './components/ProtectedRoute';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import CreateBot from './pages/CreateBot';
@@ -19,6 +19,9 @@ import Users from './pages/Users';
 import Logs from './pages/Logs';
 import PaymentCycles from './pages/PaymentCycles';
 import PaymentGatewayConfigs from './pages/PaymentGatewayConfigs';
+import GroupManagement from './pages/GroupManagement';
+import Billing from './pages/Billing';
+import UserGroups from './pages/UserGroups';
 import './App.css';
 
 function App() {
@@ -31,129 +34,153 @@ function App() {
             <Route
               path="/"
               element={
-                <PrivateRoute>
+                <ProtectedRoute>
                   <Dashboard />
-                </PrivateRoute>
+                </ProtectedRoute>
               }
             />
             <Route
               path="/bot/create"
               element={
-                <PrivateRoute>
+                <ProtectedRoute>
                   <CreateBot />
-                </PrivateRoute>
+                </ProtectedRoute>
               }
             />
             <Route
               path="/bot/update/:id"
               element={
-                <PrivateRoute>
+                <ProtectedRoute>
                   <UpdateBot />
-                </PrivateRoute>
+                </ProtectedRoute>
               }
             />
             <Route
               path="/bot/welcome"
               element={
-                <PrivateRoute>
+                <ProtectedRoute>
                   <WelcomeMessage />
-                </PrivateRoute>
+                </ProtectedRoute>
               }
             />
             <Route
               path="/bot/payment-plans"
               element={
-                <PrivateRoute>
+                <ProtectedRoute>
                   <PaymentPlans />
-                </PrivateRoute>
+                </ProtectedRoute>
               }
             />
             <Route
               path="/bot/redirect"
               element={
-                <PrivateRoute>
+                <ProtectedRoute>
                   <Redirect />
-                </PrivateRoute>
+                </ProtectedRoute>
               }
             />
             <Route
               path="/bot/administrators"
               element={
-                <PrivateRoute>
+                <ProtectedRoute>
                   <Administrators />
-                </PrivateRoute>
+                </ProtectedRoute>
               }
             />
             <Route
               path="/bot/groups"
               element={
-                <PrivateRoute>
+                <ProtectedRoute>
                   <Groups />
-                </PrivateRoute>
+                </ProtectedRoute>
               }
             />
             <Route
               path="/results/contacts"
               element={
-                <PrivateRoute>
+                <ProtectedRoute>
                   <Contacts />
-                </PrivateRoute>
+                </ProtectedRoute>
               }
             />
             <Route
               path="/marketing"
               element={
-                <PrivateRoute>
+                <ProtectedRoute>
                   <Marketing />
-                </PrivateRoute>
+                </ProtectedRoute>
               }
             />
             <Route
               path="/marketing/alerts"
               element={
-                <PrivateRoute>
+                <ProtectedRoute>
                   <Alerts />
-                </PrivateRoute>
+                </ProtectedRoute>
               }
             />
             <Route
               path="/marketing/downsell"
               element={
-                <PrivateRoute>
+                <ProtectedRoute>
                   <Downsell />
-                </PrivateRoute>
+                </ProtectedRoute>
               }
             />
             <Route
               path="/users"
               element={
-                <PrivateRoute>
+                <ProtectedRoute>
                   <Users />
-                </PrivateRoute>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/user-groups"
+              element={
+                <ProtectedRoute>
+                  <UserGroups />
+                </ProtectedRoute>
               }
             />
             <Route
               path="/logs"
               element={
-                <PrivateRoute>
+                <ProtectedRoute>
                   <Logs />
-                </PrivateRoute>
+                </ProtectedRoute>
               }
             />
             <Route
               path="/settings/payment-cycles"
               element={
-                <PrivateRoute>
+                <ProtectedRoute>
                   <PaymentCycles />
-                </PrivateRoute>
+                </ProtectedRoute>
               }
             />
             <Route
               path="/settings/payment-gateways"
               element={
-                <PrivateRoute>
+                <ProtectedRoute>
                   <PaymentGatewayConfigs />
-                </PrivateRoute>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/bot/:botId/group-management"
+              element={
+                <ProtectedRoute>
+                  <GroupManagement />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/billing"
+              element={
+                <ProtectedRoute>
+                  <Billing />
+                </ProtectedRoute>
               }
             />
           </Routes>

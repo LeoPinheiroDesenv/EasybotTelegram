@@ -1,18 +1,51 @@
-import React, { useContext, useState } from 'react';
+import React, { useContext, useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { 
+  faThLarge,
+  faRobot,
+  faUsers,
+  faChevronRight,
+  faChevronDown,
+  faChartBar,
+  faUserFriends,
+  faBullhorn,
+  faFileAlt,
+  faCog,
+  faSignOutAlt
+} from '@fortawesome/free-solid-svg-icons';
 import { AuthContext } from '../contexts/AuthContext';
+import billingService from '../services/billingService';
 import './Sidebar.css';
 
 const Sidebar = ({ isOpen, onClose }) => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { isAdmin, logout } = useContext(AuthContext);
+  const { isAdmin, logout, user } = useContext(AuthContext);
   const [botMenuOpen, setBotMenuOpen] = useState(location.pathname.startsWith('/bot'));
   const [resultsMenuOpen, setResultsMenuOpen] = useState(location.pathname.startsWith('/results'));
   const [marketingMenuOpen, setMarketingMenuOpen] = useState(location.pathname.startsWith('/marketing'));
-  const [settingsMenuOpen, setSettingsMenuOpen] = useState(location.pathname.startsWith('/settings'));
+  const [settingsMenuOpen, setSettingsMenuOpen] = useState(
+    location.pathname.startsWith('/settings') || 
+    location.pathname === '/users' || 
+    location.pathname === '/user-groups' || 
+    location.pathname === '/logs'
+  );
+  const [monthlyBilling, setMonthlyBilling] = useState({ total: 0, transaction_count: 0 });
+  const [loadingBilling, setLoadingBilling] = useState(true);
+
+  // Verifica se o usuário tem acesso a um menu específico
+  const hasMenuAccess = (menuName) => {
+    // Super admin tem acesso a tudo
+    if (user?.user_type === 'super_admin') {
+      return true;
+    }
+    
+    const accessibleMenus = user?.accessible_menus || [];
+    return accessibleMenus.includes('*') || accessibleMenus.includes(menuName);
+  };
   
-  // Auto-expand bot menu when on a submenu page
+  // Auto-expand menus when on a submenu page
   React.useEffect(() => {
     if (location.pathname.startsWith('/bot') && !location.pathname.match(/^\/bot\/create$/)) {
       setBotMenuOpen(true);
@@ -23,10 +56,36 @@ const Sidebar = ({ isOpen, onClose }) => {
     if (location.pathname.startsWith('/results')) {
       setResultsMenuOpen(true);
     }
-    if (location.pathname.startsWith('/settings')) {
+    // Expande menu de Configurações para rotas de settings e também para Usuários, Grupos de Usuários e Logs
+    if (location.pathname.startsWith('/settings') || 
+        location.pathname === '/users' || 
+        location.pathname === '/user-groups' || 
+        location.pathname === '/logs') {
       setSettingsMenuOpen(true);
     }
   }, [location.pathname]);
+
+  // Carrega faturamento mensal
+  useEffect(() => {
+    const loadBilling = async () => {
+      try {
+        setLoadingBilling(true);
+        const billing = await billingService.getMonthlyBilling();
+        setMonthlyBilling(billing);
+      } catch (err) {
+        console.error('Erro ao carregar faturamento:', err);
+        // Mantém valores padrão em caso de erro
+        setMonthlyBilling({ total: 0, transaction_count: 0 });
+      } finally {
+        setLoadingBilling(false);
+      }
+    };
+
+    loadBilling();
+    // Atualiza a cada 5 minutos
+    const interval = setInterval(loadBilling, 5 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   const botSubmenuItems = [
     { path: '/bot/create', label: 'Criar novo bot' },
@@ -38,90 +97,37 @@ const Sidebar = ({ isOpen, onClose }) => {
     { path: '/bot/groups', label: 'Grupos e Canais', requiresBot: true },
   ];
 
+  const isBillingActive = location.pathname === '/billing';
+
   const getIcon = (iconType) => {
     const icons = {
-      grid: (
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <rect x="3" y="3" width="7" height="7"></rect>
-          <rect x="14" y="3" width="7" height="7"></rect>
-          <rect x="3" y="14" width="7" height="7"></rect>
-          <rect x="14" y="14" width="7" height="7"></rect>
-        </svg>
-      ),
-      robot: (
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <rect x="6" y="4" width="12" height="16" rx="2"></rect>
-          <circle cx="10" cy="10" r="2"></circle>
-          <circle cx="14" cy="10" r="2"></circle>
-          <path d="M9 16h6"></path>
-        </svg>
-      ),
-      users: (
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-          <circle cx="9" cy="7" r="4"></circle>
-          <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-          <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-        </svg>
-      ),
-      chevron: (
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <polyline points="9 18 15 12 9 6"></polyline>
-        </svg>
-      ),
-      chevronDown: (
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <polyline points="6 9 12 15 18 9"></polyline>
-        </svg>
-      ),
-      chart: (
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <line x1="18" y1="20" x2="18" y2="10"></line>
-          <line x1="12" y1="20" x2="12" y2="4"></line>
-          <line x1="6" y1="20" x2="6" y2="14"></line>
-        </svg>
-      ),
-      contacts: (
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-          <circle cx="9" cy="7" r="4"></circle>
-          <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-          <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-        </svg>
-      ),
-      megaphone: (
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <path d="M3 11c0-1.1.9-2 2-2h2a2 2 0 0 1 2 2v2a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4z"></path>
-          <path d="M7 11v4a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2v-4"></path>
-          <path d="M13 11l4-8 4 8v6a2 2 0 0 1-2 2h-4a2 2 0 0 1-2-2v-6z"></path>
-          <path d="M21 6l-2 4"></path>
-        </svg>
-      ),
-      fileText: (
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-          <polyline points="14 2 14 8 20 8"></polyline>
-          <line x1="16" y1="13" x2="8" y2="13"></line>
-          <line x1="16" y1="17" x2="8" y2="17"></line>
-          <polyline points="10 9 9 9 8 9"></polyline>
-        </svg>
-      ),
-      settings: (
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <circle cx="12" cy="12" r="3"></circle>
-          <path d="M12 1v6m0 6v6M5.64 5.64l4.24 4.24m4.24 4.24l4.24 4.24M1 12h6m6 0h6M5.64 18.36l4.24-4.24m4.24-4.24l4.24-4.24"></path>
-        </svg>
-      )
+      grid: <FontAwesomeIcon icon={faThLarge} />,
+      robot: <FontAwesomeIcon icon={faRobot} />,
+      users: <FontAwesomeIcon icon={faUsers} />,
+      chevron: <FontAwesomeIcon icon={faChevronRight} />,
+      chevronDown: <FontAwesomeIcon icon={faChevronDown} />,
+      chart: <FontAwesomeIcon icon={faChartBar} />,
+      contacts: <FontAwesomeIcon icon={faUserFriends} />,
+      megaphone: <FontAwesomeIcon icon={faBullhorn} />,
+      fileText: <FontAwesomeIcon icon={faFileAlt} />,
+      settings: <FontAwesomeIcon icon={faCog} />
     };
     return icons[iconType] || null;
   };
 
   // Check if we're on a specific bot submenu page (not just /bot/create)
+  // Detecta qualquer rota de bot exceto /bot/create
   const isBotSubmenuActive = location.pathname.startsWith('/bot') && 
     !location.pathname.match(/^\/bot\/create$/);
-  const isBotActive = location.pathname === '/bot/create';
+  // Item principal "Bot" fica ativo quando qualquer submenu está ativo
+  const isBotActive = isBotSubmenuActive;
   const isResultsActive = location.pathname.startsWith('/results');
   const isMarketingActive = location.pathname.startsWith('/marketing');
+  // Menu de Configurações está ativo para /settings, /users, /user-groups e /logs
+  const isSettingsActive = location.pathname.startsWith('/settings') || 
+    location.pathname === '/users' || 
+    location.pathname === '/user-groups' || 
+    location.pathname === '/logs';
 
   const handleLogout = () => {
     logout();
@@ -151,7 +157,11 @@ const Sidebar = ({ isOpen, onClose }) => {
                location.pathname.startsWith('/marketing/alerts') ? 'Alertas' :
                location.pathname.startsWith('/marketing/downsell') ? 'Downsell' :
                location.pathname.startsWith('/marketing') ? 'Marketing' :
+               location.pathname === '/users' ? 'Usuários' :
+               location.pathname === '/user-groups' ? 'Grupos de Usuários' :
                location.pathname === '/logs' ? 'Logs' :
+               location.pathname.startsWith('/settings/payment-cycles') ? 'Ciclos de Pagamento' :
+               location.pathname.startsWith('/settings/payment-gateways') ? 'Gateways de Pagamento' :
                'Página inicial'}
             </div>
           </div>
@@ -160,18 +170,32 @@ const Sidebar = ({ isOpen, onClose }) => {
         <div className="sidebar-section">
           <div className="sidebar-title">MENU</div>
           
-          <Link
-            to="/"
-            className={`sidebar-item ${location.pathname === '/' ? 'active' : ''}`}
-            onClick={onClose}
-          >
-            <span className="sidebar-icon">{getIcon('grid')}</span>
-            <span className="sidebar-label">Dashboard</span>
-          </Link>
+          {hasMenuAccess('dashboard') && (
+            <Link
+              to="/"
+              className={`sidebar-item ${location.pathname === '/' ? 'active' : ''}`}
+              onClick={onClose}
+            >
+              <span className="sidebar-icon">{getIcon('grid')}</span>
+              <span className="sidebar-label">Dashboard</span>
+            </Link>
+          )}
 
-          <div className="sidebar-menu-group">
+          {hasMenuAccess('billing') && (
+            <Link
+              to="/billing"
+              className={`sidebar-item ${isBillingActive ? 'active' : ''}`}
+              onClick={onClose}
+            >
+              <span className="sidebar-icon">{getIcon('chart')}</span>
+              <span className="sidebar-label">Faturamento</span>
+            </Link>
+          )}
+
+          {hasMenuAccess('bot') && (
+            <div className="sidebar-menu-group">
             <div
-              className={`sidebar-item ${isBotActive && !isBotSubmenuActive ? 'active' : ''} ${(botMenuOpen || isBotSubmenuActive) ? 'expanded' : ''}`}
+              className={`sidebar-item ${isBotSubmenuActive ? 'active' : ''} ${(botMenuOpen || isBotSubmenuActive) ? 'expanded' : ''}`}
               onClick={() => setBotMenuOpen(!botMenuOpen)}
             >
               <span className="sidebar-icon">{getIcon('robot')}</span>
@@ -253,71 +277,76 @@ const Sidebar = ({ isOpen, onClose }) => {
               </div>
             )}
           </div>
+          )}
 
-          <div className="sidebar-menu-group">
-            <div
-              className={`sidebar-item ${isResultsActive ? 'active' : ''} ${resultsMenuOpen ? 'expanded' : ''}`}
-              onClick={() => setResultsMenuOpen(!resultsMenuOpen)}
-            >
-              <span className="sidebar-icon">{getIcon('chart')}</span>
-              <span className="sidebar-label">Resultados</span>
-              <span className="sidebar-chevron">
-                {resultsMenuOpen ? getIcon('chevronDown') : getIcon('chevron')}
-              </span>
-            </div>
-            
-            {resultsMenuOpen && (
-              <div className="sidebar-submenu">
-                <Link
-                  to="/results/contacts"
-                  className={`sidebar-submenu-item ${location.pathname === '/results/contacts' ? 'active' : ''}`}
-                  onClick={onClose}
-                >
-                  Contatos
-                </Link>
+          {hasMenuAccess('results') && (
+            <div className="sidebar-menu-group">
+              <div
+                className={`sidebar-item ${isResultsActive ? 'active' : ''} ${resultsMenuOpen ? 'expanded' : ''}`}
+                onClick={() => setResultsMenuOpen(!resultsMenuOpen)}
+              >
+                <span className="sidebar-icon">{getIcon('chart')}</span>
+                <span className="sidebar-label">Resultados</span>
+                <span className="sidebar-chevron">
+                  {resultsMenuOpen ? getIcon('chevronDown') : getIcon('chevron')}
+                </span>
               </div>
-            )}
-          </div>
+              
+              {resultsMenuOpen && (
+                <div className="sidebar-submenu">
+                  <Link
+                    to="/results/contacts"
+                    className={`sidebar-submenu-item ${location.pathname === '/results/contacts' ? 'active' : ''}`}
+                    onClick={onClose}
+                  >
+                    Contatos
+                  </Link>
+                </div>
+              )}
+            </div>
+          )}
 
-          <div className="sidebar-menu-group">
-            <div
-              className={`sidebar-item ${isMarketingActive ? 'active' : ''} ${marketingMenuOpen ? 'expanded' : ''}`}
-              onClick={() => setMarketingMenuOpen(!marketingMenuOpen)}
-            >
-              <span className="sidebar-icon">{getIcon('megaphone')}</span>
-              <span className="sidebar-label">Marketing</span>
-              <span className="sidebar-chevron">
-                {marketingMenuOpen ? getIcon('chevronDown') : getIcon('chevron')}
-              </span>
-            </div>
-            
-            {marketingMenuOpen && (
-              <div className="sidebar-submenu">
-                <Link
-                  to="/marketing/alerts"
-                  className={`sidebar-submenu-item ${location.pathname === '/marketing/alerts' ? 'active' : ''}`}
-                  onClick={onClose}
-                >
-                  Alertas
-                </Link>
-                <Link
-                  to="/marketing/downsell"
-                  className={`sidebar-submenu-item ${location.pathname === '/marketing/downsell' ? 'active' : ''}`}
-                  onClick={onClose}
-                >
-                  Downsell
-                </Link>
+          {hasMenuAccess('marketing') && (
+            <div className="sidebar-menu-group">
+              <div
+                className={`sidebar-item ${isMarketingActive ? 'active' : ''} ${marketingMenuOpen ? 'expanded' : ''}`}
+                onClick={() => setMarketingMenuOpen(!marketingMenuOpen)}
+              >
+                <span className="sidebar-icon">{getIcon('megaphone')}</span>
+                <span className="sidebar-label">Marketing</span>
+                <span className="sidebar-chevron">
+                  {marketingMenuOpen ? getIcon('chevronDown') : getIcon('chevron')}
+                </span>
               </div>
-            )}
-          </div>
+              
+              {marketingMenuOpen && (
+                <div className="sidebar-submenu">
+                  <Link
+                    to="/marketing/alerts"
+                    className={`sidebar-submenu-item ${location.pathname === '/marketing/alerts' ? 'active' : ''}`}
+                    onClick={onClose}
+                  >
+                    Alertas
+                  </Link>
+                  <Link
+                    to="/marketing/downsell"
+                    className={`sidebar-submenu-item ${location.pathname === '/marketing/downsell' ? 'active' : ''}`}
+                    onClick={onClose}
+                  >
+                    Downsell
+                  </Link>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="sidebar-section">
           <div className="sidebar-title">CONFIGURAÇÕES</div>
-          {isAdmin && (
+          {isAdmin && hasMenuAccess('settings') && (
             <div className="sidebar-menu-group">
               <div
-                className={`sidebar-item ${location.pathname.startsWith('/settings') ? 'active' : ''} ${settingsMenuOpen ? 'expanded' : ''}`}
+                className={`sidebar-item ${isSettingsActive ? 'active' : ''} ${settingsMenuOpen ? 'expanded' : ''}`}
                 onClick={() => setSettingsMenuOpen(!settingsMenuOpen)}
               >
                 <span className="sidebar-icon">{getIcon('settings')}</span>
@@ -329,61 +358,90 @@ const Sidebar = ({ isOpen, onClose }) => {
               
               {settingsMenuOpen && (
                 <div className="sidebar-submenu">
-                  <Link
-                    to="/settings/payment-cycles"
-                    className={`sidebar-submenu-item ${location.pathname === '/settings/payment-cycles' ? 'active' : ''}`}
-                    onClick={onClose}
-                  >
-                    Ciclos de Pagamento
-                  </Link>
-                  <Link
-                    to="/settings/payment-gateways"
-                    className={`sidebar-submenu-item ${location.pathname === '/settings/payment-gateways' ? 'active' : ''}`}
-                    onClick={onClose}
-                  >
-                    Gateways de Pagamento
-                  </Link>
+                  {hasMenuAccess('settings') && (
+                    <>
+                      <Link
+                        to="/settings/payment-cycles"
+                        className={`sidebar-submenu-item ${location.pathname === '/settings/payment-cycles' ? 'active' : ''}`}
+                        onClick={onClose}
+                      >
+                        Ciclos de Pagamento
+                      </Link>
+                      <Link
+                        to="/settings/payment-gateways"
+                        className={`sidebar-submenu-item ${location.pathname === '/settings/payment-gateways' ? 'active' : ''}`}
+                        onClick={onClose}
+                      >
+                        Gateways de Pagamento
+                      </Link>
+                    </>
+                  )}
+                  {user?.user_type === 'super_admin' && (
+                    <>
+                      <Link
+                        to="/users"
+                        className={`sidebar-submenu-item ${location.pathname === '/users' ? 'active' : ''}`}
+                        onClick={onClose}
+                      >
+                        Usuários
+                      </Link>
+                      <Link
+                        to="/user-groups"
+                        className={`sidebar-submenu-item ${location.pathname === '/user-groups' ? 'active' : ''}`}
+                        onClick={onClose}
+                      >
+                        Grupos de Usuários
+                      </Link>
+                      <Link
+                        to="/logs"
+                        className={`sidebar-submenu-item ${location.pathname === '/logs' ? 'active' : ''}`}
+                        onClick={onClose}
+                      >
+                        Logs
+                      </Link>
+                    </>
+                  )}
                 </div>
               )}
             </div>
           )}
         </div>
 
-        <div className="sidebar-section">
-          <div className="sidebar-title">OUTROS</div>
-          {isAdmin && (
-            <>
-              <Link
-                to="/users"
-                className={`sidebar-item ${location.pathname === '/users' ? 'active' : ''}`}
-                onClick={onClose}
-              >
-                <span className="sidebar-icon">{getIcon('users')}</span>
-                <span className="sidebar-label">Usuários</span>
-              </Link>
-              <Link
-                to="/logs"
-                className={`sidebar-item ${location.pathname === '/logs' ? 'active' : ''}`}
-                onClick={onClose}
-              >
-                <span className="sidebar-icon">{getIcon('fileText')}</span>
-                <span className="sidebar-label">Logs</span>
-              </Link>
-            </>
-          )}
-        </div>
+        
 
         <div className="sidebar-footer">
-          <div className="sidebar-billing">
-            <div className="billing-header">
-              <span>Faturamento</span>
-              <span className="billing-value">R$ 3.935</span>
+          <Link to="/billing" className="sidebar-billing-link" onClick={onClose}>
+            <div className="sidebar-billing">
+              <div className="billing-header">
+                <span>Faturamento</span>
+                <span className="billing-value">
+                  {loadingBilling ? '...' : 
+                    new Intl.NumberFormat('pt-BR', {
+                      style: 'currency',
+                      currency: 'BRL',
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2
+                    }).format(monthlyBilling.total || 0)
+                  }
+                </span>
+              </div>
+              <div className="billing-progress">
+                <div 
+                  className="billing-progress-bar" 
+                  style={{ 
+                    width: `${Math.min((monthlyBilling.total / 100000) * 100, 100)}%` 
+                  }}
+                ></div>
+              </div>
+              <div className="billing-limit">
+                {monthlyBilling.transaction_count > 0 && (
+                  <span className="billing-transactions">
+                    {monthlyBilling.transaction_count} transação{monthlyBilling.transaction_count !== 1 ? 'ões' : ''} este mês
+                  </span>
+                )}
+              </div>
             </div>
-            <div className="billing-progress">
-              <div className="billing-progress-bar" style={{ width: '3%' }}></div>
-            </div>
-            <div className="billing-limit">R$ 100.000</div>
-          </div>
+          </Link>
 
           
 
@@ -391,11 +449,7 @@ const Sidebar = ({ isOpen, onClose }) => {
             onClick={handleLogout}
             className="sidebar-logout-btn"
           >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
-              <polyline points="16 17 21 12 16 7"></polyline>
-              <line x1="21" y1="12" x2="9" y2="12"></line>
-            </svg>
+            <FontAwesomeIcon icon={faSignOutAlt} />
             <span>Sair</span>
           </button>
         </div>

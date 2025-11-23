@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import userService from '../services/userService';
+import userGroupService from '../services/userGroupService';
 import './UserModal.css';
 
 const UserModal = ({ user, onClose, onSave }) => {
@@ -7,11 +8,18 @@ const UserModal = ({ user, onClose, onSave }) => {
     name: '',
     email: '',
     password: '',
+    user_type: 'user',
+    user_group_id: '',
     role: 'user',
     active: true
   });
+  const [userGroups, setUserGroups] = useState([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    loadUserGroups();
+  }, []);
 
   useEffect(() => {
     if (user) {
@@ -19,6 +27,8 @@ const UserModal = ({ user, onClose, onSave }) => {
         name: user.name || '',
         email: user.email || '',
         password: '',
+        user_type: user.user_type || 'user',
+        user_group_id: user.user_group_id || '',
         role: user.role || 'user',
         active: user.active !== undefined ? user.active : true
       });
@@ -27,11 +37,22 @@ const UserModal = ({ user, onClose, onSave }) => {
         name: '',
         email: '',
         password: '',
+        user_type: 'user',
+        user_group_id: '',
         role: 'user',
         active: true
       });
     }
   }, [user]);
+
+  const loadUserGroups = async () => {
+    try {
+      const groups = await userGroupService.getAllGroups();
+      setUserGroups(groups);
+    } catch (err) {
+      console.error('Erro ao carregar grupos:', err);
+    }
+  };
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -126,17 +147,35 @@ const UserModal = ({ user, onClose, onSave }) => {
           </div>
 
           <div className="form-group">
-            <label htmlFor="role">Nível de Acesso *</label>
+            <label htmlFor="user_type">Tipo de Usuário *</label>
             <select
-              id="role"
-              name="role"
-              value={formData.role}
+              id="user_type"
+              name="user_type"
+              value={formData.user_type}
               onChange={handleChange}
               required
             >
-              <option value="user">Usuário</option>
-              <option value="admin">Administrador</option>
+              <option value="user">Usuário (Somente Leitura)</option>
+              <option value="admin">Administrador (Leitura e Edição)</option>
             </select>
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="user_group_id">Grupo de Usuários</label>
+            <select
+              id="user_group_id"
+              name="user_group_id"
+              value={formData.user_group_id}
+              onChange={handleChange}
+            >
+              <option value="">Selecione um grupo</option>
+              {userGroups.map(group => (
+                <option key={group.id} value={group.id}>
+                  {group.name}
+                </option>
+              ))}
+            </select>
+            <small>O grupo define quais menus e bots o usuário pode acessar</small>
           </div>
 
           <div className="form-group checkbox-group">

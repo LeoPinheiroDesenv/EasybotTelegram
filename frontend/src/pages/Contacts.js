@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout';
 import contactService from '../services/contactService';
 import botService from '../services/botService';
+import groupManagementService from '../services/groupManagementService';
 import './Contacts.css';
 
 const Contacts = () => {
@@ -19,6 +20,15 @@ const Contacts = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedBot, setSelectedBot] = useState('');
   const [pagination, setPagination] = useState({ page: 1, limit: 10, total: 0, totalPages: 0 });
+  const [managingMember, setManagingMember] = useState(null);
+  const [memberStatuses, setMemberStatuses] = useState({});
+  const [showMemberModal, setShowMemberModal] = useState(false);
+  const [selectedContact, setSelectedContact] = useState(null);
+  const [memberAction, setMemberAction] = useState(null); // 'add' or 'remove'
+  const [memberReason, setMemberReason] = useState('');
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [contactHistory, setContactHistory] = useState(null);
+  const [loadingHistory, setLoadingHistory] = useState(false);
 
   useEffect(() => {
     loadBots();
@@ -122,6 +132,76 @@ const Contacts = () => {
       setTimeout(() => setSuccess(''), 3000);
     } catch (err) {
       setError(err.response?.data?.error || 'Erro ao bloquear contato');
+    }
+  };
+
+  const checkMemberStatus = async (contactId) => {
+    if (!botId) return;
+    
+    try {
+      setManagingMember(contactId);
+      const result = await groupManagementService.checkMemberStatus(botId, contactId);
+      setMemberStatuses(prev => ({
+        ...prev,
+        [contactId]: result
+      }));
+    } catch (err) {
+      setError(err.response?.data?.error || 'Erro ao verificar status do membro');
+    } finally {
+      setManagingMember(null);
+    }
+  };
+
+  const handleManageMember = (contact, action) => {
+    setSelectedContact(contact);
+    setMemberAction(action);
+    setMemberReason('');
+    setShowMemberModal(true);
+  };
+
+  const confirmManageMember = async () => {
+    if (!selectedContact || !botId) return;
+
+    try {
+      setManagingMember(selectedContact.id);
+      let result;
+      
+      if (memberAction === 'add') {
+        result = await groupManagementService.addMember(botId, selectedContact.id, memberReason || null);
+      } else {
+        result = await groupManagementService.removeMember(botId, selectedContact.id, memberReason || null);
+      }
+
+      setSuccess(result.message || `Membro ${memberAction === 'add' ? 'adicionado' : 'removido'} com sucesso!`);
+      setShowMemberModal(false);
+      setSelectedContact(null);
+      setMemberAction(null);
+      setMemberReason('');
+      
+      // Atualiza status do membro
+      await checkMemberStatus(selectedContact.id);
+      
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (err) {
+      setError(err.response?.data?.error || `Erro ao ${memberAction === 'add' ? 'adicionar' : 'remover'} membro`);
+    } finally {
+      setManagingMember(null);
+    }
+  };
+
+  const loadContactHistory = async (contactId) => {
+    if (!botId) return;
+    
+    try {
+      setLoadingHistory(true);
+      setShowHistoryModal(true);
+      const history = await groupManagementService.getContactHistory(botId, contactId);
+      setContactHistory(history);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Erro ao carregar histórico');
+      setShowHistoryModal(false);
+    } finally {
+      setLoadingHistory(false);
     }
   };
 
@@ -260,6 +340,47 @@ const Contacts = () => {
                             >
                               Detalhes
                             </button>
+                            {memberStatuses[contact.id] && (
+                              <span className={`member-status-badge ${memberStatuses[contact.id].is_member ? 'member' : 'not-member'}`}>
+                                {memberStatuses[contact.id].is_member ? '✓ No grupo' : '✗ Fora'}
+                              </span>
+                            )}
+                            {managingMember === contact.id ? (
+                              <span className="loading-spinner">...</span>
+                            ) : (
+                              <>
+                            <button
+                              onClick={() => checkMemberStatus(contact.id)}
+                              className="btn-check-status"
+                              title="Verificar status no grupo"
+                            >
+                              Verificar
+                            </button>
+                            <button
+                              onClick={() => loadContactHistory(contact.id)}
+                              className="btn-history"
+                              title="Ver histórico de ações"
+                            >
+                              Histórico
+                            </button>
+                                <button
+                                  onClick={() => handleManageMember(contact, 'add')}
+                                  className="btn-add-member"
+                                  title="Adicionar ao grupo"
+                                  disabled={!botId}
+                                >
+                                  + Grupo
+                                </button>
+                                <button
+                                  onClick={() => handleManageMember(contact, 'remove')}
+                                  className="btn-remove-member"
+                                  title="Remover do grupo"
+                                  disabled={!botId}
+                                >
+                                  - Grupo
+                                </button>
+                              </>
+                            )}
                             <button
                               onClick={() => handleBlock(contact.id)}
                               className="btn-block"
@@ -390,6 +511,60 @@ const Contacts = () => {
             </div>
           </div>
         </div>
+
+        {/* Modal de Gerenciamento de Membro */}
+        {showMemberModal && selectedContact && (
+          <div className="modal-overlay" onClick={() => setShowMemberModal(false)}>
+            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+              <div className="modal-header">
+                <h2>
+                  {memberAction === 'add' ? 'Adicionar ao Grupo' : 'Remover do Grupo'}
+                </h2>
+                <button className="modal-close" onClick={() => setShowMemberModal(false)}>
+                  ×
+                </button>
+              </div>
+              <div className="modal-body">
+                <p>
+                  {memberAction === 'add' 
+                    ? `Deseja adicionar ${selectedContact.first_name || selectedContact.username || 'este contato'} ao grupo?`
+                    : `Deseja remover ${selectedContact.first_name || selectedContact.username || 'este contato'} do grupo?`
+                  }
+                </p>
+                <div className="form-group">
+                  <label htmlFor="memberReason">Motivo (opcional):</label>
+                  <textarea
+                    id="memberReason"
+                    value={memberReason}
+                    onChange={(e) => setMemberReason(e.target.value)}
+                    placeholder="Digite o motivo da ação..."
+                    rows="3"
+                    maxLength="500"
+                  />
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button
+                  className="btn-cancel"
+                  onClick={() => setShowMemberModal(false)}
+                  disabled={managingMember === selectedContact.id}
+                >
+                  Cancelar
+                </button>
+                <button
+                  className={`btn-confirm ${memberAction === 'add' ? 'btn-add' : 'btn-remove'}`}
+                  onClick={confirmManageMember}
+                  disabled={managingMember === selectedContact.id}
+                >
+                  {managingMember === selectedContact.id 
+                    ? 'Processando...' 
+                    : (memberAction === 'add' ? 'Adicionar' : 'Remover')
+                  }
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </Layout>
   );

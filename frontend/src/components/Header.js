@@ -1,5 +1,15 @@
 import React, { useContext, useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { 
+  faBars, 
+  faSun, 
+  faComment, 
+  faBell, 
+  faRobot,
+  faPlus,
+  faTimes
+} from '@fortawesome/free-solid-svg-icons';
 import { AuthContext } from '../contexts/AuthContext';
 import botService from '../services/botService';
 import './Header.css';
@@ -69,11 +79,7 @@ const Header = ({ onMenuClick }) => {
     <div className="header">
       <div className="header-left">
         <button className="mobile-menu-btn" onClick={onMenuClick} aria-label="Menu">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <line x1="3" y1="12" x2="21" y2="12"></line>
-            <line x1="3" y1="6" x2="21" y2="6"></line>
-            <line x1="3" y1="18" x2="21" y2="18"></line>
-          </svg>
+          <FontAwesomeIcon icon={faBars} />
         </button>
         <div className="header-logo">
           <div className="logo-circles">
@@ -100,28 +106,13 @@ const Header = ({ onMenuClick }) => {
 
       <div className="header-right">
         <button className="header-icon-btn" title="Tema">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <circle cx="12" cy="12" r="5"></circle>
-            <line x1="12" y1="1" x2="12" y2="3"></line>
-            <line x1="12" y1="21" x2="12" y2="23"></line>
-            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
-            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
-            <line x1="1" y1="12" x2="3" y2="12"></line>
-            <line x1="21" y1="12" x2="23" y2="12"></line>
-            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
-            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
-          </svg>
+          <FontAwesomeIcon icon={faSun} />
         </button>
         <button className="header-icon-btn" title="Chat">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
-          </svg>
+          <FontAwesomeIcon icon={faComment} />
         </button>
         <button className="header-icon-btn" title="Notificações">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
-            <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
-          </svg>
+          <FontAwesomeIcon icon={faBell} />
         </button>
         <div className="header-profile-menu">
           <button 
@@ -129,12 +120,7 @@ const Header = ({ onMenuClick }) => {
             onClick={() => setShowBotMenu(!showBotMenu)}
             title="Meus bots"
           >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <rect x="6" y="4" width="12" height="16" rx="2"></rect>
-              <circle cx="10" cy="10" r="2"></circle>
-              <circle cx="14" cy="10" r="2"></circle>
-              <path d="M9 16h6"></path>
-            </svg>
+            <FontAwesomeIcon icon={faRobot} />
           </button>
 
           {showBotMenu && (
@@ -150,7 +136,7 @@ const Header = ({ onMenuClick }) => {
                     className="close-btn"
                     onClick={() => setShowBotMenu(false)}
                   >
-                    ×
+                    <FontAwesomeIcon icon={faTimes} />
                   </button>
                 </div>
 
@@ -173,12 +159,7 @@ const Header = ({ onMenuClick }) => {
                           onClick={() => handleBotSelect(bot.id)}
                         >
                           <div className="bot-menu-icon">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#9333ea" strokeWidth="2">
-                              <rect x="6" y="4" width="12" height="16" rx="2"></rect>
-                              <circle cx="10" cy="10" r="2"></circle>
-                              <circle cx="14" cy="10" r="2"></circle>
-                              <path d="M9 16h6"></path>
-                            </svg>
+                            <FontAwesomeIcon icon={faRobot} style={{ color: '#9333ea' }} />
                           </div>
                           <span className="bot-menu-name">{bot.name}</span>
                           {location.pathname === `/bot/update/${bot.id}` && (
@@ -189,10 +170,7 @@ const Header = ({ onMenuClick }) => {
                     </div>
                     <div className="dropdown-footer">
                       <button onClick={handleCreateBot} className="btn-create-new-menu">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <line x1="12" y1="5" x2="12" y2="19"></line>
-                          <line x1="5" y1="12" x2="19" y2="12"></line>
-                        </svg>
+                        <FontAwesomeIcon icon={faPlus} />
                         Criar novo bot
                       </button>
                     </div>

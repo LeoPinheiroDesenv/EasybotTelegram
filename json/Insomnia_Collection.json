@@ -1,7 +1,7 @@
 {
   "_type": "export",
   "__export_format": 4,
-  "__export_date": "2025-11-07T04:00:00.000Z",
+  "__export_date": "2025-01-27T00:00:00.000Z",
   "__export_source": "insomnia.desktop.app:v2023.5.8",
   "resources": [
     {
@@ -9,12 +9,38 @@
       "_type": "environment",
       "name": "Base Environment",
       "data": {
-        "base_url": "http://localhost:5000/api",
+        "base_url": "http://172.18.0.3:8000/api",
         "token": ""
       },
       "color": null,
       "isPrivate": false,
       "metaSortKey": 1000000000000
+    },
+    {
+      "_id": "req_env_production",
+      "_type": "environment",
+      "name": "Produção",
+      "data": {
+        "base_url": "http://api.easypagamentos.com/api",
+        "jwt": "",
+        "token": ""
+      },
+      "color": "#ff6b6b",
+      "isPrivate": false,
+      "metaSortKey": 1000000001000
+    },
+    {
+      "_id": "req_env_dev",
+      "_type": "environment",
+      "name": "Dev",
+      "data": {
+        "base_url": "http://0.0.0.0:8000/api",
+        "jwt": "",
+        "token": ""
+      },
+      "color": "#4ecdc4",
+      "isPrivate": false,
+      "metaSortKey": 1000000002000
     },
     {
       "_id": "fld_auth",
@@ -240,16 +266,10 @@
       "_type": "request",
       "name": "Get Bot by ID",
       "description": "Obter bot por ID",
-      "url": "{{ base_url }}/bots/:id",
+      "url": "{{ base_url }}/bots/1",
       "method": "GET",
       "body": {},
-      "parameters": [
-        {
-          "name": "id",
-          "value": "1",
-          "description": "Bot ID"
-        }
-      ],
+      "parameters": [],
       "headers": [
         {
           "name": "Authorization",
@@ -305,19 +325,13 @@
       "_type": "request",
       "name": "Update Bot",
       "description": "Atualizar bot existente",
-      "url": "{{ base_url }}/bots/:id",
+      "url": "{{ base_url }}/bots/1",
       "method": "PUT",
       "body": {
         "mimeType": "application/json",
         "text": "{\n  \"name\": \"Bot Atualizado\",\n  \"token\": \"123456789:ABCdefGHIjklMNOpqrsTUVwxyz\",\n  \"telegram_group_id\": \"@meugrupo\"\n}"
       },
-      "parameters": [
-        {
-          "name": "id",
-          "value": "1",
-          "description": "Bot ID"
-        }
-      ],
+      "parameters": [],
       "headers": [
         {
           "name": "Authorization",
@@ -344,16 +358,10 @@
       "_type": "request",
       "name": "Delete Bot",
       "description": "Excluir bot",
-      "url": "{{ base_url }}/bots/:id",
+      "url": "{{ base_url }}/bots/1",
       "method": "DELETE",
       "body": {},
-      "parameters": [
-        {
-          "name": "id",
-          "value": "1",
-          "description": "Bot ID"
-        }
-      ],
+      "parameters": [],
       "headers": [
         {
           "name": "Authorization",
@@ -409,16 +417,10 @@
       "_type": "request",
       "name": "Initialize Bot",
       "description": "Inicializar bot (iniciar Telegram bot)",
-      "url": "{{ base_url }}/bots/:id/initialize",
+      "url": "{{ base_url }}/bots/1/initialize",
       "method": "POST",
       "body": {},
-      "parameters": [
-        {
-          "name": "id",
-          "value": "1",
-          "description": "Bot ID"
-        }
-      ],
+      "parameters": [],
       "headers": [
         {
           "name": "Authorization",
@@ -441,16 +443,10 @@
       "_type": "request",
       "name": "Stop Bot",
       "description": "Parar bot (parar Telegram bot)",
-      "url": "{{ base_url }}/bots/:id/stop",
+      "url": "{{ base_url }}/bots/1/stop",
       "method": "POST",
       "body": {},
-      "parameters": [
-        {
-          "name": "id",
-          "value": "1",
-          "description": "Bot ID"
-        }
-      ],
+      "parameters": [],
       "headers": [
         {
           "name": "Authorization",
@@ -473,16 +469,10 @@
       "_type": "request",
       "name": "Get Bot Status",
       "description": "Obter status do bot",
-      "url": "{{ base_url }}/bots/:id/status",
+      "url": "{{ base_url }}/bots/1/status",
       "method": "GET",
       "body": {},
-      "parameters": [
-        {
-          "name": "id",
-          "value": "1",
-          "description": "Bot ID"
-        }
-      ],
+      "parameters": [],
       "headers": [
         {
           "name": "Authorization",
@@ -499,6 +489,222 @@
       "settingRebuildPath": true,
       "settingFollowRedirects": "global",
       "_parentId": "fld_bots"
+    },
+    {
+      "_id": "fld_bot_commands",
+      "_type": "request_group",
+      "name": "Bot Commands",
+      "description": "Endpoints para gerenciamento de comandos personalizados dos bots",
+      "parentId": null,
+      "environment": {},
+      "environmentPropertyOrder": null,
+      "metaSortKey": 2000000009000
+    },
+    {
+      "_id": "req_get_bot_commands",
+      "_type": "request",
+      "name": "Get Bot Commands",
+      "description": "Listar comandos personalizados de um bot",
+      "url": "{{ base_url }}/bots/1/commands",
+      "method": "GET",
+      "body": {},
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ token }}"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": 2000000009000,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_parentId": "fld_bot_commands"
+    },
+    {
+      "_id": "req_create_bot_command",
+      "_type": "request",
+      "name": "Create Bot Command",
+      "description": "Criar novo comando personalizado para um bot",
+      "url": "{{ base_url }}/bots/1/commands",
+      "method": "POST",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"command\": \"info\",\n  \"response\": \"Este é um bot de exemplo criado com EasyBot Telegram!\",\n  \"description\": \"Mostra informações sobre o bot\",\n  \"active\": true\n}"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ token }}"
+        },
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": 2000000010000,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_parentId": "fld_bot_commands"
+    },
+    {
+      "_id": "req_update_bot_command",
+      "_type": "request",
+      "name": "Update Bot Command",
+      "description": "Atualizar comando personalizado de um bot",
+      "url": "{{ base_url }}/bots/1/commands/1",
+      "method": "PUT",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"response\": \"Nova resposta do comando\",\n  \"description\": \"Nova descrição\",\n  \"active\": true\n}"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ token }}"
+        },
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": 2000000011000,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_parentId": "fld_bot_commands"
+    },
+    {
+      "_id": "req_delete_bot_command",
+      "_type": "request",
+      "name": "Delete Bot Command",
+      "description": "Excluir comando personalizado de um bot",
+      "url": "{{ base_url }}/bots/1/commands/1",
+      "method": "DELETE",
+      "body": {},
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ token }}"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": 2000000012000,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_parentId": "fld_bot_commands"
+    },
+    {
+      "_id": "fld_telegram_webhook",
+      "_type": "request_group",
+      "name": "Telegram Webhook",
+      "description": "Endpoints para configuração de webhooks do Telegram",
+      "parentId": null,
+      "environment": {},
+      "environmentPropertyOrder": null,
+      "metaSortKey": 2000000013000
+    },
+    {
+      "_id": "req_get_webhook_info",
+      "_type": "request",
+      "name": "Get Webhook Info",
+      "description": "Obter informações do webhook configurado para um bot",
+      "url": "{{ base_url }}/telegram/webhook/1/info",
+      "method": "GET",
+      "body": {},
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ token }}"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": 2000000013000,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_parentId": "fld_telegram_webhook"
+    },
+    {
+      "_id": "req_set_webhook",
+      "_type": "request",
+      "name": "Set Webhook",
+      "description": "Configurar webhook para um bot (requer HTTPS)",
+      "url": "{{ base_url }}/telegram/webhook/1/set",
+      "method": "POST",
+      "body": {},
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ token }}"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": 2000000014000,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_parentId": "fld_telegram_webhook"
+    },
+    {
+      "_id": "req_delete_webhook",
+      "_type": "request",
+      "name": "Delete Webhook",
+      "description": "Remover webhook de um bot",
+      "url": "{{ base_url }}/telegram/webhook/1/delete",
+      "method": "POST",
+      "body": {},
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ token }}"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": 2000000015000,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_parentId": "fld_telegram_webhook"
     },
     {
       "_id": "fld_contacts",
@@ -593,16 +799,10 @@
       "_type": "request",
       "name": "Get Contact by ID",
       "description": "Obter contato por ID",
-      "url": "{{ base_url }}/contacts/:id",
+      "url": "{{ base_url }}/contacts/1",
       "method": "GET",
       "body": {},
-      "parameters": [
-        {
-          "name": "id",
-          "value": "1",
-          "description": "Contact ID"
-        }
-      ],
+      "parameters": [],
       "headers": [
         {
           "name": "Authorization",
@@ -658,19 +858,13 @@
       "_type": "request",
       "name": "Update Contact",
       "description": "Atualizar contato",
-      "url": "{{ base_url }}/contacts/:id",
+      "url": "{{ base_url }}/contacts/1",
       "method": "PUT",
       "body": {
         "mimeType": "application/json",
         "text": "{\n  \"username\": \"usuario_atualizado\",\n  \"first_name\": \"Nome Atualizado\"\n}"
       },
-      "parameters": [
-        {
-          "name": "id",
-          "value": "1",
-          "description": "Contact ID"
-        }
-      ],
+      "parameters": [],
       "headers": [
         {
           "name": "Authorization",
@@ -697,16 +891,10 @@
       "_type": "request",
       "name": "Delete Contact",
       "description": "Excluir contato",
-      "url": "{{ base_url }}/contacts/:id",
+      "url": "{{ base_url }}/contacts/1",
       "method": "DELETE",
       "body": {},
-      "parameters": [
-        {
-          "name": "id",
-          "value": "1",
-          "description": "Contact ID"
-        }
-      ],
+      "parameters": [],
       "headers": [
         {
           "name": "Authorization",
@@ -715,38 +903,6 @@
       ],
       "authentication": {},
       "metaSortKey": 3000000006000,
-      "isPrivate": false,
-      "settingStoreCookies": true,
-      "settingSendCookies": true,
-      "settingDisableRenderRequestBody": false,
-      "settingEncodeUrl": true,
-      "settingRebuildPath": true,
-      "settingFollowRedirects": "global",
-      "_parentId": "fld_contacts"
-    },
-    {
-      "_id": "req_block_contact",
-      "_type": "request",
-      "name": "Block Contact",
-      "description": "Bloquear contato",
-      "url": "{{ base_url }}/contacts/:id/block",
-      "method": "POST",
-      "body": {},
-      "parameters": [
-        {
-          "name": "id",
-          "value": "1",
-          "description": "Contact ID"
-        }
-      ],
-      "headers": [
-        {
-          "name": "Authorization",
-          "value": "Bearer {{ token }}"
-        }
-      ],
-      "authentication": {},
-      "metaSortKey": 3000000007000,
       "isPrivate": false,
       "settingStoreCookies": true,
       "settingSendCookies": true,
@@ -797,16 +953,10 @@
       "_type": "request",
       "name": "Get Payment Plan by ID",
       "description": "Obter plano de pagamento por ID",
-      "url": "{{ base_url }}/payment-plans/:id",
+      "url": "{{ base_url }}/payment-plans/1",
       "method": "GET",
       "body": {},
-      "parameters": [
-        {
-          "name": "id",
-          "value": "1",
-          "description": "Payment Plan ID"
-        }
-      ],
+      "parameters": [],
       "headers": [
         {
           "name": "Authorization",
@@ -862,19 +1012,13 @@
       "_type": "request",
       "name": "Update Payment Plan",
       "description": "Atualizar plano de pagamento",
-      "url": "{{ base_url }}/payment-plans/:id",
+      "url": "{{ base_url }}/payment-plans/1",
       "method": "PUT",
       "body": {
         "mimeType": "application/json",
         "text": "{\n  \"bot_id\": 1,\n  \"title\": \"Plano Mensal Atualizado\",\n  \"price\": 39.90,\n  \"charge_period\": \"month\",\n  \"cycle\": 1,\n  \"payment_cycle_id\": 1,\n  \"active\": true\n}"
       },
-      "parameters": [
-        {
-          "name": "id",
-          "value": "1",
-          "description": "Payment Plan ID"
-        }
-      ],
+      "parameters": [],
       "headers": [
         {
           "name": "Authorization",
@@ -901,16 +1045,10 @@
       "_type": "request",
       "name": "Delete Payment Plan",
       "description": "Excluir plano de pagamento",
-      "url": "{{ base_url }}/payment-plans/:id",
+      "url": "{{ base_url }}/payment-plans/1",
       "method": "DELETE",
       "body": {},
-      "parameters": [
-        {
-          "name": "id",
-          "value": "1",
-          "description": "Payment Plan ID"
-        }
-      ],
+      "parameters": [],
       "headers": [
         {
           "name": "Authorization",
@@ -927,6 +1065,448 @@
       "settingRebuildPath": true,
       "settingFollowRedirects": "global",
       "_parentId": "fld_payment_plans"
+    },
+    {
+      "_id": "fld_payment_cycles",
+      "_type": "request_group",
+      "name": "Payment Cycles",
+      "description": "Endpoints para gerenciamento de ciclos de pagamento",
+      "parentId": null,
+      "environment": {},
+      "environmentPropertyOrder": null,
+      "metaSortKey": 4500000000000
+    },
+    {
+      "_id": "req_get_all_payment_cycles",
+      "_type": "request",
+      "name": "Get All Payment Cycles",
+      "description": "Listar todos os ciclos de pagamento",
+      "url": "{{ base_url }}/payment-cycles",
+      "method": "GET",
+      "body": {},
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ token }}"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": 4500000000000,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_parentId": "fld_payment_cycles"
+    },
+    {
+      "_id": "req_get_payment_cycle_by_id",
+      "_type": "request",
+      "name": "Get Payment Cycle by ID",
+      "description": "Obter ciclo de pagamento por ID",
+      "url": "{{ base_url }}/payment-cycles/1",
+      "method": "GET",
+      "body": {},
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ token }}"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": 4500000001000,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_parentId": "fld_payment_cycles"
+    },
+    {
+      "_id": "req_create_payment_cycle",
+      "_type": "request",
+      "name": "Create Payment Cycle",
+      "description": "Criar novo ciclo de pagamento",
+      "url": "{{ base_url }}/payment-cycles",
+      "method": "POST",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"name\": \"Mensal\",\n  \"days\": 30,\n  \"description\": \"Ciclo de pagamento mensal\",\n  \"is_active\": true\n}"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ token }}"
+        },
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": 4500000002000,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_parentId": "fld_payment_cycles"
+    },
+    {
+      "_id": "req_update_payment_cycle",
+      "_type": "request",
+      "name": "Update Payment Cycle",
+      "description": "Atualizar ciclo de pagamento",
+      "url": "{{ base_url }}/payment-cycles/1",
+      "method": "PUT",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"name\": \"Mensal Atualizado\",\n  \"days\": 30,\n  \"description\": \"Ciclo de pagamento mensal atualizado\",\n  \"is_active\": true\n}"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ token }}"
+        },
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": 4500000003000,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_parentId": "fld_payment_cycles"
+    },
+    {
+      "_id": "req_delete_payment_cycle",
+      "_type": "request",
+      "name": "Delete Payment Cycle",
+      "description": "Excluir ciclo de pagamento",
+      "url": "{{ base_url }}/payment-cycles/1",
+      "method": "DELETE",
+      "body": {},
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ token }}"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": 4500000004000,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_parentId": "fld_payment_cycles"
+    },
+    {
+      "_id": "fld_payments",
+      "_type": "request_group",
+      "name": "Payments",
+      "description": "Endpoints para processamento de pagamentos",
+      "parentId": null,
+      "environment": {},
+      "environmentPropertyOrder": null,
+      "metaSortKey": 4600000000000
+    },
+    {
+      "_id": "req_process_pix",
+      "_type": "request",
+      "name": "Process PIX Payment",
+      "description": "Processar pagamento via PIX",
+      "url": "{{ base_url }}/payments/pix",
+      "method": "POST",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"bot_id\": 1,\n  \"payment_plan_id\": 1,\n  \"contact_id\": 1,\n  \"amount\": 29.90\n}"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ token }}"
+        },
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": 4600000000000,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_parentId": "fld_payments"
+    },
+    {
+      "_id": "req_process_credit_card",
+      "_type": "request",
+      "name": "Process Credit Card Payment",
+      "description": "Processar pagamento via cartão de crédito",
+      "url": "{{ base_url }}/payments/credit-card",
+      "method": "POST",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"bot_id\": 1,\n  \"payment_plan_id\": 1,\n  \"contact_id\": 1,\n  \"amount\": 29.90,\n  \"card_token\": \"card_token_here\"\n}"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ token }}"
+        },
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": 4600000001000,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_parentId": "fld_payments"
+    },
+    {
+      "_id": "req_mercadopago_webhook",
+      "_type": "request",
+      "name": "Mercado Pago Webhook",
+      "description": "Webhook do Mercado Pago",
+      "url": "{{ base_url }}/payments/webhook/mercadopago",
+      "method": "POST",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"type\": \"payment\",\n  \"data\": {\n    \"id\": \"123456789\"\n  }\n}"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": 4600000002000,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_parentId": "fld_payments"
+    },
+    {
+      "_id": "req_stripe_webhook",
+      "_type": "request",
+      "name": "Stripe Webhook",
+      "description": "Webhook do Stripe",
+      "url": "{{ base_url }}/payments/webhook/stripe",
+      "method": "POST",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"type\": \"payment_intent.succeeded\",\n  \"data\": {\n    \"object\": {\n      \"id\": \"pi_123456789\"\n    }\n  }\n}"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": 4600000003000,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_parentId": "fld_payments"
+    },
+    {
+      "_id": "fld_payment_gateway_configs",
+      "_type": "request_group",
+      "name": "Payment Gateway Configs",
+      "description": "Endpoints para configuração de gateways de pagamento",
+      "parentId": null,
+      "environment": {},
+      "environmentPropertyOrder": null,
+      "metaSortKey": 4700000000000
+    },
+    {
+      "_id": "req_get_all_payment_gateway_configs",
+      "_type": "request",
+      "name": "Get All Payment Gateway Configs",
+      "description": "Listar todas as configurações de gateway",
+      "url": "{{ base_url }}/payment-gateway-configs",
+      "method": "GET",
+      "body": {},
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ token }}"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": 4700000000000,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_parentId": "fld_payment_gateway_configs"
+    },
+    {
+      "_id": "req_get_payment_gateway_config_by_id",
+      "_type": "request",
+      "name": "Get Payment Gateway Config by ID",
+      "description": "Obter configuração de gateway por ID",
+      "url": "{{ base_url }}/payment-gateway-configs/1",
+      "method": "GET",
+      "body": {},
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ token }}"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": 4700000001000,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_parentId": "fld_payment_gateway_configs"
+    },
+    {
+      "_id": "req_create_payment_gateway_config",
+      "_type": "request",
+      "name": "Create Payment Gateway Config",
+      "description": "Criar nova configuração de gateway",
+      "url": "{{ base_url }}/payment-gateway-configs",
+      "method": "POST",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"bot_id\": 1,\n  \"gateway\": \"mercadopago\",\n  \"environment\": \"sandbox\",\n  \"api_key\": \"your_api_key\",\n  \"api_secret\": \"your_api_secret\",\n  \"active\": true\n}"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ token }}"
+        },
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": 4700000002000,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_parentId": "fld_payment_gateway_configs"
+    },
+    {
+      "_id": "req_update_payment_gateway_config",
+      "_type": "request",
+      "name": "Update Payment Gateway Config",
+      "description": "Atualizar configuração de gateway",
+      "url": "{{ base_url }}/payment-gateway-configs/1",
+      "method": "PUT",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"bot_id\": 1,\n  \"gateway\": \"mercadopago\",\n  \"environment\": \"production\",\n  \"api_key\": \"updated_api_key\",\n  \"active\": true\n}"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ token }}"
+        },
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": 4700000003000,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_parentId": "fld_payment_gateway_configs"
+    },
+    {
+      "_id": "req_delete_payment_gateway_config",
+      "_type": "request",
+      "name": "Delete Payment Gateway Config",
+      "description": "Excluir configuração de gateway",
+      "url": "{{ base_url }}/payment-gateway-configs/1",
+      "method": "DELETE",
+      "body": {},
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ token }}"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": 4700000004000,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_parentId": "fld_payment_gateway_configs"
     },
     {
       "_id": "fld_users",
@@ -969,16 +1549,10 @@
       "_type": "request",
       "name": "Get User by ID",
       "description": "Obter usuário por ID (Admin only)",
-      "url": "{{ base_url }}/users/:id",
+      "url": "{{ base_url }}/users/1",
       "method": "GET",
       "body": {},
-      "parameters": [
-        {
-          "name": "id",
-          "value": "1",
-          "description": "User ID"
-        }
-      ],
+      "parameters": [],
       "headers": [
         {
           "name": "Authorization",
@@ -1034,19 +1608,13 @@
       "_type": "request",
       "name": "Update User",
       "description": "Atualizar usuário (Admin only)",
-      "url": "{{ base_url }}/users/:id",
+      "url": "{{ base_url }}/users/1",
       "method": "PUT",
       "body": {
         "mimeType": "application/json",
         "text": "{\n  \"name\": \"Usuário Atualizado\",\n  \"email\": \"usuario_atualizado@example.com\",\n  \"role\": \"admin\"\n}"
       },
-      "parameters": [
-        {
-          "name": "id",
-          "value": "1",
-          "description": "User ID"
-        }
-      ],
+      "parameters": [],
       "headers": [
         {
           "name": "Authorization",
@@ -1073,16 +1641,10 @@
       "_type": "request",
       "name": "Delete User",
       "description": "Excluir usuário (Admin only)",
-      "url": "{{ base_url }}/users/:id",
+      "url": "{{ base_url }}/users/1",
       "method": "DELETE",
       "body": {},
-      "parameters": [
-        {
-          "name": "id",
-          "value": "1",
-          "description": "User ID"
-        }
-      ],
+      "parameters": [],
       "headers": [
         {
           "name": "Authorization",
@@ -1157,16 +1719,10 @@
       "_type": "request",
       "name": "Get Log by ID",
       "description": "Obter log por ID (Admin only)",
-      "url": "{{ base_url }}/logs/:id",
+      "url": "{{ base_url }}/logs/1",
       "method": "GET",
       "body": {},
-      "parameters": [
-        {
-          "name": "id",
-          "value": "1",
-          "description": "Log ID"
-        }
-      ],
+      "parameters": [],
       "headers": [
         {
           "name": "Authorization",
@@ -1185,209 +1741,11 @@
       "_parentId": "fld_logs"
     },
     {
-      "_id": "fld_payment_cycles",
-      "_type": "request_group",
-      "name": "Payment Cycles",
-      "description": "Endpoints para gerenciamento de ciclos de pagamento",
-      "parentId": null,
-      "environment": {},
-      "environmentPropertyOrder": null,
-      "metaSortKey": 4500000000000
-    },
-    {
-      "_id": "req_get_all_payment_cycles",
-      "_type": "request",
-      "name": "Get All Payment Cycles",
-      "description": "Listar todos os ciclos de pagamento",
-      "url": "{{ base_url }}/payment-cycles",
-      "method": "GET",
-      "body": {},
-      "parameters": [],
-      "headers": [
-        {
-          "name": "Authorization",
-          "value": "Bearer {{ token }}"
-        }
-      ],
-      "authentication": {},
-      "metaSortKey": 4500000000000,
-      "isPrivate": false,
-      "settingStoreCookies": true,
-      "settingSendCookies": true,
-      "settingDisableRenderRequestBody": false,
-      "settingEncodeUrl": true,
-      "settingRebuildPath": true,
-      "settingFollowRedirects": "global",
-      "_parentId": "fld_payment_cycles"
-    },
-    {
-      "_id": "req_get_active_payment_cycles",
-      "_type": "request",
-      "name": "Get Active Payment Cycles",
-      "description": "Listar ciclos de pagamento ativos",
-      "url": "{{ base_url }}/payment-cycles/active",
-      "method": "GET",
-      "body": {},
-      "parameters": [],
-      "headers": [
-        {
-          "name": "Authorization",
-          "value": "Bearer {{ token }}"
-        }
-      ],
-      "authentication": {},
-      "metaSortKey": 4500000001000,
-      "isPrivate": false,
-      "settingStoreCookies": true,
-      "settingSendCookies": true,
-      "settingDisableRenderRequestBody": false,
-      "settingEncodeUrl": true,
-      "settingRebuildPath": true,
-      "settingFollowRedirects": "global",
-      "_parentId": "fld_payment_cycles"
-    },
-    {
-      "_id": "req_get_payment_cycle_by_id",
-      "_type": "request",
-      "name": "Get Payment Cycle by ID",
-      "description": "Obter ciclo de pagamento por ID",
-      "url": "{{ base_url }}/payment-cycles/:id",
-      "method": "GET",
-      "body": {},
-      "parameters": [
-        {
-          "name": "id",
-          "value": "1",
-          "description": "Payment Cycle ID"
-        }
-      ],
-      "headers": [
-        {
-          "name": "Authorization",
-          "value": "Bearer {{ token }}"
-        }
-      ],
-      "authentication": {},
-      "metaSortKey": 4500000002000,
-      "isPrivate": false,
-      "settingStoreCookies": true,
-      "settingSendCookies": true,
-      "settingDisableRenderRequestBody": false,
-      "settingEncodeUrl": true,
-      "settingRebuildPath": true,
-      "settingFollowRedirects": "global",
-      "_parentId": "fld_payment_cycles"
-    },
-    {
-      "_id": "req_create_payment_cycle",
-      "_type": "request",
-      "name": "Create Payment Cycle",
-      "description": "Criar novo ciclo de pagamento (Admin only)",
-      "url": "{{ base_url }}/payment-cycles",
-      "method": "POST",
-      "body": {
-        "mimeType": "application/json",
-        "text": "{\n  \"name\": \"Mensal\",\n  \"days\": 30,\n  \"description\": \"Ciclo de pagamento mensal\",\n  \"is_active\": true\n}"
-      },
-      "parameters": [],
-      "headers": [
-        {
-          "name": "Authorization",
-          "value": "Bearer {{ token }}"
-        },
-        {
-          "name": "Content-Type",
-          "value": "application/json"
-        }
-      ],
-      "authentication": {},
-      "metaSortKey": 4500000003000,
-      "isPrivate": false,
-      "settingStoreCookies": true,
-      "settingSendCookies": true,
-      "settingDisableRenderRequestBody": false,
-      "settingEncodeUrl": true,
-      "settingRebuildPath": true,
-      "settingFollowRedirects": "global",
-      "_parentId": "fld_payment_cycles"
-    },
-    {
-      "_id": "req_update_payment_cycle",
-      "_type": "request",
-      "name": "Update Payment Cycle",
-      "description": "Atualizar ciclo de pagamento (Admin only)",
-      "url": "{{ base_url }}/payment-cycles/:id",
-      "method": "PUT",
-      "body": {
-        "mimeType": "application/json",
-        "text": "{\n  \"name\": \"Mensal Atualizado\",\n  \"days\": 30,\n  \"description\": \"Ciclo de pagamento mensal atualizado\",\n  \"is_active\": true\n}"
-      },
-      "parameters": [
-        {
-          "name": "id",
-          "value": "1",
-          "description": "Payment Cycle ID"
-        }
-      ],
-      "headers": [
-        {
-          "name": "Authorization",
-          "value": "Bearer {{ token }}"
-        },
-        {
-          "name": "Content-Type",
-          "value": "application/json"
-        }
-      ],
-      "authentication": {},
-      "metaSortKey": 4500000004000,
-      "isPrivate": false,
-      "settingStoreCookies": true,
-      "settingSendCookies": true,
-      "settingDisableRenderRequestBody": false,
-      "settingEncodeUrl": true,
-      "settingRebuildPath": true,
-      "settingFollowRedirects": "global",
-      "_parentId": "fld_payment_cycles"
-    },
-    {
-      "_id": "req_delete_payment_cycle",
-      "_type": "request",
-      "name": "Delete Payment Cycle",
-      "description": "Excluir ciclo de pagamento (Admin only)",
-      "url": "{{ base_url }}/payment-cycles/:id",
-      "method": "DELETE",
-      "body": {},
-      "parameters": [
-        {
-          "name": "id",
-          "value": "1",
-          "description": "Payment Cycle ID"
-        }
-      ],
-      "headers": [
-        {
-          "name": "Authorization",
-          "value": "Bearer {{ token }}"
-        }
-      ],
-      "authentication": {},
-      "metaSortKey": 4500000005000,
-      "isPrivate": false,
-      "settingStoreCookies": true,
-      "settingSendCookies": true,
-      "settingDisableRenderRequestBody": false,
-      "settingEncodeUrl": true,
-      "settingRebuildPath": true,
-      "settingFollowRedirects": "global",
-      "_parentId": "fld_payment_cycles"
-    },
-    {
       "_id": "req_health",
       "_type": "request",
       "name": "Health Check",
       "description": "Verificar status do servidor",
-      "url": "{{ base_url }}/health",
+      "url": "http://172.18.0.3:8000/api/health",
       "method": "GET",
       "body": {},
       "parameters": [],
@@ -1405,4 +1763,3 @@
     }
   ]
 }
-

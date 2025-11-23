@@ -1,0 +1,60 @@
+/* Card Styles from Modelo */
+
+.card {
+  border-radius: 0.5rem;
+  background-color: white;
+  box-shadow: 0 4px 18px rgba(47, 43, 61, 0.1), 0 0 transparent, 0 0 transparent;
+}
+
+.card-title {
+  font-weight: 500;
+  text-transform: capitalize;
+  font-size: 1rem;
+  color: #111827;
+  margin: 0;
+}
+
+.card-subtitle {
+  font-size: 0.875rem;
+  color: #9CA3AF;
+  margin-top: 0.25rem;
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.25rem 1rem 1.25rem;
+}
+
+.card-header:not(.no-border) {
+  border-bottom: 1px solid rgba(99, 102, 241, 0.1);
+  padding-bottom: 1rem;
+}
+
+.card-header.no-border {
+  border-bottom: none;
+}
+
+.card-body {
+  padding: 1rem 1.25rem;
+}
+
+.card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.5rem 1.5rem 1rem 1.5rem;
+  border-top: 1px solid #e5e7eb;
+}
+
+.card-header-slot {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.card-height-auto .card {
+  height: min-content;
+}
+

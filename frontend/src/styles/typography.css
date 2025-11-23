@@ -1,0 +1,118 @@
+/* Typography Styles from Modelo */
+
+h1 {
+  font-size: 3.75rem;
+  font-weight: 600;
+  color: #111827;
+  line-height: 1.2;
+}
+
+h2 {
+  font-size: 3rem;
+  font-weight: 600;
+  color: #111827;
+  line-height: 1.2;
+}
+
+h3 {
+  font-size: 2.25rem;
+  font-weight: 500;
+  color: #111827;
+  line-height: 1.2;
+}
+
+h4 {
+  font-size: 1.875rem;
+  font-weight: 500;
+  color: #111827;
+  line-height: 1.2;
+}
+
+h5 {
+  font-size: 1.5rem;
+  font-weight: 500;
+  color: #111827;
+  line-height: 1.2;
+}
+
+h6 {
+  font-size: 1.25rem;
+  font-weight: 500;
+  color: #111827;
+  line-height: 1.25;
+}
+
+.display-1 {
+  font-size: 4.375rem;
+  line-height: 5rem;
+  font-weight: 600;
+  color: #111827;
+}
+
+.display-2 {
+  font-size: 3rem;
+  line-height: 3.625rem;
+  font-weight: 600;
+  color: #111827;
+}
+
+.display-3 {
+  font-size: 2.5rem;
+  line-height: 3rem;
+  font-weight: 600;
+  color: #111827;
+}
+
+.display-4 {
+  font-size: 2.5rem;
+  line-height: 3rem;
+  font-weight: 400;
+  color: #111827;
+}
+
+blockquote {
+  border-left: 2px solid #9CA3AF;
+  padding-left: 1.25rem;
+  font-size: 1.25rem;
+  font-style: italic;
+}
+
+.gradient-1 {
+  background: linear-gradient(96.2deg, #0575e6 0%, #021b79 100%);
+}
+
+.gradient-2 {
+  background: linear-gradient(96.01deg, #00c9ff 0.29%, #fff94c 100%);
+}
+
+.gradient-3 {
+  background: linear-gradient(96.01deg, #aaffa9 0.29%, #11ffbd 100%);
+}
+
+/* Custom list styles */
+.custom-list {
+  position: relative;
+  padding-left: 1rem;
+  margin-left: -0.25rem;
+  list-style: none;
+}
+
+.custom-list li {
+  position: relative;
+}
+
+.custom-list li::before {
+  position: absolute;
+  left: 0;
+}
+
+ol.custom-list ol,
+ul.custom-list ul {
+  margin-top: 0.75rem;
+}
+
+ol.custom-list ol li,
+ul.custom-list ul li {
+  padding-left: 1.5rem;
+}
+

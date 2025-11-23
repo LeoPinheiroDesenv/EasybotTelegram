@@ -1,0 +1,248 @@
+/* Button Styles from Modelo */
+
+.btn {
+  font-weight: 500;
+  font-size: 0.875rem;
+  letter-spacing: 0.025rem;
+  padding: 0.625rem 1.25rem;
+  border-radius: 0.5rem;
+  text-transform: capitalize;
+  transition: all 0.15s ease-in-out;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  border: none;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn.block-btn {
+  display: block;
+  width: 100%;
+  text-align: center;
+}
+
+.btn.block-btn span {
+  justify-content: center;
+}
+
+/* Primary Button */
+.btn-primary {
+  background-color: #6366f1;
+  color: white;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background-color: #4f46e5;
+}
+
+/* Secondary Button */
+.btn-secondary {
+  background-color: #d946ef;
+  color: white;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background-color: #c026d3;
+}
+
+/* Success Button */
+.btn-success {
+  background-color: #10b981;
+  color: white;
+}
+
+.btn-success:hover:not(:disabled) {
+  background-color: #059669;
+}
+
+/* Info Button */
+.btn-info {
+  background-color: #06b6d4;
+  color: white;
+}
+
+.btn-info:hover:not(:disabled) {
+  background-color: #0891b2;
+}
+
+/* Warning Button */
+.btn-warning {
+  background-color: #eab308;
+  color: white;
+}
+
+.btn-warning:hover:not(:disabled) {
+  background-color: #ca8a04;
+}
+
+/* Danger Button */
+.btn-danger {
+  background-color: #ef4444;
+  color: white;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background-color: #dc2626;
+}
+
+/* Light Button */
+.btn-light {
+  background-color: #e5e7eb;
+  color: #374151;
+}
+
+.btn-light:hover:not(:disabled) {
+  background-color: #d1d5db;
+  color: #111827;
+}
+
+/* Dark Button */
+.btn-dark {
+  background-color: #374151;
+  color: white;
+}
+
+.btn-dark:hover:not(:disabled) {
+  background-color: #1f2937;
+}
+
+/* Outline Buttons */
+.btn-outline-primary {
+  background-color: transparent;
+  color: #6366f1;
+  border: 1px solid #6366f1;
+}
+
+.btn-outline-primary:hover:not(:disabled) {
+  background-color: #6366f1;
+  color: white;
+}
+
+.btn-outline-primary.active {
+  background-color: #6366f1;
+  color: white;
+}
+
+.btn-outline-secondary {
+  background-color: transparent;
+  color: #d946ef;
+  border: 1px solid #d946ef;
+}
+
+.btn-outline-secondary:hover:not(:disabled) {
+  background-color: #d946ef;
+  color: white;
+}
+
+.btn-outline-success {
+  background-color: transparent;
+  color: #10b981;
+  border: 1px solid #10b981;
+}
+
+.btn-outline-success:hover:not(:disabled) {
+  background-color: #10b981;
+  color: white;
+}
+
+.btn-outline-danger {
+  background-color: transparent;
+  color: #ef4444;
+  border: 1px solid #ef4444;
+}
+
+.btn-outline-danger:hover:not(:disabled) {
+  background-color: #ef4444;
+  color: white;
+}
+
+.btn-outline-warning {
+  background-color: transparent;
+  color: #eab308;
+  border: 1px solid #eab308;
+}
+
+.btn-outline-warning:hover:not(:disabled) {
+  background-color: #eab308;
+  color: white;
+}
+
+.btn-outline-info {
+  background-color: transparent;
+  color: #06b6d4;
+  border: 1px solid #06b6d4;
+}
+
+.btn-outline-info:hover:not(:disabled) {
+  background-color: #06b6d4;
+  color: white;
+}
+
+/* Link Button */
+.btn-link {
+  color: #111827;
+  font-weight: 500;
+  text-decoration: underline;
+  font-size: 0.875rem;
+  background: none;
+  border: none;
+  padding: 0;
+}
+
+.btn-link.white {
+  color: white;
+}
+
+/* Icon Button */
+.icon-btn {
+  height: 1.75rem;
+  width: 1.75rem;
+  font-size: 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.25rem;
+  background: transparent;
+  cursor: pointer;
+}
+
+.icon-btn:hover {
+  background-color: rgba(99, 102, 241, 0.2);
+  color: #6366f1;
+  border-color: #6366f1;
+}
+
+/* Light variant */
+.btn-primary.light {
+  background-color: rgba(99, 102, 241, 0.1);
+  color: #6366f1;
+}
+
+.btn-primary.light:hover {
+  background-color: rgba(99, 102, 241, 0.15);
+}
+
+.btn-secondary.light {
+  background-color: rgba(217, 70, 239, 0.1);
+  color: #d946ef;
+}
+
+.btn-success.light {
+  background-color: rgba(16, 185, 129, 0.1);
+  color: #10b981;
+}
+
+.btn-danger.light {
+  background-color: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+}
+

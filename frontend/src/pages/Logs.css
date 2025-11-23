@@ -75,12 +75,21 @@
   overflow: hidden;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   overflow-x: auto;
+  max-height: 70vh;
+  overflow-y: auto;
 }
 
 .logs-table {
   width: 100%;
   border-collapse: collapse;
   min-width: 1200px;
+  table-layout: auto;
+}
+
+.logs-table th,
+.logs-table td {
+  white-space: normal;
+  word-wrap: break-word;
 }
 
 .logs-table thead {
@@ -94,6 +103,10 @@
   color: #333;
   border-bottom: 2px solid #dee2e6;
   white-space: nowrap;
+  position: sticky;
+  top: 0;
+  background-color: #f8f9fa;
+  z-index: 10;
 }
 
 .logs-table td {
@@ -106,10 +119,37 @@
   background-color: #f8f9fa;
 }
 
+.logs-table tbody tr:nth-child(even) {
+  background-color: #fafafa;
+}
+
+.logs-table tbody tr:nth-child(even):hover {
+  background-color: #f0f0f0;
+}
+
 .log-message {
-  max-width: 300px;
+  max-width: 400px;
   word-wrap: break-word;
   white-space: normal;
+  line-height: 1.4;
+}
+
+.logs-table td:nth-child(3) {
+  max-width: 400px;
+}
+
+.logs-table td:nth-child(4),
+.logs-table td:nth-child(5) {
+  white-space: nowrap;
+  font-family: monospace;
+  font-size: 12px;
+  color: #666;
+}
+
+.logs-table td:nth-child(6) {
+  white-space: nowrap;
+  font-size: 12px;
+  color: #666;
 }
 
 .text-center {
@@ -118,11 +158,16 @@
 
 .badge {
   display: inline-block;
-  padding: 4px 8px;
+  padding: 4px 10px;
   border-radius: 12px;
   font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
+  white-space: nowrap;
+  min-width: 50px;
+  text-align: center;
+  border: none;
+  outline: none;
 }
 
 .badge-error {
@@ -148,6 +193,21 @@
 .badge-default {
   background-color: #6c757d;
   color: white;
+}
+
+.badge-critical {
+  background-color: #721c24;
+  color: white;
+}
+
+.logs-table td:nth-child(2) {
+  white-space: nowrap;
+  min-width: 80px;
+}
+
+.logs-table th:nth-child(2) {
+  white-space: nowrap;
+  min-width: 80px;
 }
 
 .log-context {

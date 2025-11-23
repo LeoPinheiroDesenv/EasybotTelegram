@@ -1,10 +1,20 @@
 import axios from 'axios';
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+// URL da API - deve ser definida no arquivo .env na raiz do frontend
+// Em desenvolvimento, usa o proxy do React (setupProxy.js)
+// Em produção, usa a URL completa do .env
+const isDevelopment = process.env.NODE_ENV === 'development';
+const API_URL = isDevelopment 
+  ? '/api'  // Usa o proxy do React em desenvolvimento
+  : (process.env.REACT_APP_API_URL || (() => {
+      const error = 'REACT_APP_API_URL não está configurada. Verifique o arquivo .env na pasta frontend.';
+      console.error(error);
+      throw new Error(error);
+    })());
 
 const api = axios.create({
   baseURL: API_URL,
-  timeout: 10000,
+  timeout: 30000, // Aumentado para 30 segundos para evitar timeouts
 });
 
 api.interceptors.request.use((config) => {
@@ -34,10 +44,21 @@ api.interceptors.response.use(
     } else if (error.request) {
       // Request was made but no response received
       console.error('Network Error:', error.request);
-      error.message = 'Não foi possível conectar ao servidor. Verifique se o backend está rodando.';
+      console.error('Request URL:', error.config?.url);
+      console.error('Request Method:', error.config?.method);
+      
+      // Verifica se é um erro de timeout
+      if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
+        error.message = 'Tempo de espera esgotado. O servidor está demorando para responder. Tente novamente.';
+      } else if (error.message.includes('504') || error.message.includes('Gateway Timeout')) {
+        error.message = 'Erro de gateway timeout. Verifique se o backend está rodando e acessível.';
+      } else {
+        error.message = 'Não foi possível conectar ao servidor. Verifique se o backend está rodando.';
+      }
     } else {
       // Something else happened
       console.error('Error:', error.message);
+      console.error('Error Code:', error.code);
     }
     return Promise.reject(error);
   }

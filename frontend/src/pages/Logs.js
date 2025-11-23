@@ -66,7 +66,8 @@ const Logs = () => {
   };
 
   const getLevelBadgeClass = (level) => {
-    switch (level?.toLowerCase()) {
+    if (!level) return 'badge-default';
+    switch (level.toLowerCase()) {
       case 'error':
         return 'badge-error';
       case 'warn':
@@ -76,6 +77,8 @@ const Logs = () => {
         return 'badge-info';
       case 'debug':
         return 'badge-debug';
+      case 'critical':
+        return 'badge-critical';
       default:
         return 'badge-default';
     }
@@ -199,9 +202,13 @@ const Logs = () => {
                           <tr key={log.id}>
                             <td>{log.id}</td>
                             <td>
-                              <span className={`badge ${getLevelBadgeClass(log.level)}`}>
-                                {log.level?.toUpperCase()}
-                              </span>
+                              {log.level ? (
+                                <span className={`badge ${getLevelBadgeClass(log.level)}`}>
+                                  {log.level.toUpperCase()}
+                                </span>
+                              ) : (
+                                <span className="badge badge-default">-</span>
+                              )}
                             </td>
                             <td className="log-message">{log.message}</td>
                             <td>{log.user_email || '-'}</td>

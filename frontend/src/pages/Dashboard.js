@@ -29,7 +29,7 @@ const Dashboard = () => {
       
       // Se for erro de conexão, mostrar mensagem mais clara
       if (error.code === 'ECONNREFUSED' || error.message.includes('Network Error')) {
-        setError('Não foi possível conectar ao servidor. Verifique se o backend está rodando na porta 5000.');
+        setError('Não foi possível conectar ao servidor. Verifique se o backend está rodando.');
       }
     } finally {
       setLoading(false);
