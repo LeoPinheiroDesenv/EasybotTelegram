@@ -15,6 +15,7 @@ const routeToMenuMap = {
   '/bot/redirect': 'bot',
   '/bot/administrators': 'bot',
   '/bot/groups': 'bot',
+  '/bot/telegram-groups': 'bot',
   '/bot/': 'bot', // Para rotas que começam com /bot/
   '/results/contacts': 'results',
   '/marketing': 'marketing',
@@ -22,6 +23,7 @@ const routeToMenuMap = {
   '/marketing/downsell': 'marketing',
   '/settings/payment-cycles': 'settings',
   '/settings/payment-gateways': 'settings',
+  '/settings/security': 'settings',
   '/users': 'settings',
   '/user-groups': 'settings',
   '/logs': 'settings',

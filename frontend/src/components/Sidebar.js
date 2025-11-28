@@ -93,8 +93,9 @@ const Sidebar = ({ isOpen, onClose }) => {
     { path: '/bot/welcome', label: 'Mensagem de boas-vindas', requiresBot: true },
     { path: '/bot/payment-plans', label: 'Planos de pagamento', requiresBot: true },
     { path: '/bot/redirect', label: 'Botões de redirecionamento', requiresBot: true },
+    { path: '/bot/commands', label: 'Comandos', requiresBot: true },
     { path: '/bot/administrators', label: 'Administradores', requiresBot: true },
-    { path: '/bot/groups', label: 'Grupos e Canais', requiresBot: true },
+    { path: '/bot/telegram-groups', label: 'Grupos e Canais', requiresBot: true },
   ];
 
   const isBillingActive = location.pathname === '/billing';
@@ -119,8 +120,6 @@ const Sidebar = ({ isOpen, onClose }) => {
   // Detecta qualquer rota de bot exceto /bot/create
   const isBotSubmenuActive = location.pathname.startsWith('/bot') && 
     !location.pathname.match(/^\/bot\/create$/);
-  // Item principal "Bot" fica ativo quando qualquer submenu está ativo
-  const isBotActive = isBotSubmenuActive;
   const isResultsActive = location.pathname.startsWith('/results');
   const isMarketingActive = location.pathname.startsWith('/marketing');
   // Menu de Configurações está ativo para /settings, /users, /user-groups e /logs
@@ -152,8 +151,9 @@ const Sidebar = ({ isOpen, onClose }) => {
                location.pathname.startsWith('/bot/welcome') ? 'Mensagem de boas-vindas' :
                location.pathname.startsWith('/bot/payment-plans') ? 'Planos de pagamento' :
                location.pathname.startsWith('/bot/redirect') ? 'Botões de redirecionamento' :
+               location.pathname.startsWith('/bot/commands') ? 'Comandos' :
                location.pathname.startsWith('/bot/administrators') ? 'Administradores' :
-               location.pathname.startsWith('/bot/groups') ? 'Grupos e Canais' :
+               location.pathname.startsWith('/bot/telegram-groups') ? 'Grupos e Canais' :
                location.pathname.startsWith('/marketing/alerts') ? 'Alertas' :
                location.pathname.startsWith('/marketing/downsell') ? 'Downsell' :
                location.pathname.startsWith('/marketing') ? 'Marketing' :
@@ -162,6 +162,7 @@ const Sidebar = ({ isOpen, onClose }) => {
                location.pathname === '/logs' ? 'Logs' :
                location.pathname.startsWith('/settings/payment-cycles') ? 'Ciclos de Pagamento' :
                location.pathname.startsWith('/settings/payment-gateways') ? 'Gateways de Pagamento' :
+               location.pathname.startsWith('/settings/security') ? 'Segurança (2FA)' :
                'Página inicial'}
             </div>
           </div>
@@ -219,12 +220,14 @@ const Sidebar = ({ isOpen, onClose }) => {
                         path = `/bot/welcome?botId=${selectedBotId}`;
                       } else if (item.path === '/bot/payment-plans') {
                         path = `/bot/payment-plans?botId=${selectedBotId}`;
-                      } else if (item.path === '/bot/redirect') {
-                        path = `/bot/redirect?botId=${selectedBotId}`;
+                    } else if (item.path === '/bot/redirect') {
+                      path = `/bot/redirect?botId=${selectedBotId}`;
+                      } else if (item.path === '/bot/commands') {
+                      path = `/bot/commands?botId=${selectedBotId}`;
                       } else if (item.path === '/bot/administrators') {
                         path = `/bot/administrators?botId=${selectedBotId}`;
-                      } else if (item.path === '/bot/groups') {
-                        path = `/bot/groups?botId=${selectedBotId}`;
+                      } else if (item.path === '/bot/telegram-groups') {
+                        path = `/bot/telegram-groups?botId=${selectedBotId}`;
                       }
                     } else {
                       // If no bot selected, navigate to dashboard first
@@ -242,12 +245,15 @@ const Sidebar = ({ isOpen, onClose }) => {
                     } else if (item.path === '/bot/redirect') {
                       isActive = location.pathname === '/bot/redirect' || 
                                  (location.pathname.startsWith('/bot/redirect') && location.search.includes('botId'));
+                    } else if (item.path === '/bot/commands') {
+                      isActive = location.pathname === '/bot/commands' || 
+                                 (location.pathname.startsWith('/bot/commands') && location.search.includes('botId'));
                     } else if (item.path === '/bot/administrators') {
                       isActive = location.pathname === '/bot/administrators' || 
                                  (location.pathname.startsWith('/bot/administrators') && location.search.includes('botId'));
-                    } else if (item.path === '/bot/groups') {
-                      isActive = location.pathname === '/bot/groups' || 
-                                 (location.pathname.startsWith('/bot/groups') && location.search.includes('botId'));
+                    } else if (item.path === '/bot/telegram-groups') {
+                      isActive = location.pathname === '/bot/telegram-groups' || 
+                                 (location.pathname.startsWith('/bot/telegram-groups') && location.search.includes('botId'));
                     } else {
                       isActive = location.pathname.startsWith(item.path) && 
                                  location.pathname !== '/bot/create';
@@ -373,6 +379,13 @@ const Sidebar = ({ isOpen, onClose }) => {
                         onClick={onClose}
                       >
                         Gateways de Pagamento
+                      </Link>
+                      <Link
+                        to="/settings/security"
+                        className={`sidebar-submenu-item ${location.pathname === '/settings/security' ? 'active' : ''}`}
+                        onClick={onClose}
+                      >
+                        Segurança (2FA)
                       </Link>
                     </>
                   )}

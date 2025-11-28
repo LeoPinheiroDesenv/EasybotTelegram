@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Layout from '../components/Layout';
 import billingService from '../services/billingService';
 import botService from '../services/botService';
-import { Line, Bar } from 'react-chartjs-2';
+import { Line } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -55,6 +55,7 @@ const Billing = () => {
     if (filters.start_date || filters.end_date || filters.month || filters.bot_id || filters.payment_method || filters.gateway) {
       loadBillingData();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters]);
 
   const loadInitialData = async () => {
@@ -117,11 +118,6 @@ const Billing = () => {
     }).format(value);
   };
 
-  const formatDate = (dateString) => {
-    if (!dateString) return 'N/A';
-    const date = new Date(dateString);
-    return date.toLocaleDateString('pt-BR');
-  };
 
   const getChartConfig = () => {
     if (!chartData || chartData.length === 0) return null;

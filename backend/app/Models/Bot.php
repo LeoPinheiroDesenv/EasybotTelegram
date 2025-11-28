@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Bot extends Model
 {
@@ -50,5 +51,21 @@ class Bot extends Model
     public function commands()
     {
         return $this->hasMany(BotCommand::class);
+    }
+
+    /**
+     * Get the administrators for the bot.
+     */
+    public function administrators()
+    {
+        return $this->hasMany(BotAdministrator::class);
+    }
+
+    /**
+     * Get the redirect buttons for the bot.
+     */
+    public function redirectButtons()
+    {
+        return $this->hasMany(RedirectButton::class);
     }
 }

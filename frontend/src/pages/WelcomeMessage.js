@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faUpload, faTrash } from '@fortawesome/free-solid-svg-icons';
 import Layout from '../components/Layout';
@@ -8,7 +8,6 @@ import './WelcomeMessage.css';
 
 const WelcomeMessage = () => {
   const navigate = useNavigate();
-  const location = useLocation();
   const [searchParams] = useSearchParams();
   let botId = searchParams.get('botId');
   
@@ -42,6 +41,7 @@ const WelcomeMessage = () => {
       setError('Bot não selecionado. Por favor, selecione um bot primeiro.');
       setLoadingData(false);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [botId]);
 
   const loadBot = async () => {

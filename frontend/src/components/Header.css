@@ -42,6 +42,26 @@
     gap: 8px;
   }
   
+  .current-bot-info {
+    padding: 6px 12px;
+    gap: 8px;
+  }
+  
+  .current-bot-icon {
+    width: 28px;
+    height: 28px;
+  }
+  
+  .current-bot-name {
+    font-size: 13px;
+    max-width: 120px;
+  }
+  
+  .current-bot-username {
+    font-size: 11px;
+    max-width: 120px;
+  }
+  
   .header-icon-btn {
     width: 36px;
     height: 36px;
@@ -165,6 +185,74 @@
   display: flex;
   align-items: center;
   gap: 12px;
+}
+
+.current-bot-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px;
+  background-color: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  transition: all 0.2s;
+}
+
+.current-bot-info.no-bot {
+  background-color: #fef2f2;
+  border-color: #fecaca;
+}
+
+.current-bot-info.loading {
+  background-color: #f0f9ff;
+  border-color: #bae6fd;
+}
+
+.current-bot-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background-color: var(--color-dark-green);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-on-green);
+  flex-shrink: 0;
+}
+
+.current-bot-info.no-bot .current-bot-icon {
+  background-color: #9ca3af;
+}
+
+.current-bot-details {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.current-bot-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #111827;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 200px;
+}
+
+.current-bot-info.no-bot .current-bot-name {
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.current-bot-username {
+  font-size: 12px;
+  color: #6b7280;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 200px;
 }
 
 .header-icon-btn {

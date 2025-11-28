@@ -140,6 +140,33 @@
   box-shadow: 0 0 0 3px rgba(147, 51, 234, 0.1);
 }
 
+.btn-process-alerts {
+  background-color: #10b981;
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 20px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-right: 10px;
+}
+
+.btn-process-alerts:hover:not(:disabled) {
+  background-color: #059669;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 6px rgba(16, 185, 129, 0.3);
+}
+
+.btn-process-alerts:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .btn-create-alert {
   background-color: #9333ea;
   color: #ffffff;

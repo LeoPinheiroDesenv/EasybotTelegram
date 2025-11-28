@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faEdit, faTrash } from '@fortawesome/free-solid-svg-icons';
 import Layout from '../components/Layout';
-import botService from '../services/botService';
+import redirectButtonService from '../services/redirectButtonService';
 import './Redirect.css';
 
 const Redirect = () => {
@@ -45,9 +45,8 @@ const Redirect = () => {
   const loadRedirectButtons = async () => {
     try {
       setLoadingData(true);
-      // TODO: Implementar API para carregar botões de redirecionamento
-      // Por enquanto, usando dados mockados
-      setRedirectButtons([]);
+      const buttons = await redirectButtonService.getRedirectButtons(botId);
+      setRedirectButtons(buttons);
       setError('');
     } catch (err) {
       setError(err.response?.data?.error || 'Erro ao carregar botões de redirecionamento');
@@ -91,7 +90,7 @@ const Redirect = () => {
 
     try {
       setLoading(true);
-      // TODO: Implementar API para deletar botão
+      await redirectButtonService.deleteRedirectButton(botId, buttonId);
       setRedirectButtons(redirectButtons.filter(btn => btn.id !== buttonId));
       setSuccess('Botão deletado com sucesso!');
       setTimeout(() => setSuccess(''), 3000);
@@ -125,26 +124,28 @@ const Redirect = () => {
     setLoading(true);
 
     try {
-      // TODO: Implementar API para salvar botão
       if (editingButton) {
         // Update existing button
+        const updatedButton = await redirectButtonService.updateRedirectButton(
+          botId,
+          editingButton.id,
+          formData
+        );
         setRedirectButtons(redirectButtons.map(btn => 
-          btn.id === editingButton.id ? { ...btn, ...formData } : btn
+          btn.id === editingButton.id ? updatedButton : btn
         ));
         setSuccess('Botão atualizado com sucesso!');
       } else {
         // Add new button
-        const newButton = {
-          id: Date.now(), // Temporary ID
-          ...formData
-        };
+        const newButton = await redirectButtonService.createRedirectButton(botId, formData);
         setRedirectButtons([...redirectButtons, newButton]);
         setSuccess('Botão adicionado com sucesso!');
       }
       setShowAddModal(false);
+      setFormData({ title: '', link: '' });
       setTimeout(() => setSuccess(''), 3000);
     } catch (err) {
-      setError(err.response?.data?.error || 'Erro ao salvar botão');
+      setError(err.response?.data?.error || err.response?.data?.errors?.link?.[0] || 'Erro ao salvar botão');
     } finally {
       setLoading(false);
     }

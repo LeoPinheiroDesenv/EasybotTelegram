@@ -18,6 +18,7 @@ const GroupManagement = () => {
       loadBot();
       loadStatistics();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [botId, selectedPeriod]);
 
   const loadBot = async () => {

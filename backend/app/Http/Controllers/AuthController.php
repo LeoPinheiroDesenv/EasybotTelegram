@@ -183,11 +183,19 @@ class AuthController extends Controller
     public function setup2FA(): JsonResponse
     {
         try {
+            $twoFactorService = $this->getTwoFactorService();
+            
+            if (!$twoFactorService) {
+                return response()->json([
+                    'error' => 'Two-factor authentication is not available. Google2FA package is not installed.'
+                ], 503);
+            }
+
             $user = auth()->user();
-            $result = $this->twoFactorService->setup2FA($user->id, $user->email);
+            $result = $twoFactorService->setup2FA($user->id, $user->email);
             return response()->json($result);
         } catch (\Exception $e) {
-            return response()->json(['error' => 'Internal server error'], 500);
+            return response()->json(['error' => $e->getMessage()], 500);
         }
     }
 

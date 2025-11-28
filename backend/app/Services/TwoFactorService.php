@@ -46,13 +46,35 @@ class TwoFactorService
     public function generateQRCode(string $otpauthUrl): string
     {
         try {
-            $qrCodeData = QrCode::format('png')
+            // Verifica qual extensão de imagem está disponível
+            $hasImagick = extension_loaded('imagick');
+            $hasGd = extension_loaded('gd');
+            
+            // Tenta gerar PNG se alguma extensão de imagem estiver disponível
+            if ($hasImagick || $hasGd) {
+                try {
+                    $qrCodeData = QrCode::format('png')
+                        ->size(200)
+                        ->generate($otpauthUrl);
+                    
+                    // Converte para data URL
+                    $base64 = base64_encode($qrCodeData);
+                    return 'data:image/png;base64,' . $base64;
+                } catch (\Exception $pngException) {
+                    // Se PNG falhar, tenta SVG como fallback
+                    // (continua no código abaixo)
+                }
+            }
+            
+            // Fallback: usa SVG que não precisa de extensões de imagem
+            $qrCodeData = QrCode::format('svg')
                 ->size(200)
                 ->generate($otpauthUrl);
             
-            // Converte para data URL
-            $base64 = base64_encode($qrCodeData);
-            return 'data:image/png;base64,' . $base64;
+            // SVG pode ser retornado diretamente ou como base64
+            // Vamos retornar como base64 para consistência
+            return 'data:image/svg+xml;base64,' . base64_encode($qrCodeData);
+            
         } catch (\Exception $e) {
             throw new \Exception('Failed to generate QR code: ' . $e->getMessage());
         }

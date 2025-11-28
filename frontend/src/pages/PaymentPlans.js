@@ -1,14 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout';
 import paymentPlanService from '../services/paymentPlanService';
 import paymentCycleService from '../services/paymentCycleService';
-import botService from '../services/botService';
 import './PaymentPlans.css';
 
 const PaymentPlans = () => {
   const navigate = useNavigate();
-  const location = useLocation();
   const [botId, setBotId] = useState(null);
   const [paymentPlans, setPaymentPlans] = useState([]);
   const [paymentCycles, setPaymentCycles] = useState([]);
@@ -175,14 +173,6 @@ const PaymentPlans = () => {
     }
   };
 
-  const handlePixMessage = (plan) => {
-    setSelectedPlan(plan);
-    setFormData({
-      ...formData,
-      pix_message: plan.pix_message || ''
-    });
-    setShowPixModal(true);
-  };
 
   const handleSavePixMessage = async () => {
     if (!selectedPlan) {

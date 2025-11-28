@@ -1,0 +1,292 @@
+.security-settings-container {
+  padding: 20px;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.security-settings-header {
+  margin-bottom: 30px;
+}
+
+.security-settings-header h1 {
+  font-size: 28px;
+  color: #333;
+  margin-bottom: 10px;
+}
+
+.security-settings-header p {
+  color: #666;
+  font-size: 16px;
+}
+
+.security-settings-content {
+  display: flex;
+  flex-direction: column;
+  gap: 30px;
+}
+
+.security-card {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+}
+
+.security-card-header {
+  padding: 20px;
+  background: #f8f9fa;
+  border-bottom: 1px solid #e9ecef;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.security-card-header h2 {
+  font-size: 20px;
+  color: #333;
+  margin: 0;
+}
+
+.2fa-status {
+  padding: 6px 12px;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.2fa-status.enabled {
+  background: #d4edda;
+  color: #155724;
+}
+
+.2fa-status.disabled {
+  background: #f8d7da;
+  color: #721c24;
+}
+
+.security-card-body {
+  padding: 30px;
+}
+
+.security-description {
+  color: #666;
+  line-height: 1.6;
+  margin-bottom: 20px;
+}
+
+.security-actions {
+  margin-top: 20px;
+}
+
+.alert {
+  padding: 12px 16px;
+  border-radius: 4px;
+  margin-bottom: 20px;
+}
+
+.alert-error {
+  background: #f8d7da;
+  color: #721c24;
+  border: 1px solid #f5c6cb;
+}
+
+.alert-success {
+  background: #d4edda;
+  color: #155724;
+  border: 1px solid #c3e6cb;
+}
+
+.2fa-setup {
+  margin-top: 20px;
+}
+
+.2fa-setup h3 {
+  font-size: 18px;
+  color: #333;
+  margin-bottom: 10px;
+}
+
+.2fa-setup p {
+  color: #666;
+  margin-bottom: 20px;
+}
+
+.qr-code-container {
+  display: flex;
+  justify-content: center;
+  margin: 20px 0;
+  padding: 20px;
+  background: #f8f9fa;
+  border-radius: 8px;
+}
+
+.qr-code-image {
+  max-width: 250px;
+  height: auto;
+  border: 2px solid #dee2e6;
+  border-radius: 4px;
+}
+
+.manual-entry {
+  margin: 20px 0;
+  padding: 15px;
+  background: #f8f9fa;
+  border-radius: 4px;
+  text-align: center;
+}
+
+.manual-entry p {
+  margin-bottom: 10px;
+  color: #666;
+}
+
+.secret-key {
+  display: inline-block;
+  padding: 10px 15px;
+  background: white;
+  border: 1px solid #dee2e6;
+  border-radius: 4px;
+  font-family: 'Courier New', monospace;
+  font-size: 16px;
+  letter-spacing: 2px;
+  color: #333;
+  font-weight: 600;
+}
+
+.verify-form {
+  margin-top: 20px;
+}
+
+.verify-form .form-group {
+  margin-bottom: 20px;
+}
+
+.verify-form .form-control {
+  width: 100%;
+  max-width: 200px;
+  padding: 12px;
+  font-size: 18px;
+  text-align: center;
+  letter-spacing: 4px;
+  border: 2px solid #dee2e6;
+  border-radius: 4px;
+  font-family: 'Courier New', monospace;
+}
+
+.verify-form .form-control:focus {
+  outline: none;
+  border-color: #007bff;
+  box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.25);
+}
+
+.form-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.btn {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 4px;
+  font-size: 16px;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: #007bff;
+  color: white;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: #0056b3;
+}
+
+.btn-secondary {
+  background: #6c757d;
+  color: white;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: #545b62;
+}
+
+.btn-danger {
+  background: #dc3545;
+  color: white;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: #c82333;
+}
+
+.security-info {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  padding: 30px;
+}
+
+.security-info h3 {
+  font-size: 18px;
+  color: #333;
+  margin-bottom: 15px;
+  margin-top: 0;
+}
+
+.security-info h3:not(:first-child) {
+  margin-top: 30px;
+}
+
+.security-info ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.security-info li {
+  padding: 10px 0;
+  padding-left: 25px;
+  color: #666;
+  line-height: 1.6;
+  position: relative;
+}
+
+.security-info li:before {
+  content: "•";
+  position: absolute;
+  left: 10px;
+  color: #007bff;
+  font-weight: bold;
+  font-size: 20px;
+}
+
+@media (max-width: 768px) {
+  .security-settings-container {
+    padding: 15px;
+  }
+
+  .security-card-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .qr-code-image {
+    max-width: 200px;
+  }
+
+  .form-actions {
+    flex-direction: column;
+  }
+
+  .btn {
+    width: 100%;
+  }
+}
+

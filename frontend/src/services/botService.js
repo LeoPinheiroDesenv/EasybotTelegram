@@ -37,6 +37,26 @@ const botService = {
       telegram_group_id: telegramGroupId 
     });
     return response.data;
+  },
+
+  initializeBot: async (id) => {
+    const response = await api.post(`/bots/${id}/initialize`);
+    return response.data;
+  },
+
+  stopBot: async (id) => {
+    const response = await api.post(`/bots/${id}/stop`);
+    return response.data;
+  },
+
+  getBotStatus: async (id) => {
+    const response = await api.get(`/bots/${id}/status`);
+    return response.data;
+  },
+
+  validateAndActivate: async (id) => {
+    const response = await api.post(`/bots/${id}/validate-and-activate`);
+    return response.data;
   }
 };
 

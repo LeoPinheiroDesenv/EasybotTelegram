@@ -1,5 +1,6 @@
 # Dependencies
 node_modules/
+vendor/
 /.pnp
 .pnp.js
 
@@ -34,4 +35,4 @@ lerna-debug.log*
 
 # Docker
 .docker/
-
+manuais/

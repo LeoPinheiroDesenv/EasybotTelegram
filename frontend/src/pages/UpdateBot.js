@@ -30,6 +30,7 @@ const UpdateBot = () => {
   useEffect(() => {
     loadBots();
     loadBot();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   const loadBots = async () => {

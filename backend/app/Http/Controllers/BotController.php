@@ -73,6 +73,17 @@ class BotController extends Controller
                 return response()->json(['error' => 'Acesso negado. Apenas administradores podem criar bots.'], 403);
             }
 
+            // Valida token automaticamente ao criar
+            $telegramService = new TelegramService();
+            $validation = $telegramService->validateToken($request->token);
+            
+            if (!$validation['valid']) {
+                return response()->json([
+                    'error' => 'Token inválido: ' . ($validation['error'] ?? 'Token não pôde ser validado'),
+                    'token_valid' => false
+                ], 400);
+            }
+
             $bot = Bot::create([
                 'user_id' => $user->isSuperAdmin() ? $request->input('user_id', auth()->id()) : auth()->id(),
                 'name' => $request->name,
@@ -93,7 +104,19 @@ class BotController extends Controller
                 'activated' => $request->activated ?? false,
             ]);
 
-            return response()->json(['bot' => $bot], 201);
+            // Se solicitado, ativa automaticamente
+            if ($request->input('activate', false) && $bot->active) {
+                $initResult = $telegramService->initializeBot($bot);
+                if ($initResult['success']) {
+                    $bot->refresh();
+                }
+            }
+
+            return response()->json([
+                'bot' => $bot,
+                'bot_info' => $validation['bot'] ?? null,
+                'token_valid' => true
+            ], 201);
         } catch (\Exception $e) {
             return response()->json(['error' => 'Failed to create bot: ' . $e->getMessage()], 500);
         }
@@ -158,6 +181,19 @@ class BotController extends Controller
 
         try {
             $bot = Bot::findOrFail($id);
+            $telegramService = new TelegramService();
+            
+            // Se o token foi alterado, valida automaticamente
+            if ($request->has('token') && $request->token !== $bot->token) {
+                $validation = $telegramService->validateToken($request->token);
+                
+                if (!$validation['valid']) {
+                    return response()->json([
+                        'error' => 'Token inválido: ' . ($validation['error'] ?? 'Token não pôde ser validado'),
+                        'token_valid' => false
+                    ], 400);
+                }
+            }
 
             $bot->update($request->only([
                 'name',
@@ -177,6 +213,14 @@ class BotController extends Controller
                 'payment_method',
                 'activated',
             ]));
+
+            // Se solicitado, ativa automaticamente
+            if ($request->input('activate', false) && $bot->active && !$bot->activated) {
+                $initResult = $telegramService->initializeBot($bot);
+                if ($initResult['success']) {
+                    $bot->refresh();
+                }
+            }
 
             return response()->json(['bot' => $bot]);
         } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
@@ -216,9 +260,13 @@ class BotController extends Controller
     public function initialize(string $id): JsonResponse
     {
         try {
-            $bot = Bot::where('id', $id)
-                ->where('user_id', auth()->id())
-                ->firstOrFail();
+            $user = auth()->user();
+            $bot = Bot::findOrFail($id);
+
+            // Verifica permissão de escrita
+            if (!$this->permissionService->hasBotPermission($user, (int)$id, 'write')) {
+                return response()->json(['error' => 'Acesso negado. Você não tem permissão para inicializar este bot.'], 403);
+            }
 
             $telegramService = new TelegramService();
             $result = $telegramService->initializeBot($bot);
@@ -230,7 +278,9 @@ class BotController extends Controller
             return response()->json([
                 'message' => $result['message'] ?? 'Bot initialized successfully',
                 'bot' => $bot->fresh(),
-                'bot_info' => $result['bot_info'] ?? null
+                'bot_info' => $result['bot_info'] ?? null,
+                'has_webhook' => $result['has_webhook'] ?? false,
+                'webhook_url' => $result['webhook_url'] ?? null
             ]);
         } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
             return response()->json(['error' => 'Bot not found'], 404);
@@ -245,9 +295,13 @@ class BotController extends Controller
     public function stop(string $id): JsonResponse
     {
         try {
-            $bot = Bot::where('id', $id)
-                ->where('user_id', auth()->id())
-                ->firstOrFail();
+            $user = auth()->user();
+            $bot = Bot::findOrFail($id);
+
+            // Verifica permissão de escrita
+            if (!$this->permissionService->hasBotPermission($user, (int)$id, 'write')) {
+                return response()->json(['error' => 'Acesso negado. Você não tem permissão para parar este bot.'], 403);
+            }
 
             $telegramService = new TelegramService();
             $result = $telegramService->stopBot($bot);
@@ -273,9 +327,13 @@ class BotController extends Controller
     public function status(string $id): JsonResponse
     {
         try {
-            $bot = Bot::where('id', $id)
-                ->where('user_id', auth()->id())
-                ->firstOrFail();
+            $user = auth()->user();
+            $bot = Bot::findOrFail($id);
+
+            // Verifica permissão de leitura
+            if (!$this->permissionService->hasBotPermission($user, (int)$id, 'read')) {
+                return response()->json(['error' => 'Acesso negado'], 403);
+            }
 
             $telegramService = new TelegramService();
             $status = $telegramService->getBotStatus($bot);
@@ -364,6 +422,68 @@ class BotController extends Controller
                 'valid' => false,
                 'error' => 'Erro ao validar: ' . $e->getMessage()
             ], 500);
+        }
+    }
+
+    /**
+     * Validate and activate bot in one step
+     */
+    public function validateAndActivate(string $id): JsonResponse
+    {
+        try {
+            $user = auth()->user();
+            $bot = Bot::findOrFail($id);
+
+            // Verifica permissão de escrita
+            if (!$this->permissionService->hasBotPermission($user, (int)$id, 'write')) {
+                return response()->json(['error' => 'Acesso negado. Você não tem permissão para ativar este bot.'], 403);
+            }
+
+            $telegramService = new TelegramService();
+
+            // Valida token
+            $validation = $telegramService->validateToken($bot->token);
+            
+            if (!$validation['valid']) {
+                return response()->json([
+                    'success' => false,
+                    'error' => $validation['error'] ?? 'Token inválido',
+                    'token_valid' => false
+                ], 400);
+            }
+
+            // Ativa bot se estiver ativo
+            if (!$bot->active) {
+                $bot->update(['active' => true]);
+            }
+
+            // Inicializa bot
+            $initResult = $telegramService->initializeBot($bot);
+
+            if (!$initResult['success']) {
+                return response()->json([
+                    'success' => false,
+                    'error' => $initResult['error'] ?? 'Falha ao inicializar bot',
+                    'token_valid' => true
+                ], 500);
+            }
+
+            $bot->refresh();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Bot validado e ativado com sucesso!',
+                'bot' => $bot,
+                'bot_info' => $validation['bot'] ?? null,
+                'token_valid' => true,
+                'activated' => $bot->activated,
+                'has_webhook' => $initResult['has_webhook'] ?? false,
+                'webhook_url' => $initResult['webhook_url'] ?? null
+            ]);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json(['success' => false, 'error' => 'Bot not found'], 404);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'error' => 'Erro ao validar e ativar bot: ' . $e->getMessage()], 500);
         }
     }
 }

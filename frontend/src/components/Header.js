@@ -3,9 +3,6 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
   faBars, 
-  faSun, 
-  faComment, 
-  faBell, 
   faRobot,
   faPlus,
   faTimes
@@ -17,13 +14,31 @@ import './Header.css';
 const Header = ({ onMenuClick }) => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { user } = useContext(AuthContext);
+  useContext(AuthContext);
   const [bots, setBots] = useState([]);
   const [showBotMenu, setShowBotMenu] = useState(false);
   const [loadingBots, setLoadingBots] = useState(false);
+  const [currentBot, setCurrentBot] = useState(null);
+  const [loadingCurrentBot, setLoadingCurrentBot] = useState(false);
 
   useEffect(() => {
     loadBots();
+    loadCurrentBot();
+  }, [location.pathname]);
+
+  // Recarrega o bot atual quando o selectedBotId mudar (de outras abas)
+  useEffect(() => {
+    const handleStorageChange = (e) => {
+      if (e.key === 'selectedBotId') {
+        loadCurrentBot();
+      }
+    };
+    
+    window.addEventListener('storage', handleStorageChange);
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+    };
   }, []);
 
   const loadBots = async () => {
@@ -35,6 +50,36 @@ const Header = ({ onMenuClick }) => {
       console.error('Error loading bots:', err);
     } finally {
       setLoadingBots(false);
+    }
+  };
+
+  const loadCurrentBot = async () => {
+    try {
+      const storedBotId = localStorage.getItem('selectedBotId');
+      if (storedBotId) {
+        setLoadingCurrentBot(true);
+        const bot = await botService.getBotById(storedBotId);
+        
+        // Tenta obter o username do bot_info se disponível
+        try {
+          const status = await botService.getBotStatus(storedBotId);
+          if (status.bot_info && status.bot_info.username) {
+            bot.username = status.bot_info.username;
+          }
+        } catch (statusErr) {
+          // Se não conseguir obter o status, continua sem username
+          console.warn('Could not load bot status for username:', statusErr);
+        }
+        
+        setCurrentBot(bot);
+      } else {
+        setCurrentBot(null);
+      }
+    } catch (err) {
+      console.error('Error loading current bot:', err);
+      setCurrentBot(null);
+    } finally {
+      setLoadingCurrentBot(false);
     }
   };
 
@@ -57,12 +102,13 @@ const Header = ({ onMenuClick }) => {
     return 'Página Inicial';
   };
 
-  const handleBotSelect = (botId) => {
+  const handleBotSelect = async (botId) => {
     localStorage.setItem('selectedBotId', botId.toString());
-    navigate(`/bot/update/${botId}`);
     setShowBotMenu(false);
-    // Reload page to update sidebar
-    window.location.reload();
+    await loadCurrentBot(); // Atualiza o bot exibido no header
+    navigate(`/bot/update/${botId}`);
+    // Dispara evento customizado para atualizar outros componentes
+    window.dispatchEvent(new Event('botSelected'));
   };
 
   const handleCreateBot = () => {
@@ -70,10 +116,6 @@ const Header = ({ onMenuClick }) => {
     setShowBotMenu(false);
   };
 
-  const handleLogout = () => {
-    // Implementar logout
-    setShowBotMenu(false);
-  };
 
   return (
     <div className="header">
@@ -105,15 +147,37 @@ const Header = ({ onMenuClick }) => {
       </div>
 
       <div className="header-right">
-        <button className="header-icon-btn" title="Tema">
-          <FontAwesomeIcon icon={faSun} />
-        </button>
-        <button className="header-icon-btn" title="Chat">
-          <FontAwesomeIcon icon={faComment} />
-        </button>
-        <button className="header-icon-btn" title="Notificações">
-          <FontAwesomeIcon icon={faBell} />
-        </button>
+        {loadingCurrentBot ? (
+          <div className="current-bot-info loading">
+            <div className="current-bot-icon">
+              <FontAwesomeIcon icon={faRobot} />
+            </div>
+            <div className="current-bot-details">
+              <div className="current-bot-name">Carregando...</div>
+            </div>
+          </div>
+        ) : currentBot ? (
+          <div className="current-bot-info">
+            <div className="current-bot-icon">
+              <FontAwesomeIcon icon={faRobot} />
+            </div>
+            <div className="current-bot-details">
+              <div className="current-bot-name">{currentBot.name}</div>
+              {currentBot.username && (
+                <div className="current-bot-username">@{currentBot.username}</div>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="current-bot-info no-bot">
+            <div className="current-bot-icon">
+              <FontAwesomeIcon icon={faRobot} />
+            </div>
+            <div className="current-bot-details">
+              <div className="current-bot-name">Nenhum bot selecionado</div>
+            </div>
+          </div>
+        )}
         <div className="header-profile-menu">
           <button 
             className="profile-circle-btn"

@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import Login from './pages/Login';
@@ -10,11 +10,11 @@ import WelcomeMessage from './pages/WelcomeMessage';
 import PaymentPlans from './pages/PaymentPlans';
 import Redirect from './pages/Redirect';
 import Administrators from './pages/Administrators';
-import Groups from './pages/Groups';
 import Marketing from './pages/Marketing';
 import Alerts from './pages/Alerts';
 import Downsell from './pages/Downsell';
 import Contacts from './pages/Contacts';
+import ContactDetails from './pages/ContactDetails';
 import Users from './pages/Users';
 import Logs from './pages/Logs';
 import PaymentCycles from './pages/PaymentCycles';
@@ -22,6 +22,9 @@ import PaymentGatewayConfigs from './pages/PaymentGatewayConfigs';
 import GroupManagement from './pages/GroupManagement';
 import Billing from './pages/Billing';
 import UserGroups from './pages/UserGroups';
+import SecuritySettings from './pages/SecuritySettings';
+import TelegramGroups from './pages/TelegramGroups';
+import Commands from './pages/Commands';
 import './App.css';
 
 function App() {
@@ -88,10 +91,18 @@ function App() {
               }
             />
             <Route
-              path="/bot/groups"
+              path="/bot/telegram-groups"
               element={
                 <ProtectedRoute>
-                  <Groups />
+                  <TelegramGroups />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/bot/commands"
+              element={
+                <ProtectedRoute>
+                  <Commands />
                 </ProtectedRoute>
               }
             />
@@ -100,6 +111,14 @@ function App() {
               element={
                 <ProtectedRoute>
                   <Contacts />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/results/contacts/:id"
+              element={
+                <ProtectedRoute>
+                  <ContactDetails />
                 </ProtectedRoute>
               }
             />
@@ -164,6 +183,14 @@ function App() {
               element={
                 <ProtectedRoute>
                   <PaymentGatewayConfigs />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/settings/security"
+              element={
+                <ProtectedRoute>
+                  <SecuritySettings />
                 </ProtectedRoute>
               }
             />

@@ -247,14 +247,22 @@ class ContactController extends Controller
 
             $botId = $request->botId;
             $total = Contact::where('bot_id', $botId)->count();
-            $active = Contact::where('bot_id', $botId)->where('is_blocked', false)->count();
-            $blocked = Contact::where('bot_id', $botId)->where('is_blocked', true)->count();
+            $active = Contact::where('bot_id', $botId)
+                ->where('telegram_status', 'active')
+                ->where('is_blocked', false)
+                ->count();
+            $inactive = Contact::where('bot_id', $botId)
+                ->where(function($query) {
+                    $query->where('telegram_status', 'inactive')
+                        ->orWhere('is_blocked', true);
+                })
+                ->count();
 
             return response()->json([
                 'stats' => [
                     'total_count' => $total,
                     'active_count' => $active,
-                    'inactive_count' => $blocked,
+                    'inactive_count' => $inactive,
                 ],
             ]);
         } catch (\Exception $e) {
@@ -286,6 +294,109 @@ class ContactController extends Controller
             return response()->json(['contacts' => $contacts]);
         } catch (\Exception $e) {
             return response()->json(['error' => 'Failed to fetch latest contacts'], 500);
+        }
+    }
+
+    /**
+     * Sincroniza membros do grupo salvando-os como contatos
+     * Obtém administradores do grupo via API do Telegram e os salva no banco
+     */
+    public function syncGroupMembers(Request $request): JsonResponse
+    {
+        try {
+            $validator = Validator::make($request->all(), [
+                'botId' => 'required|exists:bots,id',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json(['errors' => $validator->errors()], 400);
+            }
+
+            $bot = \App\Models\Bot::findOrFail($request->botId);
+
+            if (empty($bot->telegram_group_id)) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Bot não tem grupo configurado',
+                    'synced_count' => 0
+                ], 400);
+            }
+
+            $telegramService = new \App\Services\TelegramService();
+            $result = $telegramService->syncGroupMembers($bot);
+
+            if (!$result['success']) {
+                return response()->json([
+                    'success' => false,
+                    'error' => $result['error'],
+                    'synced_count' => $result['synced_count']
+                ], 400);
+            }
+
+            // Atualiza status de todos os contatos do bot após sincronização
+            $contacts = Contact::where('bot_id', $bot->id)->get();
+            foreach ($contacts as $contact) {
+                $telegramService->updateContactTelegramStatus($bot, $contact);
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => "{$result['synced_count']} membro(s) sincronizado(s) e status atualizado com sucesso",
+                'synced_count' => $result['synced_count'],
+                'details' => $result['details']
+            ]);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json(['error' => 'Bot not found'], 404);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Failed to sync group members: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Atualiza o status do Telegram de todos os contatos de um bot
+     */
+    public function updateAllContactsStatus(Request $request): JsonResponse
+    {
+        try {
+            $validator = Validator::make($request->all(), [
+                'botId' => 'required|exists:bots,id',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json(['errors' => $validator->errors()], 400);
+            }
+
+            $bot = \App\Models\Bot::findOrFail($request->botId);
+            $contacts = Contact::where('bot_id', $bot->id)->get();
+            
+            $telegramService = new \App\Services\TelegramService();
+            $updatedCount = 0;
+
+            foreach ($contacts as $contact) {
+                try {
+                    $telegramService->updateContactTelegramStatus($bot, $contact);
+                    $updatedCount++;
+                } catch (\Exception $e) {
+                    // Continua com os próximos contatos mesmo se um falhar
+                    continue;
+                }
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => "Status de {$updatedCount} contato(s) atualizado(s) com sucesso",
+                'updated_count' => $updatedCount
+            ]);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json(['error' => 'Bot not found'], 404);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Failed to update contacts status: ' . $e->getMessage()
+            ], 500);
         }
     }
 }

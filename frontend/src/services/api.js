@@ -4,13 +4,22 @@ import axios from 'axios';
 // Em desenvolvimento, usa o proxy do React (setupProxy.js)
 // Em produção, usa a URL completa do .env
 const isDevelopment = process.env.NODE_ENV === 'development';
-const API_URL = isDevelopment 
+let API_URL = isDevelopment 
   ? '/api'  // Usa o proxy do React em desenvolvimento
   : (process.env.REACT_APP_API_URL || (() => {
       const error = 'REACT_APP_API_URL não está configurada. Verifique o arquivo .env na pasta frontend.';
       console.error(error);
       throw new Error(error);
     })());
+
+// Em produção, se a página está em HTTPS mas a API está configurada como HTTP, força HTTPS
+if (!isDevelopment && typeof window !== 'undefined') {
+  const isPageHTTPS = window.location.protocol === 'https:';
+  if (isPageHTTPS && API_URL.startsWith('http://')) {
+    console.warn('Página está em HTTPS mas API está configurada como HTTP. Convertendo para HTTPS...');
+    API_URL = API_URL.replace('http://', 'https://');
+  }
+}
 
 const api = axios.create({
   baseURL: API_URL,

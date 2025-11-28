@@ -109,6 +109,7 @@
   text-decoration: none;
   transition: all 0.2s;
   position: relative;
+  cursor: pointer;
 }
 
 .sidebar-item:hover {
@@ -175,6 +176,7 @@
   text-decoration: none;
   font-size: 14px;
   transition: all 0.2s;
+  cursor: pointer;
 }
 
 .sidebar-submenu-item:hover {
@@ -224,6 +226,7 @@
   display: block;
   margin-bottom: 20px;
   transition: opacity 0.2s;
+  cursor: pointer;
 }
 
 .sidebar-billing-link:hover {

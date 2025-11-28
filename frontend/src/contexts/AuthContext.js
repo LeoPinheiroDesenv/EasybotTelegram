@@ -50,11 +50,23 @@ export const AuthProvider = ({ children }) => {
     setUser(null);
   };
 
+  const refreshUser = async () => {
+    try {
+      const userData = await authService.getCurrentUser();
+      setUser(userData);
+      return userData;
+    } catch (error) {
+      console.error('Erro ao atualizar usuário:', error);
+      return null;
+    }
+  };
+
   const value = {
     user,
     login,
     verifyTwoFactor,
     logout,
+    refreshUser,
     loading,
     isAuthenticated: !!user,
     isAdmin: user?.role === 'admin'

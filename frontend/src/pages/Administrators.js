@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import Layout from '../components/Layout';
-import botService from '../services/botService';
+import botAdministratorService from '../services/botAdministratorService';
 import './Administrators.css';
 
 const Administrators = () => {
@@ -35,14 +35,14 @@ const Administrators = () => {
       setError('Bot não selecionado. Por favor, selecione um bot primeiro.');
       setLoadingData(false);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [botId]);
 
   const loadAdministrators = async () => {
     try {
       setLoadingData(true);
-      // TODO: Implementar API para carregar administradores
-      // Por enquanto, usando dados mockados
-      setAdministrators([]);
+      const admins = await botAdministratorService.getAll(botId);
+      setAdministrators(admins);
       setError('');
     } catch (err) {
       setError(err.response?.data?.error || 'Erro ao carregar administradores');
@@ -69,7 +69,7 @@ const Administrators = () => {
   const handleEdit = (admin) => {
     setEditingAdmin(admin);
     setFormData({
-      user_id: admin.user_id || ''
+      user_id: admin.telegram_user_id || ''
     });
     setShowAddModal(true);
   };
@@ -81,9 +81,9 @@ const Administrators = () => {
 
     try {
       setLoading(true);
-      // TODO: Implementar API para deletar administrador
-      setAdministrators(administrators.filter(admin => admin.id !== adminId));
+      await botAdministratorService.delete(adminId);
       setSuccess('Administrador removido com sucesso!');
+      await loadAdministrators();
       setTimeout(() => setSuccess(''), 3000);
     } catch (err) {
       setError(err.response?.data?.error || 'Erro ao remover administrador');
@@ -104,30 +104,34 @@ const Administrators = () => {
       return;
     }
 
+    if (!botId) {
+      setError('Bot não selecionado');
+      return;
+    }
+
     setError('');
     setLoading(true);
 
     try {
-      // TODO: Implementar API para salvar administrador
       if (editingAdmin) {
         // Update existing administrator
-        setAdministrators(administrators.map(admin => 
-          admin.id === editingAdmin.id ? { ...admin, user_id: formData.user_id.trim() } : admin
-        ));
+        await botAdministratorService.update(editingAdmin.id, {
+          telegram_user_id: formData.user_id.trim()
+        });
         setSuccess('Administrador atualizado com sucesso!');
       } else {
         // Add new administrator
-        const newAdmin = {
-          id: Date.now(), // Temporary ID
-          user_id: formData.user_id.trim()
-        };
-        setAdministrators([...administrators, newAdmin]);
+        await botAdministratorService.create({
+          bot_id: botId,
+          telegram_user_id: formData.user_id.trim()
+        });
         setSuccess('Administrador adicionado com sucesso!');
       }
       setShowAddModal(false);
+      await loadAdministrators();
       setTimeout(() => setSuccess(''), 3000);
     } catch (err) {
-      setError(err.response?.data?.error || 'Erro ao salvar administrador');
+      setError(err.response?.data?.error || err.response?.data?.errors?.telegram_user_id?.[0] || 'Erro ao salvar administrador');
     } finally {
       setLoading(false);
     }
@@ -227,7 +231,7 @@ const Administrators = () => {
                   ) : (
                     administrators.map((admin) => (
                       <tr key={admin.id}>
-                        <td>{admin.user_id}</td>
+                        <td>{admin.telegram_user_id}</td>
                         <td>
                           <div className="action-buttons">
                             <button

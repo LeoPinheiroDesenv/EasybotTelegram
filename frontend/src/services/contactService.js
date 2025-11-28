@@ -55,6 +55,13 @@ const contactService = {
       params: { botId, limit }
     });
     return response.data.contacts;
+  },
+
+  async syncGroupMembers(botId) {
+    const response = await api.post('/contacts/sync-group-members', null, {
+      params: { botId }
+    });
+    return response.data;
   }
 };
 

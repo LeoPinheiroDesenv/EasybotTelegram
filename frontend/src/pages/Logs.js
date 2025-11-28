@@ -20,6 +20,7 @@ const Logs = () => {
     if (isAdmin) {
       loadLogs();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAdmin, filters]);
 
   const loadLogs = async () => {

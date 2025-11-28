@@ -18,8 +18,14 @@ class Contact extends Model
         'username',
         'first_name',
         'last_name',
+        'email',
+        'phone',
+        'language',
         'is_bot',
         'is_blocked',
+        'telegram_status',
+        'expires_at',
+        'last_interaction_at',
     ];
 
     /**
@@ -32,6 +38,8 @@ class Contact extends Model
         return [
             'is_bot' => 'boolean',
             'is_blocked' => 'boolean',
+            'expires_at' => 'datetime',
+            'last_interaction_at' => 'datetime',
         ];
     }
 

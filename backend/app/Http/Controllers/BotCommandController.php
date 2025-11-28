@@ -4,21 +4,36 @@ namespace App\Http\Controllers;
 
 use App\Models\Bot;
 use App\Models\BotCommand;
+use App\Services\PermissionService;
+use App\Services\TelegramService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 
 class BotCommandController extends Controller
 {
+    protected $permissionService;
+    protected $telegramService;
+
+    public function __construct(PermissionService $permissionService, TelegramService $telegramService)
+    {
+        $this->permissionService = $permissionService;
+        $this->telegramService = $telegramService;
+    }
+
     /**
      * Lista comandos de um bot
      */
     public function index(string $botId): JsonResponse
     {
         try {
-            $bot = Bot::where('id', $botId)
-                ->where('user_id', auth()->id())
-                ->firstOrFail();
+            $user = auth()->user();
+            $bot = Bot::findOrFail($botId);
+
+            // Verifica permissão de leitura
+            if (!$this->permissionService->hasBotPermission($user, (int)$botId, 'read')) {
+                return response()->json(['error' => 'Acesso negado'], 403);
+            }
 
             $commands = BotCommand::where('bot_id', $bot->id)
                 ->orderBy('command')
@@ -49,9 +64,13 @@ class BotCommandController extends Controller
         }
 
         try {
-            $bot = Bot::where('id', $botId)
-                ->where('user_id', auth()->id())
-                ->firstOrFail();
+            $user = auth()->user();
+            $bot = Bot::findOrFail($botId);
+
+            // Verifica permissão de escrita
+            if (!$this->permissionService->hasBotPermission($user, (int)$botId, 'write')) {
+                return response()->json(['error' => 'Acesso negado'], 403);
+            }
 
             // Remove barra se presente
             $command = str_replace('/', '', $request->command);
@@ -72,6 +91,11 @@ class BotCommandController extends Controller
                 'description' => $request->description,
                 'active' => $request->active ?? true,
             ]);
+
+            // Registra comandos no Telegram se o bot estiver ativado
+            if ($bot->activated && $bot->active) {
+                $this->telegramService->registerBotCommands($bot);
+            }
 
             return response()->json(['command' => $botCommand], 201);
         } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
@@ -97,15 +121,24 @@ class BotCommandController extends Controller
         }
 
         try {
-            $bot = Bot::where('id', $botId)
-                ->where('user_id', auth()->id())
-                ->firstOrFail();
+            $user = auth()->user();
+            $bot = Bot::findOrFail($botId);
+
+            // Verifica permissão de escrita
+            if (!$this->permissionService->hasBotPermission($user, (int)$botId, 'write')) {
+                return response()->json(['error' => 'Acesso negado'], 403);
+            }
 
             $botCommand = BotCommand::where('id', $commandId)
                 ->where('bot_id', $bot->id)
                 ->firstOrFail();
 
             $botCommand->update($request->only(['response', 'description', 'active']));
+
+            // Registra comandos no Telegram se o bot estiver ativado
+            if ($bot->activated && $bot->active) {
+                $this->telegramService->registerBotCommands($bot);
+            }
 
             return response()->json(['command' => $botCommand]);
         } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
@@ -121,9 +154,13 @@ class BotCommandController extends Controller
     public function destroy(string $botId, string $commandId): JsonResponse
     {
         try {
-            $bot = Bot::where('id', $botId)
-                ->where('user_id', auth()->id())
-                ->firstOrFail();
+            $user = auth()->user();
+            $bot = Bot::findOrFail($botId);
+
+            // Verifica permissão de escrita
+            if (!$this->permissionService->hasBotPermission($user, (int)$botId, 'write')) {
+                return response()->json(['error' => 'Acesso negado'], 403);
+            }
 
             $botCommand = BotCommand::where('id', $commandId)
                 ->where('bot_id', $bot->id)
@@ -131,11 +168,81 @@ class BotCommandController extends Controller
 
             $botCommand->delete();
 
+            // Registra comandos no Telegram se o bot estiver ativado
+            if ($bot->activated && $bot->active) {
+                $this->telegramService->registerBotCommands($bot);
+            }
+
             return response()->json(['message' => 'Command deleted successfully']);
         } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
             return response()->json(['error' => 'Command not found'], 404);
         } catch (\Exception $e) {
             return response()->json(['error' => 'Failed to delete command'], 500);
+        }
+    }
+
+    /**
+     * Registra comandos do bot no Telegram
+     */
+    public function registerCommands(string $botId): JsonResponse
+    {
+        try {
+            $user = auth()->user();
+            $bot = Bot::findOrFail($botId);
+
+            // Verifica permissão de escrita
+            if (!$this->permissionService->hasBotPermission($user, (int)$botId, 'write')) {
+                return response()->json(['error' => 'Acesso negado'], 403);
+            }
+
+            if (!$bot->activated || !$bot->active) {
+                return response()->json(['error' => 'Bot não está ativo ou não foi inicializado'], 400);
+            }
+
+            $success = $this->telegramService->registerBotCommands($bot);
+
+            if ($success) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Comandos registrados no Telegram com sucesso'
+                ]);
+            }
+
+            return response()->json([
+                'success' => false,
+                'error' => 'Erro ao registrar comandos no Telegram'
+            ], 500);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json(['error' => 'Bot not found'], 404);
+        } catch (\Exception $e) {
+            return response()->json(['error' => 'Failed to register commands: ' . $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Obtém comandos registrados no Telegram
+     */
+    public function getTelegramCommands(string $botId): JsonResponse
+    {
+        try {
+            $user = auth()->user();
+            $bot = Bot::findOrFail($botId);
+
+            // Verifica permissão de leitura
+            if (!$this->permissionService->hasBotPermission($user, (int)$botId, 'read')) {
+                return response()->json(['error' => 'Acesso negado'], 403);
+            }
+
+            $commands = $this->telegramService->getMyCommands($bot);
+
+            return response()->json([
+                'success' => true,
+                'commands' => $commands
+            ]);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json(['error' => 'Bot not found'], 404);
+        } catch (\Exception $e) {
+            return response()->json(['error' => 'Failed to get commands: ' . $e->getMessage()], 500);
         }
     }
 }

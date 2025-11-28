@@ -29,16 +29,34 @@ const Login = () => {
       const result = await login(email, password, twoFactorToken || null);
       
       // Se requer 2FA, mostra o campo de código
-      if (result.requiresTwoFactor) {
+      if (result && result.requiresTwoFactor) {
         setRequiresTwoFactor(true);
         setUserId(result.userId);
+        setTwoFactorToken(''); // Limpa o campo para o código 2FA
         setLoading(false);
         return;
       }
       
-      navigate('/');
+      // Se chegou aqui, login foi bem-sucedido
+      if (result && result.token) {
+        navigate('/');
+        return;
+      }
+      
+      // Se não tem token nem requiresTwoFactor, algo está errado
+      setError('Resposta inválida do servidor');
+      setLoading(false);
     } catch (err) {
-      setError(err.response?.data?.error || 'Erro ao fazer login');
+      // Verifica se é uma resposta de 2FA (não é erro)
+      if (err.response?.data?.requiresTwoFactor) {
+        setRequiresTwoFactor(true);
+        setUserId(err.response.data.userId);
+        setTwoFactorToken('');
+        setLoading(false);
+        return;
+      }
+      
+      setError(err.response?.data?.error || err.response?.data?.message || 'Erro ao fazer login');
       setLoading(false);
     }
   };
@@ -60,8 +78,18 @@ const Login = () => {
   return (
     <div className="login-container">
       <div className="login-card">
-        <h1>Easy</h1>
-        <h2>Login</h2>
+        <div className="login-logo">
+          <div className="logo-circles">
+            <span className="circle circle-1"></span>
+            <span className="circle circle-2"></span>
+            <span className="circle circle-3"></span>
+          </div>
+          <div className="logo-text">
+            <div className="logo-title">Easy</div>
+            <div className="logo-subtitle">Sistema de Gerenciamento</div>
+          </div>
+        </div>
+        <h2 className="login-title">Login</h2>
         {!requiresTwoFactor ? (
           <form onSubmit={handleSubmit}>
             <div className="form-group">
@@ -96,6 +124,14 @@ const Login = () => {
         ) : (
           <form onSubmit={handleVerifyTwoFactor}>
             <div className="form-group">
+              <div className="two-factor-info">
+                <p className="two-factor-title">
+                  🔐 Autenticação de dois fatores ativada
+                </p>
+                <p className="two-factor-description">
+                  Digite o código de 6 dígitos do seu aplicativo autenticador
+                </p>
+              </div>
               <label htmlFor="twoFactorToken">Código de Verificação (2FA):</label>
               <input
                 type="text"
@@ -107,12 +143,18 @@ const Login = () => {
                 maxLength="6"
                 autoFocus
                 disabled={loading}
+                style={{ 
+                  textAlign: 'center', 
+                  letterSpacing: '8px', 
+                  fontSize: '20px',
+                  fontWeight: 'bold'
+                }}
               />
-              <small>Digite o código de 6 dígitos do seu aplicativo autenticador</small>
+              <small>Digite o código de 6 dígitos do seu aplicativo autenticador (Google Authenticator, Authy, etc.)</small>
             </div>
             {error && <div className="error">{error}</div>}
             <button type="submit" className="btn btn-primary" disabled={loading || twoFactorToken.length !== 6}>
-              {loading ? 'Verificando...' : 'Verificar'}
+              {loading ? 'Verificando...' : 'Verificar e Entrar'}
             </button>
             <button 
               type="button" 
@@ -128,13 +170,6 @@ const Login = () => {
               Voltar
             </button>
           </form>
-        )}
-        {!requiresTwoFactor && (
-          <div className="login-info">
-            <p>Usuário padrão:</p>
-            <p><strong>Email:</strong> admin@admin.com</p>
-            <p><strong>Senha:</strong> admin123</p>
-          </div>
         )}
       </div>
     </div>

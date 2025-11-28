@@ -1,16 +1,36 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import Layout from '../components/Layout';
+import alertService from '../services/alertService';
+import paymentPlanService from '../services/paymentPlanService';
 import './Alerts.css';
 
 const Alerts = () => {
+  const [searchParams] = useSearchParams();
+  let botId = searchParams.get('botId');
+  
+  // Tenta obter botId do localStorage se não estiver na URL
+  if (!botId) {
+    const storedBotId = localStorage.getItem('selectedBotId');
+    if (storedBotId) {
+      botId = storedBotId;
+    }
+  }
+
   const [alerts, setAlerts] = useState([]);
+  const [paymentPlans, setPaymentPlans] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [loadingData, setLoadingData] = useState(true);
+  const [processing, setProcessing] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [filter, setFilter] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [showSearch, setShowSearch] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingAlert, setEditingAlert] = useState(null);
   const [formData, setFormData] = useState({
+    bot_id: botId || '',
     alert_type: '',
     message: '',
     scheduled_date: '',
@@ -18,23 +38,38 @@ const Alerts = () => {
     plan_id: '',
     user_language: 'pt',
     user_category: 'all',
-    file: null
+    file_url: ''
   });
 
   useEffect(() => {
-    loadAlerts();
-  }, []);
+    if (botId) {
+      loadAlerts();
+      loadPaymentPlans();
+    } else {
+      setError('Bot não selecionado. Por favor, selecione um bot primeiro.');
+      setLoadingData(false);
+    }
+  }, [botId]);
 
   const loadAlerts = async () => {
     try {
-      setLoading(true);
-      // TODO: Implementar API para carregar alertas
-      // Por enquanto, usando dados mockados
-      setAlerts([]);
+      setLoadingData(true);
+      const alertsData = await alertService.getAlerts(botId);
+      setAlerts(alertsData);
+      setError('');
     } catch (err) {
-      console.error('Erro ao carregar alertas:', err);
+      setError(err.response?.data?.error || 'Erro ao carregar alertas');
     } finally {
-      setLoading(false);
+      setLoadingData(false);
+    }
+  };
+
+  const loadPaymentPlans = async () => {
+    try {
+      const plans = await paymentPlanService.getPaymentPlans(botId);
+      setPaymentPlans(plans);
+    } catch (err) {
+      console.error('Erro ao carregar planos:', err);
     }
   };
 
@@ -66,8 +101,13 @@ const Alerts = () => {
   };
 
   const handleCreate = () => {
+    if (!botId) {
+      setError('Bot não selecionado. Por favor, selecione um bot primeiro.');
+      return;
+    }
     setEditingAlert(null);
     setFormData({
+      bot_id: botId,
       alert_type: '',
       message: '',
       scheduled_date: '',
@@ -75,14 +115,16 @@ const Alerts = () => {
       plan_id: '',
       user_language: 'pt',
       user_category: 'all',
-      file: null
+      file_url: ''
     });
     setShowCreateModal(true);
+    setError('');
   };
 
   const handleEdit = (alert) => {
     setEditingAlert(alert);
     setFormData({
+      bot_id: alert.bot_id || botId,
       alert_type: alert.alert_type || '',
       message: alert.message || '',
       scheduled_date: alert.scheduled_date || '',
@@ -90,9 +132,10 @@ const Alerts = () => {
       plan_id: alert.plan_id || '',
       user_language: alert.user_language || 'pt',
       user_category: alert.user_category || 'all',
-      file: alert.file || null
+      file_url: alert.file_url || ''
     });
     setShowCreateModal(true);
+    setError('');
   };
 
   const handleDelete = async (alertId) => {
@@ -102,54 +145,136 @@ const Alerts = () => {
 
     try {
       setLoading(true);
-      // TODO: Implementar API para deletar alerta
-      setAlerts(alerts.filter(alert => alert.id !== alertId));
+      await alertService.deleteAlert(alertId);
+      setSuccess('Alerta excluído com sucesso!');
+      loadAlerts();
+      setTimeout(() => setSuccess(''), 3000);
     } catch (err) {
-      console.error('Erro ao deletar alerta:', err);
+      setError(err.response?.data?.error || 'Erro ao excluir alerta');
     } finally {
       setLoading(false);
     }
   };
 
   const handleSave = async () => {
-    if (!formData.alert_type || !formData.message || !formData.scheduled_date) {
-      alert('Por favor, preencha todos os campos obrigatórios');
+    if (!formData.alert_type || !formData.message) {
+      setError('Por favor, preencha todos os campos obrigatórios');
+      return;
+    }
+
+    if (formData.alert_type === 'scheduled' && (!formData.scheduled_date || !formData.scheduled_time)) {
+      setError('Para alertas agendados, é necessário informar data e hora');
+      return;
+    }
+
+    if (!formData.bot_id) {
+      setError('Bot não selecionado');
       return;
     }
 
     setLoading(true);
+    setError('');
 
     try {
-      // TODO: Implementar API para salvar alerta
-      if (editingAlert) {
-        setAlerts(alerts.map(alert => 
-          alert.id === editingAlert.id ? { ...alert, ...formData } : alert
-        ));
-      } else {
-        const newAlert = {
-          id: Date.now(),
-          ...formData
-        };
-        setAlerts([...alerts, newAlert]);
+      // Prepara dados para envio
+      const alertData = {
+        bot_id: formData.bot_id,
+        alert_type: formData.alert_type,
+        message: formData.message,
+        plan_id: formData.plan_id || null,
+        user_language: formData.user_language,
+        user_category: formData.user_category,
+        file_url: formData.file_url || null
+      };
+
+      // Adiciona data e hora apenas para alertas agendados
+      if (formData.alert_type === 'scheduled') {
+        alertData.scheduled_date = formData.scheduled_date;
+        alertData.scheduled_time = formData.scheduled_time;
       }
+
+      if (editingAlert) {
+        await alertService.updateAlert(editingAlert.id, alertData);
+        setSuccess('Alerta atualizado com sucesso!');
+      } else {
+        await alertService.createAlert(alertData);
+        setSuccess('Alerta criado com sucesso!');
+      }
+
       setShowCreateModal(false);
+      loadAlerts();
+      setTimeout(() => setSuccess(''), 3000);
     } catch (err) {
-      console.error('Erro ao salvar alerta:', err);
+      setError(err.response?.data?.error || err.response?.data?.errors?.message?.[0] || 'Erro ao salvar alerta');
     } finally {
       setLoading(false);
     }
   };
 
+  const handleProcessAlerts = async () => {
+    if (!window.confirm('Deseja processar e enviar os alertas que estão prontos?')) {
+      return;
+    }
+
+    try {
+      setProcessing(true);
+      setError('');
+      const result = await alertService.processAlerts(botId);
+      setSuccess(result.message || `Processamento concluído. ${result.processed} alerta(s) processado(s), ${result.sent} mensagem(s) enviada(s).`);
+      loadAlerts();
+      setTimeout(() => setSuccess(''), 5000);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Erro ao processar alertas');
+    } finally {
+      setProcessing(false);
+    }
+  };
+
   const filteredAlerts = alerts.filter(alert => {
-    const matchesSearch = alert.title?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = alert.message?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         alert.alert_type?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesFilter = filter === 'all' || alert.status === filter;
     return matchesSearch && matchesFilter;
   });
+
+  if (loadingData) {
+    return (
+      <Layout>
+        <div className="alerts-page">
+          <div className="loading-container">Carregando alertas...</div>
+        </div>
+      </Layout>
+    );
+  }
+
+  if (!botId) {
+    return (
+      <Layout>
+        <div className="alerts-page">
+          <div className="error-container">
+            <p>{error}</p>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
 
   return (
     <Layout>
       <div className="alerts-page">
         <div className="alerts-content">
+          {error && (
+            <div className="alert alert-error">
+              {error}
+            </div>
+          )}
+
+          {success && (
+            <div className="alert alert-success">
+              {success}
+            </div>
+          )}
+
           <div className="alerts-header">
             <div className="alerts-title-section">
               <h1 className="alerts-title">Todos os alertas cadastrados</h1>
@@ -201,8 +326,17 @@ const Alerts = () => {
                 <option value="inactive">Inativos</option>
               </select>
               <button
+                onClick={handleProcessAlerts}
+                className="btn-process-alerts"
+                disabled={processing || loading}
+                title="Processar e enviar alertas que estão prontos"
+              >
+                {processing ? 'Processando...' : '🔄 Processar Alertas'}
+              </button>
+              <button
                 onClick={handleCreate}
                 className="btn-create-alert"
+                disabled={loading}
               >
                 Criar novo alerta
               </button>
@@ -234,13 +368,13 @@ const Alerts = () => {
                 ) : (
                   filteredAlerts.map((alert) => (
                     <tr key={alert.id}>
-                      <td>{alert.title}</td>
-                      <td>{alert.plan_name || '-'}</td>
-                      <td>{alert.promotion_value}</td>
-                      <td>{alert.target_users}</td>
+                      <td>{alert.message?.substring(0, 50) || '-'}</td>
+                      <td>{alert.plan?.title || '-'}</td>
+                      <td>-</td>
+                      <td>{alert.user_category === 'all' ? 'Todos' : alert.user_category === 'premium' ? 'Premium' : 'Gratuitos'}</td>
                       <td>
                         <span className={`status-badge status-${alert.status}`}>
-                          {alert.status === 'active' ? 'Ativo' : 'Inativo'}
+                          {alert.status === 'active' ? 'Ativo' : alert.status === 'sent' ? 'Enviado' : 'Inativo'}
                         </span>
                       </td>
                       <td>
@@ -324,28 +458,37 @@ const Alerts = () => {
                     />
                   </div>
 
-                  <div className="form-group">
-                    <label>
-                      Data e Hora do Agendamento <span className="required-asterisk">*</span>
-                    </label>
-                    <div className="datetime-input-container">
+                  {formData.alert_type === 'scheduled' && (
+                    <div className="form-group">
+                      <label>
+                        Data do Agendamento <span className="required-asterisk">*</span>
+                      </label>
                       <input
-                        type="text"
-                        name="scheduled_datetime"
-                        value={`${formData.scheduled_date || ''}${formData.scheduled_time ? ', ' + formData.scheduled_time : ''}`}
-                        onChange={handleDateTimeChange}
-                        placeholder="dd/mm/aaaa, --:--"
-                        className="form-input datetime-input"
-                        required
+                        type="date"
+                        name="scheduled_date"
+                        value={formData.scheduled_date}
+                        onChange={handleChange}
+                        className="form-input"
+                        required={formData.alert_type === 'scheduled'}
                       />
-                      <button type="button" className="datetime-icon-btn" title="Selecionar data e hora">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <circle cx="12" cy="12" r="10"></circle>
-                          <polyline points="12 6 12 12 16 14"></polyline>
-                        </svg>
-                      </button>
                     </div>
-                  </div>
+                  )}
+
+                  {formData.alert_type === 'scheduled' && (
+                    <div className="form-group">
+                      <label>
+                        Hora do Agendamento <span className="required-asterisk">*</span>
+                      </label>
+                      <input
+                        type="time"
+                        name="scheduled_time"
+                        value={formData.scheduled_time}
+                        onChange={handleChange}
+                        className="form-input"
+                        required={formData.alert_type === 'scheduled'}
+                      />
+                    </div>
+                  )}
 
                   <div className="form-group">
                     <label>
@@ -358,7 +501,9 @@ const Alerts = () => {
                       className="form-input"
                     >
                       <option value="">Selecione um plano</option>
-                      {/* TODO: Carregar planos da API */}
+                      {paymentPlans.map(plan => (
+                        <option key={plan.id} value={plan.id}>{plan.title}</option>
+                      ))}
                     </select>
                   </div>
 
@@ -392,39 +537,17 @@ const Alerts = () => {
 
                   <div className="form-group">
                     <label>
-                      Arquivo <span className="optional-label">(Opcional)</span>
+                      URL do Arquivo <span className="optional-label">(Opcional)</span>
                     </label>
-                    <div className="file-upload-area">
-                      <input
-                        type="file"
-                        name="file"
-                        id="file-upload"
-                        onChange={handleChange}
-                        className="file-input"
-                        accept="image/*,video/*"
-                      />
-                      <label htmlFor="file-upload" className="file-upload-label">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="file-icon">
-                          <path d="M16.5 6v11.5c0 2.5-2 4.5-4.5 4.5S7 20 7 17.5V5a2.5 2.5 0 0 1 5 0v10.5"></path>
-                        </svg>
-                        <span className="file-upload-text">Arquivo (Opcional)</span>
-                      </label>
-                      <p className="file-upload-note">
-                        Anexos devem ter até 2MB para imagens e até 20MB para videos
-                      </p>
-                      {formData.file && (
-                        <div className="file-selected">
-                          <span>{formData.file.name}</span>
-                          <button
-                            type="button"
-                            onClick={() => setFormData({ ...formData, file: null })}
-                            className="file-remove-btn"
-                          >
-                            ×
-                          </button>
-                        </div>
-                      )}
-                    </div>
+                    <input
+                      type="url"
+                      name="file_url"
+                      value={formData.file_url}
+                      onChange={handleChange}
+                      placeholder="https://exemplo.com/imagem.jpg"
+                      className="form-input"
+                    />
+                    <small>URL da imagem ou vídeo a ser enviado com o alerta</small>
                   </div>
                 </div>
                 <div className="modal-footer">

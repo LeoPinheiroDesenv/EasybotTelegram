@@ -14,7 +14,6 @@ const Contacts = () => {
   const [stats, setStats] = useState({ active_count: 0, inactive_count: 0, total_count: 0 });
   const [latestContacts, setLatestContacts] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [loadingStats, setLoadingStats] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
@@ -26,9 +25,7 @@ const Contacts = () => {
   const [selectedContact, setSelectedContact] = useState(null);
   const [memberAction, setMemberAction] = useState(null); // 'add' or 'remove'
   const [memberReason, setMemberReason] = useState('');
-  const [showHistoryModal, setShowHistoryModal] = useState(false);
-  const [contactHistory, setContactHistory] = useState(null);
-  const [loadingHistory, setLoadingHistory] = useState(false);
+  const [syncingMembers, setSyncingMembers] = useState(false);
 
   useEffect(() => {
     loadBots();
@@ -42,8 +39,8 @@ const Contacts = () => {
     } else {
       setError('Bot não selecionado. Por favor, selecione um bot primeiro.');
       setLoading(false);
-      setLoadingStats(false);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const loadBots = async () => {
@@ -75,13 +72,10 @@ const Contacts = () => {
 
   const loadStats = async (id) => {
     try {
-      setLoadingStats(true);
       const statsData = await contactService.getStats(id);
       setStats(statsData);
     } catch (err) {
       console.error('Error loading stats:', err);
-    } finally {
-      setLoadingStats(false);
     }
   };
 
@@ -193,15 +187,9 @@ const Contacts = () => {
     if (!botId) return;
     
     try {
-      setLoadingHistory(true);
-      setShowHistoryModal(true);
-      const history = await groupManagementService.getContactHistory(botId, contactId);
-      setContactHistory(history);
+      await groupManagementService.getContactHistory(botId, contactId);
     } catch (err) {
       setError(err.response?.data?.error || 'Erro ao carregar histórico');
-      setShowHistoryModal(false);
-    } finally {
-      setLoadingHistory(false);
     }
   };
 
@@ -211,15 +199,70 @@ const Contacts = () => {
     setTimeout(() => setSuccess(''), 3000);
   };
 
+  const handleSyncGroupMembers = async () => {
+    if (!botId) {
+      setError('Bot não selecionado. Por favor, selecione um bot primeiro.');
+      return;
+    }
+
+    if (!window.confirm('Deseja sincronizar os membros do grupo? Isso irá buscar os administradores do grupo e salvá-los como contatos.')) {
+      return;
+    }
+
+    try {
+      setSyncingMembers(true);
+      setError('');
+      const result = await contactService.syncGroupMembers(botId);
+      
+      if (result.success) {
+        setSuccess(result.message || `${result.synced_count} membro(s) sincronizado(s) com sucesso!`);
+        // Recarrega contatos, estatísticas e últimos contatos
+        await loadContacts(botId, pagination.page);
+        await loadStats(botId);
+        await loadLatestContacts(botId);
+        setTimeout(() => setSuccess(''), 5000);
+      } else {
+        setError(result.error || 'Erro ao sincronizar membros');
+      }
+    } catch (err) {
+      setError(err.response?.data?.error || 'Erro ao sincronizar membros do grupo');
+    } finally {
+      setSyncingMembers(false);
+    }
+  };
+
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
     const date = new Date(dateString);
     return date.toLocaleDateString('pt-BR');
   };
 
-  const getInitials = (name) => {
-    if (!name) return '?';
-    return name.charAt(0).toUpperCase();
+  const getInitials = (contact) => {
+    if (!contact) return '?';
+    const firstName = contact.first_name || '';
+    const lastName = contact.last_name || '';
+    if (firstName && lastName) {
+      return (firstName.charAt(0) + lastName.charAt(0)).toUpperCase();
+    }
+    if (firstName) {
+      return firstName.charAt(0).toUpperCase();
+    }
+    if (contact.username) {
+      return contact.username.charAt(0).toUpperCase();
+    }
+    return '?';
+  };
+
+  const getContactName = (contact) => {
+    if (!contact) return 'N/A';
+    const parts = [contact.first_name, contact.last_name].filter(Boolean);
+    if (parts.length > 0) {
+      return parts.join(' ');
+    }
+    if (contact.username) {
+      return `@${contact.username}`;
+    }
+    return 'Sem nome';
   };
 
   // Calculate chart percentages
@@ -283,6 +326,15 @@ const Contacts = () => {
               <button onClick={handleSearch} className="btn-apply">
                 Aplicar
               </button>
+
+              <button 
+                onClick={handleSyncGroupMembers} 
+                className="btn-sync-members"
+                disabled={!botId || syncingMembers}
+                title="Sincronizar membros do grupo do Telegram"
+              >
+                {syncingMembers ? 'Sincronizando...' : '🔄 Sincronizar Membros'}
+              </button>
             </div>
 
             {error && <div className="alert alert-error">{error}</div>}
@@ -316,10 +368,15 @@ const Contacts = () => {
                       <tr key={contact.id}>
                         <td>
                           <div className="contact-name-cell">
-                            <div className="contact-avatar">
-                              {getInitials(contact.name)}
+                            <div className={`contact-avatar ${contact.is_bot ? 'bot-avatar' : ''}`}>
+                              {getInitials(contact)}
                             </div>
-                            <span>{contact.name || 'N/A'}</span>
+                            <div className="contact-name-info">
+                              <span>{getContactName(contact)}</span>
+                              {contact.is_bot && (
+                                <span className="bot-badge" title="Bot">🤖 Bot</span>
+                              )}
+                            </div>
                           </div>
                         </td>
                         <td>{contact.telegram_id}</td>
@@ -334,7 +391,7 @@ const Contacts = () => {
                         <td>
                           <div className="action-buttons">
                             <button
-                              onClick={() => navigate(`/results/contacts/${contact.id}`)}
+                              onClick={() => navigate(`/results/contacts/${contact.id}?botId=${botId}`)}
                               className="btn-details"
                               title="Detalhes"
                             >
@@ -349,20 +406,22 @@ const Contacts = () => {
                               <span className="loading-spinner">...</span>
                             ) : (
                               <>
-                            <button
-                              onClick={() => checkMemberStatus(contact.id)}
-                              className="btn-check-status"
-                              title="Verificar status no grupo"
-                            >
-                              Verificar
-                            </button>
-                            <button
-                              onClick={() => loadContactHistory(contact.id)}
-                              className="btn-history"
-                              title="Ver histórico de ações"
-                            >
-                              Histórico
-                            </button>
+                            {!contact.is_bot && (
+                              <>
+                                <button
+                                  onClick={() => checkMemberStatus(contact.id)}
+                                  className="btn-check-status"
+                                  title="Verificar status no grupo"
+                                >
+                                  Verificar
+                                </button>
+                                <button
+                                  onClick={() => loadContactHistory(contact.id)}
+                                  className="btn-history"
+                                  title="Ver histórico de ações"
+                                >
+                                  Histórico
+                                </button>
                                 <button
                                   onClick={() => handleManageMember(contact, 'add')}
                                   className="btn-add-member"
@@ -381,13 +440,25 @@ const Contacts = () => {
                                 </button>
                               </>
                             )}
-                            <button
-                              onClick={() => handleBlock(contact.id)}
-                              className="btn-block"
-                              title="Bloquear"
-                            >
-                              Bloquear
-                            </button>
+                            {contact.is_bot && (
+                              <span className="bot-indicator" title="Este é um bot - ações de grupo não disponíveis">
+                                Bot
+                              </span>
+                            )}
+                              </>
+                            )}
+                            {!contact.is_bot && (
+                              <button
+                                onClick={() => handleBlock(contact.id)}
+                                className="btn-block"
+                                title="Bloquear"
+                              >
+                                Bloquear
+                              </button>
+                            )}
+                            {contact.is_bot && (
+                              <span className="bot-indicator" title="Este é um bot">Bot</span>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -495,11 +566,16 @@ const Contacts = () => {
               <div className="latest-members-list">
                 {latestContacts.map((contact) => (
                   <div key={contact.id} className="latest-member-item">
-                    <div className="member-avatar">
-                      {getInitials(contact.name)}
+                    <div className={`member-avatar ${contact.is_bot ? 'bot-avatar' : ''}`}>
+                      {getInitials(contact)}
                     </div>
                     <div className="member-info">
-                      <span className="member-name">{contact.name || 'Sem nome'}</span>
+                      <div className="member-name-row">
+                        <span className="member-name">{getContactName(contact)}</span>
+                        {contact.is_bot && (
+                          <span className="bot-badge-small" title="Bot">🤖</span>
+                        )}
+                      </div>
                       <span className="member-date">{formatDate(contact.created_at)}</span>
                     </div>
                   </div>

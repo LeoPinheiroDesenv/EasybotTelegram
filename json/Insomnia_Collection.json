@@ -10,7 +10,8 @@
       "name": "Base Environment",
       "data": {
         "base_url": "http://172.18.0.3:8000/api",
-        "token": ""
+        "token": "",
+        "user_id": ""
       },
       "color": null,
       "isPrivate": false,
@@ -23,7 +24,8 @@
       "data": {
         "base_url": "http://api.easypagamentos.com/api",
         "jwt": "",
-        "token": ""
+        "token": "",
+        "user_id": ""
       },
       "color": "#ff6b6b",
       "isPrivate": false,
@@ -36,7 +38,8 @@
       "data": {
         "base_url": "http://0.0.0.0:8000/api",
         "jwt": "",
-        "token": ""
+        "token": "",
+        "user_id": ""
       },
       "color": "#4ecdc4",
       "isPrivate": false,
@@ -56,7 +59,7 @@
       "_id": "req_login",
       "_type": "request",
       "name": "Login",
-      "description": "Fazer login e obter token",
+      "description": "Fazer login e obter token. Se 2FA estiver ativado, retornará requiresTwoFactor: true. Nesse caso, use a requisição 'Verify Two Factor' para completar o login.",
       "url": "{{ base_url }}/auth/login",
       "method": "POST",
       "body": {
@@ -79,8 +82,8 @@
       "settingEncodeUrl": true,
       "settingRebuildPath": true,
       "settingFollowRedirects": "global",
-      "responseFilter": "const response = await insomnia.response.json();\nif (response && response.token) {\n  insomnia.environment.set('token', response.token);\n}",
-      "responseFilterScript": "const response = await insomnia.response.json();\nif (response && response.token) {\n  insomnia.environment.set('token', response.token);\n}",
+      "responseFilter": "const response = await insomnia.response.json();\nif (response && response.token) {\n  insomnia.environment.set('token', response.token);\n}\nif (response && response.requiresTwoFactor && response.userId) {\n  insomnia.environment.set('user_id', response.userId.toString());\n}",
+      "responseFilterScript": "const response = await insomnia.response.json();\nif (response && response.token) {\n  insomnia.environment.set('token', response.token);\n}\nif (response && response.requiresTwoFactor && response.userId) {\n  insomnia.environment.set('user_id', response.userId.toString());\n}",
       "_parentId": "fld_auth"
     },
     {
@@ -113,12 +116,12 @@
       "_id": "req_verify_2fa",
       "_type": "request",
       "name": "Verify Two Factor",
-      "description": "Verificar código 2FA após login inicial",
+      "description": "Verificar código 2FA após login inicial. Use esta requisição quando o Login retornar requiresTwoFactor: true. O userId será preenchido automaticamente da resposta anterior. Substitua '123456' pelo código real do seu aplicativo autenticador.",
       "url": "{{ base_url }}/auth/verify-2fa",
       "method": "POST",
       "body": {
         "mimeType": "application/json",
-        "text": "{\n  \"userId\": 1,\n  \"token\": \"123456\"\n}"
+        "text": "{\n  \"userId\": {{ user_id }},\n  \"token\": \"123456\"\n}"
       },
       "parameters": [],
       "headers": [
