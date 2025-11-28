@@ -37,3 +37,4 @@ lerna-debug.log*
 .docker/
 manuais/
 .cursor/
+.cursor/rules/regra-leonidas.mdc
