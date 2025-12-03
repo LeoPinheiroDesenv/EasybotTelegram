@@ -2,26 +2,45 @@ import React, { useState, useEffect, useContext } from 'react';
 import { AuthContext } from '../contexts/AuthContext';
 import Layout from '../components/Layout';
 import logService from '../services/logService';
+import botService from '../services/botService';
 import './Logs.css';
 
 const Logs = () => {
   const [logs, setLogs] = useState([]);
+  const [bots, setBots] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [selectedLog, setSelectedLog] = useState(null);
+  const [showModal, setShowModal] = useState(false);
   const [filters, setFilters] = useState({
     level: '',
+    bot_id: '',
     limit: 100,
-    offset: 0
+    offset: 0,
+    startDate: '',
+    endDate: '',
+    user_email: '',
+    message: ''
   });
   const [total, setTotal] = useState(0);
   const { isAdmin } = useContext(AuthContext);
 
   useEffect(() => {
     if (isAdmin) {
+      loadBots();
       loadLogs();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAdmin, filters]);
+
+  const loadBots = async () => {
+    try {
+      const data = await botService.getAllBots();
+      setBots(data);
+    } catch (err) {
+      console.error('Erro ao carregar bots:', err);
+    }
+  };
 
   const loadLogs = async () => {
     try {
@@ -53,6 +72,16 @@ const Logs = () => {
     }));
   };
 
+  const handleViewDetails = (log) => {
+    setSelectedLog(log);
+    setShowModal(true);
+  };
+
+  const handleCloseModal = () => {
+    setShowModal(false);
+    setSelectedLog(null);
+  };
+
   const formatDate = (dateString) => {
     if (!dateString) return '-';
     const date = new Date(dateString);
@@ -63,6 +92,20 @@ const Logs = () => {
       hour: '2-digit',
       minute: '2-digit',
       second: '2-digit'
+    });
+  };
+
+  const formatDateFull = (dateString) => {
+    if (!dateString) return '-';
+    const date = new Date(dateString);
+    return date.toLocaleString('pt-BR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      timeZoneName: 'short'
     });
   };
 
@@ -85,28 +128,31 @@ const Logs = () => {
     }
   };
 
-  const parseContext = (context) => {
-    if (!context) return null;
+  const formatJson = (obj) => {
+    if (!obj) return null;
     try {
-      if (typeof context === 'string') {
-        return JSON.parse(context);
+      if (typeof obj === 'string') {
+        const parsed = JSON.parse(obj);
+        return JSON.stringify(parsed, null, 2);
       }
-      return context;
+      return JSON.stringify(obj, null, 2);
     } catch (e) {
-      return null;
+      return String(obj);
     }
   };
 
-  const parseDetails = (details) => {
-    if (!details) return null;
-    try {
-      if (typeof details === 'string') {
-        return JSON.parse(details);
-      }
-      return details;
-    } catch (e) {
-      return null;
-    }
+
+  const clearFilters = () => {
+    setFilters({
+      level: '',
+      bot_id: '',
+      limit: 100,
+      offset: 0,
+      startDate: '',
+      endDate: '',
+      user_email: '',
+      message: ''
+    });
   };
 
   if (!isAdmin) {
@@ -124,6 +170,7 @@ const Logs = () => {
 
   const currentPage = Math.floor(filters.offset / filters.limit) + 1;
   const totalPages = Math.ceil(total / filters.limit);
+  const hasActiveFilters = filters.level || filters.bot_id || filters.startDate || filters.endDate || filters.user_email || filters.message;
 
   return (
     <Layout>
@@ -148,8 +195,78 @@ const Logs = () => {
                 <option value="warn">Warning</option>
                 <option value="info">Info</option>
                 <option value="debug">Debug</option>
+                <option value="critical">Critical</option>
               </select>
             </div>
+
+            <div className="filter-group">
+              <label htmlFor="bot_id">Bot:</label>
+              <select
+                id="bot_id"
+                name="bot_id"
+                value={filters.bot_id}
+                onChange={handleFilterChange}
+                className="filter-select"
+              >
+                <option value="">Todos os bots</option>
+                {bots.map(bot => (
+                  <option key={bot.id} value={bot.id}>
+                    {bot.name} {bot.username ? `(@${bot.username})` : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="filter-group">
+              <label htmlFor="startDate">Data Inicial:</label>
+              <input
+                type="date"
+                id="startDate"
+                name="startDate"
+                value={filters.startDate}
+                onChange={handleFilterChange}
+                className="filter-input"
+              />
+            </div>
+
+            <div className="filter-group">
+              <label htmlFor="endDate">Data Final:</label>
+              <input
+                type="date"
+                id="endDate"
+                name="endDate"
+                value={filters.endDate}
+                onChange={handleFilterChange}
+                className="filter-input"
+              />
+            </div>
+
+            <div className="filter-group">
+              <label htmlFor="user_email">Usuário:</label>
+              <input
+                type="text"
+                id="user_email"
+                name="user_email"
+                value={filters.user_email}
+                onChange={handleFilterChange}
+                placeholder="Filtrar por email"
+                className="filter-input"
+              />
+            </div>
+
+            <div className="filter-group">
+              <label htmlFor="message">Mensagem:</label>
+              <input
+                type="text"
+                id="message"
+                name="message"
+                value={filters.message}
+                onChange={handleFilterChange}
+                placeholder="Buscar na mensagem"
+                className="filter-input"
+              />
+            </div>
+
             <div className="filter-group">
               <label htmlFor="limit">Itens por página:</label>
               <select
@@ -165,6 +282,16 @@ const Logs = () => {
                 <option value="500">500</option>
               </select>
             </div>
+
+            {hasActiveFilters && (
+              <button
+                onClick={clearFilters}
+                className="btn btn-secondary btn-clear-filters"
+              >
+                Limpar Filtros
+              </button>
+            )}
+
             <div className="filter-info">
               Total: {total} logs
             </div>
@@ -180,12 +307,12 @@ const Logs = () => {
                     <tr>
                       <th>ID</th>
                       <th>Nível</th>
+                      <th>Bot</th>
                       <th>Mensagem</th>
                       <th>Usuário</th>
                       <th>IP</th>
                       <th>Data/Hora</th>
-                      <th>Contexto</th>
-                      <th>Detalhes</th>
+                      <th>Ações</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -197,10 +324,12 @@ const Logs = () => {
                       </tr>
                     ) : (
                       logs.map((log) => {
-                        const context = parseContext(log.context);
-                        const details = parseDetails(log.details);
+                        const context = log.context;
+                        const details = log.details;
+                        const hasDetails = context || details;
+                        
                         return (
-                          <tr key={log.id}>
+                          <tr key={log.id} className={log.level === 'error' ? 'log-row-error' : ''}>
                             <td>{log.id}</td>
                             <td>
                               {log.level ? (
@@ -211,54 +340,34 @@ const Logs = () => {
                                 <span className="badge badge-default">-</span>
                               )}
                             </td>
-                            <td className="log-message">{log.message}</td>
+                            <td>
+                              {log.bot_name ? (
+                                <div className="bot-info">
+                                  <div className="bot-name">{log.bot_name}</div>
+                                  {log.bot_username && (
+                                    <div className="bot-username">@{log.bot_username}</div>
+                                  )}
+                                </div>
+                              ) : (
+                                <span className="text-muted">-</span>
+                              )}
+                            </td>
+                            <td className="log-message" title={log.message}>
+                              {log.message ? (log.message.length > 100 ? `${log.message.substring(0, 100)}...` : log.message) : '-'}
+                            </td>
                             <td>{log.user_email || '-'}</td>
                             <td>{log.ip_address || '-'}</td>
                             <td>{formatDate(log.created_at)}</td>
                             <td>
-                              {context ? (
-                                <details className="log-context">
-                                  <summary>Ver contexto</summary>
-                                  <pre>{JSON.stringify(context, null, 2)}</pre>
-                                </details>
-                              ) : (
-                                '-'
+                              {hasDetails && (
+                                <button
+                                  onClick={() => handleViewDetails(log)}
+                                  className="btn btn-sm btn-primary"
+                                >
+                                  Ver Detalhes
+                                </button>
                               )}
-                            </td>
-                            <td>
-                              {details ? (
-                                <details className="log-details">
-                                  <summary>Ver detalhes</summary>
-                                  <div className="log-details-content">
-                                    {details.request && (
-                                      <div className="details-section">
-                                        <h4>Requisição</h4>
-                                        <pre>{JSON.stringify(details.request, null, 2)}</pre>
-                                      </div>
-                                    )}
-                                    {details.response && (
-                                      <div className="details-section">
-                                        <h4>Resposta</h4>
-                                        <pre>{JSON.stringify(details.response, null, 2)}</pre>
-                                      </div>
-                                    )}
-                                    {details.user && (
-                                      <div className="details-section">
-                                        <h4>Usuário</h4>
-                                        <pre>{JSON.stringify(details.user, null, 2)}</pre>
-                                      </div>
-                                    )}
-                                    {details.timestamp && (
-                                      <div className="details-section">
-                                        <h4>Timestamp</h4>
-                                        <pre>{details.timestamp}</pre>
-                                      </div>
-                                    )}
-                                  </div>
-                                </details>
-                              ) : (
-                                '-'
-                              )}
+                              {!hasDetails && <span className="text-muted">-</span>}
                             </td>
                           </tr>
                         );
@@ -293,9 +402,90 @@ const Logs = () => {
           )}
         </div>
       </div>
+
+      {/* Modal de Detalhes */}
+      {showModal && selectedLog && (
+        <div className="modal-overlay" onClick={handleCloseModal}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Detalhes do Log #{selectedLog.id}</h2>
+              <button className="modal-close" onClick={handleCloseModal}>×</button>
+            </div>
+            <div className="modal-body">
+              <div className="log-detail-section">
+                <h3>Informações Básicas</h3>
+                <div className="detail-grid">
+                  <div className="detail-item">
+                    <label>ID:</label>
+                    <span>{selectedLog.id}</span>
+                  </div>
+                  <div className="detail-item">
+                    <label>Nível:</label>
+                    <span className={`badge ${getLevelBadgeClass(selectedLog.level)}`}>
+                      {selectedLog.level?.toUpperCase() || '-'}
+                    </span>
+                  </div>
+                  <div className="detail-item">
+                    <label>Data/Hora:</label>
+                    <span>{formatDateFull(selectedLog.created_at)}</span>
+                  </div>
+                  <div className="detail-item">
+                    <label>Bot:</label>
+                    <span>
+                      {selectedLog.bot_name ? (
+                        <>
+                          {selectedLog.bot_name}
+                          {selectedLog.bot_username && ` (@${selectedLog.bot_username})`}
+                        </>
+                      ) : '-'}
+                    </span>
+                  </div>
+                  <div className="detail-item">
+                    <label>Usuário:</label>
+                    <span>{selectedLog.user_email || '-'}</span>
+                  </div>
+                  <div className="detail-item">
+                    <label>IP:</label>
+                    <span>{selectedLog.ip_address || '-'}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="log-detail-section">
+                <h3>Mensagem</h3>
+                <div className="log-message-full">
+                  {selectedLog.message || '-'}
+                </div>
+              </div>
+
+              {selectedLog.context && (
+                <div className="log-detail-section">
+                  <h3>Contexto</h3>
+                  <div className="json-viewer">
+                    <pre className="json-pre">{formatJson(selectedLog.context)}</pre>
+                  </div>
+                </div>
+              )}
+
+              {selectedLog.details && (
+                <div className="log-detail-section">
+                  <h3>Detalhes</h3>
+                  <div className="json-viewer">
+                    <pre className="json-pre">{formatJson(selectedLog.details)}</pre>
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-secondary" onClick={handleCloseModal}>
+                Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </Layout>
   );
 };
 
 export default Logs;
-

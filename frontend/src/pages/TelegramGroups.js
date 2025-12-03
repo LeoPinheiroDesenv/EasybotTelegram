@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faEdit, faTrash, faPlus, faLink, faRefresh, faCopy, faCheck } from '@fortawesome/free-solid-svg-icons';
 import Layout from '../components/Layout';
@@ -9,16 +9,7 @@ import './TelegramGroups.css';
 
 const TelegramGroups = () => {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  let botId = searchParams.get('botId');
-  
-  // Tenta obter botId do localStorage se não estiver na URL
-  if (!botId) {
-    const storedBotId = localStorage.getItem('selectedBotId');
-    if (storedBotId) {
-      botId = storedBotId;
-    }
-  }
+  const { botId } = useParams();
   
   const [groups, setGroups] = useState([]);
   const [paymentPlans, setPaymentPlans] = useState([]);

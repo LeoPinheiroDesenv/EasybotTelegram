@@ -251,6 +251,13 @@
   margin-top: 32px;
 }
 
+.action-buttons-vertical {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 16px;
+}
+
 .btn {
   padding: 14px 32px;
   border: none;
@@ -300,6 +307,30 @@
 
 .btn-activate.activated:hover:not(:disabled) {
   background-color: #7e22ce;
+}
+
+.btn-primary {
+  background-color: #3b82f6;
+  color: #ffffff;
+  width: 100%;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background-color: #2563eb;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+.btn-secondary {
+  background-color: #6b7280;
+  color: #ffffff;
+  width: 100%;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background-color: #4b5563;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(107, 114, 128, 0.3);
 }
 
 .sidebar-header {

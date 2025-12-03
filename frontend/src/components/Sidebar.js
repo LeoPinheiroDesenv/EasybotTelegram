@@ -29,7 +29,8 @@ const Sidebar = ({ isOpen, onClose }) => {
     location.pathname.startsWith('/settings') || 
     location.pathname === '/users' || 
     location.pathname === '/user-groups' || 
-    location.pathname === '/logs'
+    location.pathname === '/logs' ||
+    location.pathname === '/ftp'
   );
   const [monthlyBilling, setMonthlyBilling] = useState({ total: 0, transaction_count: 0 });
   const [loadingBilling, setLoadingBilling] = useState(true);
@@ -56,11 +57,12 @@ const Sidebar = ({ isOpen, onClose }) => {
     if (location.pathname.startsWith('/results')) {
       setResultsMenuOpen(true);
     }
-    // Expande menu de Configurações para rotas de settings e também para Usuários, Grupos de Usuários e Logs
+    // Expande menu de Configurações para rotas de settings e também para Usuários, Grupos de Usuários, Logs e FTP
     if (location.pathname.startsWith('/settings') || 
         location.pathname === '/users' || 
         location.pathname === '/user-groups' || 
-        location.pathname === '/logs') {
+        location.pathname === '/logs' ||
+        location.pathname === '/ftp') {
       setSettingsMenuOpen(true);
     }
   }, [location.pathname]);
@@ -122,11 +124,12 @@ const Sidebar = ({ isOpen, onClose }) => {
     !location.pathname.match(/^\/bot\/create$/);
   const isResultsActive = location.pathname.startsWith('/results');
   const isMarketingActive = location.pathname.startsWith('/marketing');
-  // Menu de Configurações está ativo para /settings, /users, /user-groups e /logs
+  // Menu de Configurações está ativo para /settings, /users, /user-groups, /logs e /ftp
   const isSettingsActive = location.pathname.startsWith('/settings') || 
     location.pathname === '/users' || 
     location.pathname === '/user-groups' || 
-    location.pathname === '/logs';
+    location.pathname === '/logs' ||
+    location.pathname === '/ftp';
 
   const handleLogout = () => {
     logout();
@@ -143,17 +146,17 @@ const Sidebar = ({ isOpen, onClose }) => {
             <span className="circle circle-2"></span>
             <span className="circle circle-3"></span>
           </div>
-          <div className="logo-text">
+            <div className="logo-text">
             <div className="logo-title">Easy</div>
             <div className="logo-subtitle">
               {location.pathname === '/bot/create' ? 'Criar novo bot' : 
-               location.pathname.startsWith('/bot/update') ? 'Atualizar bot' : 
-               location.pathname.startsWith('/bot/welcome') ? 'Mensagem de boas-vindas' :
-               location.pathname.startsWith('/bot/payment-plans') ? 'Planos de pagamento' :
-               location.pathname.startsWith('/bot/redirect') ? 'Botões de redirecionamento' :
-               location.pathname.startsWith('/bot/commands') ? 'Comandos' :
-               location.pathname.startsWith('/bot/administrators') ? 'Administradores' :
-               location.pathname.startsWith('/bot/telegram-groups') ? 'Grupos e Canais' :
+               location.pathname.startsWith('/bot/update/') ? 'Atualizar bot' : 
+               location.pathname.startsWith('/bot/welcome/') ? 'Mensagem de boas-vindas' :
+               location.pathname.startsWith('/bot/payment-plans/') ? 'Planos de pagamento' :
+               location.pathname.startsWith('/bot/redirect/') ? 'Botões de redirecionamento' :
+               location.pathname.startsWith('/bot/commands/') ? 'Comandos' :
+               location.pathname.startsWith('/bot/administrators/') ? 'Administradores' :
+               location.pathname.startsWith('/bot/telegram-groups/') ? 'Grupos e Canais' :
                location.pathname.startsWith('/marketing/alerts') ? 'Alertas' :
                location.pathname.startsWith('/marketing/downsell') ? 'Downsell' :
                location.pathname.startsWith('/marketing') ? 'Marketing' :
@@ -163,6 +166,7 @@ const Sidebar = ({ isOpen, onClose }) => {
                location.pathname.startsWith('/settings/payment-cycles') ? 'Ciclos de Pagamento' :
                location.pathname.startsWith('/settings/payment-gateways') ? 'Gateways de Pagamento' :
                location.pathname.startsWith('/settings/security') ? 'Segurança (2FA)' :
+               location.pathname.startsWith('/settings/storage') ? 'Storage' :
                'Página inicial'}
             </div>
           </div>
@@ -217,17 +221,17 @@ const Sidebar = ({ isOpen, onClose }) => {
                       if (item.path === '/bot/update') {
                         path = `/bot/update/${selectedBotId}`;
                       } else if (item.path === '/bot/welcome') {
-                        path = `/bot/welcome?botId=${selectedBotId}`;
+                        path = `/bot/welcome/${selectedBotId}`;
                       } else if (item.path === '/bot/payment-plans') {
-                        path = `/bot/payment-plans?botId=${selectedBotId}`;
+                        path = `/bot/payment-plans/${selectedBotId}`;
                     } else if (item.path === '/bot/redirect') {
-                      path = `/bot/redirect?botId=${selectedBotId}`;
+                      path = `/bot/redirect/${selectedBotId}`;
                       } else if (item.path === '/bot/commands') {
-                      path = `/bot/commands?botId=${selectedBotId}`;
+                      path = `/bot/commands/${selectedBotId}`;
                       } else if (item.path === '/bot/administrators') {
-                        path = `/bot/administrators?botId=${selectedBotId}`;
+                        path = `/bot/administrators/${selectedBotId}`;
                       } else if (item.path === '/bot/telegram-groups') {
-                        path = `/bot/telegram-groups?botId=${selectedBotId}`;
+                        path = `/bot/telegram-groups/${selectedBotId}`;
                       }
                     } else {
                       // If no bot selected, navigate to dashboard first
@@ -238,22 +242,17 @@ const Sidebar = ({ isOpen, onClose }) => {
                   // More precise active detection
                   let isActive = false;
                   if (item.requiresBot) {
-                    // For items with requiresBot, check if pathname matches exactly or starts with the path
+                    // For items with requiresBot, check if pathname matches the pattern
                     if (item.path === '/bot/welcome') {
-                      isActive = location.pathname === '/bot/welcome' || 
-                                 (location.pathname.startsWith('/bot/welcome') && location.search.includes('botId'));
+                      isActive = location.pathname.startsWith('/bot/welcome/');
                     } else if (item.path === '/bot/redirect') {
-                      isActive = location.pathname === '/bot/redirect' || 
-                                 (location.pathname.startsWith('/bot/redirect') && location.search.includes('botId'));
+                      isActive = location.pathname.startsWith('/bot/redirect/');
                     } else if (item.path === '/bot/commands') {
-                      isActive = location.pathname === '/bot/commands' || 
-                                 (location.pathname.startsWith('/bot/commands') && location.search.includes('botId'));
+                      isActive = location.pathname.startsWith('/bot/commands/');
                     } else if (item.path === '/bot/administrators') {
-                      isActive = location.pathname === '/bot/administrators' || 
-                                 (location.pathname.startsWith('/bot/administrators') && location.search.includes('botId'));
+                      isActive = location.pathname.startsWith('/bot/administrators/');
                     } else if (item.path === '/bot/telegram-groups') {
-                      isActive = location.pathname === '/bot/telegram-groups' || 
-                                 (location.pathname.startsWith('/bot/telegram-groups') && location.search.includes('botId'));
+                      isActive = location.pathname.startsWith('/bot/telegram-groups/');
                     } else {
                       isActive = location.pathname.startsWith(item.path) && 
                                  location.pathname !== '/bot/create';
@@ -387,6 +386,20 @@ const Sidebar = ({ isOpen, onClose }) => {
                       >
                         Segurança (2FA)
                       </Link>
+                      <Link
+                        to="/settings/storage"
+                        className={`sidebar-submenu-item ${location.pathname === '/settings/storage' ? 'active' : ''}`}
+                        onClick={onClose}
+                      >
+                        Storage
+                      </Link>
+                      {/* <Link
+                        to="/ftp"
+                        className={`sidebar-submenu-item ${location.pathname === '/ftp' ? 'active' : ''}`}
+                        onClick={onClose}
+                      >
+                        Gerenciador FTP
+                      </Link> */}
                     </>
                   )}
                   {user?.user_type === 'super_admin' && (

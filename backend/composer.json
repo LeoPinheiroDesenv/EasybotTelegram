@@ -9,6 +9,8 @@
         "php": "^8.2",
         "laravel/framework": "^12.0",
         "laravel/tinker": "^2.10.1",
+        "league/flysystem-ftp": "*",
+        "league/flysystem-sftp-v3": "^3.30",
         "longman/telegram-bot": "^0.83.1",
         "mercadopago/dx-php": "^3.7",
         "pragmarx/google2fa": "^9.0",

@@ -25,6 +25,9 @@ import UserGroups from './pages/UserGroups';
 import SecuritySettings from './pages/SecuritySettings';
 import TelegramGroups from './pages/TelegramGroups';
 import Commands from './pages/Commands';
+import FtpManager from './pages/FtpManager';
+import CardPayment from './pages/CardPayment';
+import StorageSettings from './pages/StorageSettings';
 import './App.css';
 
 function App() {
@@ -59,7 +62,7 @@ function App() {
               }
             />
             <Route
-              path="/bot/welcome"
+              path="/bot/welcome/:botId"
               element={
                 <ProtectedRoute>
                   <WelcomeMessage />
@@ -67,7 +70,7 @@ function App() {
               }
             />
             <Route
-              path="/bot/payment-plans"
+              path="/bot/payment-plans/:botId"
               element={
                 <ProtectedRoute>
                   <PaymentPlans />
@@ -75,7 +78,7 @@ function App() {
               }
             />
             <Route
-              path="/bot/redirect"
+              path="/bot/redirect/:botId"
               element={
                 <ProtectedRoute>
                   <Redirect />
@@ -83,7 +86,7 @@ function App() {
               }
             />
             <Route
-              path="/bot/administrators"
+              path="/bot/administrators/:botId"
               element={
                 <ProtectedRoute>
                   <Administrators />
@@ -91,7 +94,7 @@ function App() {
               }
             />
             <Route
-              path="/bot/telegram-groups"
+              path="/bot/telegram-groups/:botId"
               element={
                 <ProtectedRoute>
                   <TelegramGroups />
@@ -99,7 +102,7 @@ function App() {
               }
             />
             <Route
-              path="/bot/commands"
+              path="/bot/commands/:botId"
               element={
                 <ProtectedRoute>
                   <Commands />
@@ -207,6 +210,27 @@ function App() {
               element={
                 <ProtectedRoute>
                   <Billing />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/ftp"
+              element={
+                <ProtectedRoute>
+                  <FtpManager />
+                </ProtectedRoute>
+              }
+            />
+            {/* Rota pública de pagamento */}
+            <Route
+              path="/payment/card/:token"
+              element={<CardPayment />}
+            />
+            <Route
+              path="/settings/storage"
+              element={
+                <ProtectedRoute>
+                  <StorageSettings />
                 </ProtectedRoute>
               }
             />

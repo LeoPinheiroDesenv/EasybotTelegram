@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faEdit, faTrash } from '@fortawesome/free-solid-svg-icons';
 import Layout from '../components/Layout';
@@ -8,16 +8,7 @@ import './Redirect.css';
 
 const Redirect = () => {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  let botId = searchParams.get('botId');
-  
-  // Try to get botId from localStorage if not in URL
-  if (!botId) {
-    const storedBotId = localStorage.getItem('selectedBotId');
-    if (storedBotId) {
-      botId = storedBotId;
-    }
-  }
+  const { botId } = useParams();
   
   const [redirectButtons, setRedirectButtons] = useState([]);
   const [loading, setLoading] = useState(false);

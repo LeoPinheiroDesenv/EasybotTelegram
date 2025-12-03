@@ -245,5 +245,78 @@ class BotCommandController extends Controller
             return response()->json(['error' => 'Failed to get commands: ' . $e->getMessage()], 500);
         }
     }
+
+    /**
+     * Deleta todos os comandos registrados no Telegram
+     */
+    public function deleteTelegramCommands(string $botId): JsonResponse
+    {
+        try {
+            $user = auth()->user();
+            $bot = Bot::findOrFail($botId);
+
+            // Verifica permissão de escrita
+            if (!$this->permissionService->hasBotPermission($user, (int)$botId, 'write')) {
+                return response()->json(['error' => 'Acesso negado'], 403);
+            }
+
+            $result = $this->telegramService->deleteBotCommands($bot);
+
+            if ($result) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Comandos deletados do Telegram com sucesso'
+                ]);
+            } else {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Erro ao deletar comandos do Telegram'
+                ], 500);
+            }
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json(['error' => 'Bot not found'], 404);
+        } catch (\Exception $e) {
+            return response()->json(['error' => 'Failed to delete commands: ' . $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Deleta um comando específico registrado no Telegram
+     */
+    public function deleteTelegramCommand(string $botId, Request $request): JsonResponse
+    {
+        try {
+            $user = auth()->user();
+            $bot = Bot::findOrFail($botId);
+
+            // Verifica permissão de escrita
+            if (!$this->permissionService->hasBotPermission($user, (int)$botId, 'write')) {
+                return response()->json(['error' => 'Acesso negado'], 403);
+            }
+
+            $commandName = $request->input('command');
+            if (!$commandName) {
+                return response()->json(['error' => 'Nome do comando é obrigatório'], 400);
+            }
+
+            $result = $this->telegramService->deleteBotCommand($bot, $commandName);
+
+            if ($result) {
+                return response()->json([
+                    'success' => true,
+                    'message' => "Comando '{$commandName}' deletado do Telegram com sucesso"
+                ]);
+            } else {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Erro ao deletar comando do Telegram'
+                ], 500);
+            }
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json(['error' => 'Bot not found'], 404);
+        } catch (\Exception $e) {
+            return response()->json(['error' => 'Failed to delete command: ' . $e->getMessage()], 500);
+        }
+    }
 }
 

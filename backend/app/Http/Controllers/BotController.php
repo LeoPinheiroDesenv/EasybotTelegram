@@ -8,6 +8,8 @@ use App\Services\PermissionService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\File;
 
 class BotController extends Controller
 {
@@ -484,6 +486,216 @@ class BotController extends Controller
             return response()->json(['success' => false, 'error' => 'Bot not found'], 404);
         } catch (\Exception $e) {
             return response()->json(['success' => false, 'error' => 'Erro ao validar e ativar bot: ' . $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Upload media file for bot
+     */
+    public function uploadMedia(Request $request, string $id): JsonResponse
+    {
+        try {
+            $user = auth()->user();
+            $bot = Bot::findOrFail($id);
+
+            // Verifica permissão de escrita
+            if (!$this->permissionService->hasBotPermission($user, (int)$id, 'write')) {
+                return response()->json(['error' => 'Acesso negado. Você não tem permissão para fazer upload de mídia neste bot.'], 403);
+            }
+
+            $validator = Validator::make($request->all(), [
+                'file' => 'required|file|mimes:jpg,jpeg,png,gif,mp4,avi,mov,webm,pdf,doc,docx|max:10240', // 10MB máximo
+                'media_number' => 'required|integer|in:1,2,3'
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'success' => false,
+                    'error' => $validator->errors()->first()
+                ], 400);
+            }
+
+            $file = $request->file('file');
+            $mediaNumber = $request->input('media_number');
+            $originalName = $file->getClientOriginalName();
+            $extension = $file->getClientOriginalExtension();
+            
+            // Gera nome único para o arquivo
+            $fileName = 'bot_' . $bot->id . '_media_' . $mediaNumber . '_' . time() . '.' . $extension;
+            $path = 'bots/' . $bot->id . '/media';
+            
+            // Garante que o diretório existe
+            if (!Storage::disk('public')->exists($path)) {
+                Storage::disk('public')->makeDirectory($path);
+            }
+            
+            // Verifica e cria link simbólico se necessário
+            $this->ensureStorageLink();
+            
+            // Salva o arquivo no storage público
+            $filePath = $file->storeAs($path, $fileName, 'public');
+            
+            // Gera URL pública do arquivo
+            $url = Storage::disk('public')->url($filePath);
+            
+            // Garante que a URL está corretamente formatada (remove espaços duplos e codifica)
+            $url = preg_replace('/\s+/', '%20', $url);
+            
+            // Atualiza o campo de mídia no bot
+            $fieldName = 'media_' . $mediaNumber . '_url';
+            
+            // Remove arquivo antigo se existir
+            if ($bot->$fieldName) {
+                $oldUrl = $bot->$fieldName;
+                // Extrai o caminho relativo da URL
+                $baseUrl = Storage::disk('public')->url('');
+                $oldPath = str_replace($baseUrl, '', $oldUrl);
+                $oldPath = ltrim($oldPath, '/');
+                
+                if ($oldPath && Storage::disk('public')->exists($oldPath)) {
+                    try {
+                        Storage::disk('public')->delete($oldPath);
+                    } catch (\Exception $e) {
+                        // Log erro mas continua
+                        \Log::warning('Erro ao deletar arquivo antigo: ' . $e->getMessage());
+                    }
+                }
+            }
+            
+            $bot->$fieldName = $url;
+            $bot->save();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Mídia enviada com sucesso',
+                'url' => $url,
+                'file' => [
+                    'name' => $originalName,
+                    'path' => $filePath,
+                    'url' => $url,
+                    'size' => $file->getSize(),
+                    'size_formatted' => $this->formatBytes($file->getSize())
+                ]
+            ]);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json(['success' => false, 'error' => 'Bot não encontrado'], 404);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'error' => 'Erro ao fazer upload de mídia: ' . $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Delete media file for bot
+     */
+    public function deleteMedia(Request $request, string $id): JsonResponse
+    {
+        try {
+            $user = auth()->user();
+            $bot = Bot::findOrFail($id);
+
+            // Verifica permissão de escrita
+            if (!$this->permissionService->hasBotPermission($user, (int)$id, 'write')) {
+                return response()->json(['error' => 'Acesso negado. Você não tem permissão para deletar mídia deste bot.'], 403);
+            }
+
+            $validator = Validator::make($request->all(), [
+                'media_number' => 'required|integer|in:1,2,3'
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'success' => false,
+                    'error' => $validator->errors()->first()
+                ], 400);
+            }
+
+            $mediaNumber = $request->input('media_number');
+            $fieldName = 'media_' . $mediaNumber . '_url';
+            
+            // Remove arquivo se existir
+            if ($bot->$fieldName) {
+                $oldUrl = $bot->$fieldName;
+                // Extrai o caminho relativo da URL
+                $baseUrl = Storage::disk('public')->url('');
+                $oldPath = str_replace($baseUrl, '', $oldUrl);
+                $oldPath = ltrim($oldPath, '/');
+                
+                if ($oldPath && Storage::disk('public')->exists($oldPath)) {
+                    try {
+                        Storage::disk('public')->delete($oldPath);
+                    } catch (\Exception $e) {
+                        // Log erro mas continua
+                        \Log::warning('Erro ao deletar arquivo: ' . $e->getMessage());
+                    }
+                }
+            }
+            
+            $bot->$fieldName = null;
+            $bot->save();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Mídia removida com sucesso'
+            ]);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json(['success' => false, 'error' => 'Bot não encontrado'], 404);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'error' => 'Erro ao remover mídia: ' . $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Format bytes to human readable format
+     */
+    protected function formatBytes($bytes, $precision = 2): string
+    {
+        $units = ['B', 'KB', 'MB', 'GB', 'TB'];
+        
+        for ($i = 0; $bytes > 1024 && $i < count($units) - 1; $i++) {
+            $bytes /= 1024;
+        }
+        
+        return round($bytes, $precision) . ' ' . $units[$i];
+    }
+
+    /**
+     * Garante que o link simbólico do storage existe
+     */
+    protected function ensureStorageLink(): void
+    {
+        $publicPath = public_path('storage');
+        $storagePath = storage_path('app/public');
+
+        // Se o link já existe e está correto, não faz nada
+        if (is_link($publicPath)) {
+            $linkTarget = readlink($publicPath);
+            if ($linkTarget === $storagePath || realpath($linkTarget) === realpath($storagePath)) {
+                return;
+            }
+        }
+
+        // Se não existe ou está quebrado, tenta criar
+        if (!File::exists($publicPath) || (is_link($publicPath) && !File::exists($publicPath))) {
+            try {
+                // Remove link quebrado
+                if (File::exists($publicPath) && is_link($publicPath)) {
+                    @unlink($publicPath);
+                }
+
+                // Cria o diretório public se não existir
+                $publicDir = dirname($publicPath);
+                if (!File::exists($publicDir)) {
+                    File::makeDirectory($publicDir, 0755, true);
+                }
+
+                // Cria o link simbólico (apenas Linux/Unix)
+                if (PHP_OS_FAMILY !== 'Windows') {
+                    @symlink($storagePath, $publicPath);
+                }
+            } catch (\Exception $e) {
+                // Log erro mas não interrompe o fluxo
+                \Log::warning('Erro ao criar link simbólico automaticamente: ' . $e->getMessage());
+            }
         }
     }
 }

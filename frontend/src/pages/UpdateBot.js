@@ -26,6 +26,8 @@ const UpdateBot = () => {
   const [success, setSuccess] = useState('');
   const [validating, setValidating] = useState(false);
   const [validationResult, setValidationResult] = useState(null);
+  const [initializing, setInitializing] = useState(false);
+  const [settingWebhook, setSettingWebhook] = useState(false);
 
   useEffect(() => {
     loadBots();
@@ -90,6 +92,53 @@ const UpdateBot = () => {
     // Implementar lógica de atualização de link
     setSuccess('Link atualizado com sucesso!');
     setTimeout(() => setSuccess(''), 3000);
+  };
+
+  const handleInitialize = async () => {
+    if (!id) {
+      setError('ID do bot não encontrado');
+      return;
+    }
+
+    setError('');
+    setSuccess('');
+    setInitializing(true);
+
+    try {
+      const result = await botService.initializeBot(id);
+      setSuccess(result.message || 'Bot inicializado com sucesso!');
+      
+      // Recarrega os dados do bot para atualizar o status
+      await loadBot();
+      
+      setTimeout(() => setSuccess(''), 5000);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Erro ao inicializar o bot');
+    } finally {
+      setInitializing(false);
+    }
+  };
+
+  const handleSetWebhook = async () => {
+    if (!id) {
+      setError('ID do bot não encontrado');
+      return;
+    }
+
+    setError('');
+    setSuccess('');
+    setSettingWebhook(true);
+
+    try {
+      const result = await botService.setWebhook(id);
+      setSuccess(result.message || 'Webhook configurado com sucesso!');
+      
+      setTimeout(() => setSuccess(''), 5000);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Erro ao configurar webhook');
+    } finally {
+      setSettingWebhook(false);
+    }
   };
 
   const handleSave = async () => {
@@ -442,6 +491,27 @@ const UpdateBot = () => {
                   {formData.payment_method === 'pix' && <div className="radio-dot"></div>}
                 </div>
                 <span>Pix direto</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Botões de verificação e configuração */}
+          <div className="update-section">
+            <h2 className="section-title">Verificação e Configuração</h2>
+            <div className="action-buttons-vertical">
+              <button
+                onClick={handleInitialize}
+                className="btn btn-primary"
+                disabled={loading || initializing}
+              >
+                {initializing ? 'Verificando e iniciando...' : '🔍 Verificar e iniciar o bot'}
+              </button>
+              <button
+                onClick={handleSetWebhook}
+                className="btn btn-secondary"
+                disabled={loading || settingWebhook}
+              >
+                {settingWebhook ? 'Configurando webhook...' : '🔗 Verificar e setar o webhook'}
               </button>
             </div>
           </div>

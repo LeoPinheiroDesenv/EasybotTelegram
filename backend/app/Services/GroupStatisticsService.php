@@ -123,6 +123,11 @@ class GroupStatisticsService
             return [];
         }
 
+        // Busca ações registradas do contato
+        $contactActionService = new \App\Services\ContactActionService();
+        $contactActions = $contactActionService->getContactHistory($bot, $contactId);
+
+        // Busca logs antigos relacionados a grupos (para compatibilidade)
         $logs = Log::where('bot_id', $bot->id)
             ->where(function ($query) {
                 $query->where('message', 'like', '%adicionado%grupo%')
@@ -139,23 +144,52 @@ class GroupStatisticsService
             });
 
         $history = [];
+        
+        // Adiciona ações registradas
+        foreach ($contactActions as $action) {
+            $history[] = [
+                'id' => $action['id'],
+                'action' => $action['action'],
+                'action_type' => $action['action_type'],
+                'action_label' => $this->getActionLabel($action['action_type'], $action['action']),
+                'description' => $action['description'],
+                'status' => $action['status'],
+                'metadata' => $action['metadata'],
+                'transaction' => $action['transaction'],
+                'performed_by' => 'Usuário',
+                'created_at' => $action['created_at'],
+                'created_at_human' => $action['created_at_human']
+            ];
+        }
+
+        // Adiciona logs antigos de grupos (para compatibilidade)
         foreach ($logs as $log) {
             $context = $log->context ?? [];
             $isAdd = str_contains(strtolower($log->message), 'adicionado');
             
             $history[] = [
-                'id' => $log->id,
+                'id' => 'log_' . $log->id,
                 'action' => $isAdd ? 'add' : 'remove',
-                'action_label' => $isAdd ? 'Adicionado' : 'Removido',
-                'message' => $log->message,
-                'reason' => $context['reason'] ?? null,
-                'action_type' => $context['action_type'] ?? 'automatic',
-                'transaction_id' => $context['transaction_id'] ?? null,
+                'action_type' => 'group_management',
+                'action_label' => $isAdd ? 'Adicionado ao Grupo' : 'Removido do Grupo',
+                'description' => $log->message,
+                'status' => 'completed',
+                'metadata' => [
+                    'reason' => $context['reason'] ?? null,
+                    'action_type' => $context['action_type'] ?? 'automatic',
+                    'transaction_id' => $context['transaction_id'] ?? null
+                ],
+                'transaction' => null,
                 'performed_by' => $log->user_email ?? 'Sistema',
                 'created_at' => $log->created_at->format('Y-m-d H:i:s'),
                 'created_at_human' => $log->created_at->diffForHumans()
             ];
         }
+
+        // Ordena por data (mais recente primeiro)
+        usort($history, function ($a, $b) {
+            return strtotime($b['created_at']) - strtotime($a['created_at']);
+        });
 
         return [
             'contact' => [
@@ -167,6 +201,42 @@ class GroupStatisticsService
             'history' => $history,
             'total_actions' => count($history)
         ];
+    }
+
+    /**
+     * Retorna label legível para ação
+     */
+    protected function getActionLabel(string $actionType, string $action): string
+    {
+        $labels = [
+            'command' => [
+                'start' => 'Comando /start',
+                'help' => 'Comando /help',
+                'planos' => 'Comando /planos',
+                'unknown' => 'Comando desconhecido'
+            ],
+            'payment' => [
+                'plan_selected' => 'Plano Selecionado',
+                'payment_initiated' => 'Pagamento Iniciado',
+                'payment_pending' => 'Pagamento Pendente',
+                'payment_completed' => 'Pagamento Concluído',
+                'payment_failed' => 'Pagamento Falhou'
+            ],
+            'data_collection' => [
+                'email_collected' => 'E-mail Coletado',
+                'phone_collected' => 'Telefone Coletado',
+                'language_collected' => 'Idioma Coletado'
+            ],
+            'moderation' => [
+                'blocked' => 'Contato Bloqueado',
+                'unblocked' => 'Contato Desbloqueado'
+            ],
+            'message' => [
+                'message_sent' => 'Mensagem Enviada'
+            ]
+        ];
+
+        return $labels[$actionType][$action] ?? ucfirst(str_replace('_', ' ', $action));
     }
 }
 

@@ -47,6 +47,24 @@ const botCommandService = {
   async getTelegramCommands(botId) {
     const response = await api.get(`/bots/${botId}/commands/telegram`);
     return response.data.commands || [];
+  },
+
+  /**
+   * Deleta todos os comandos registrados no Telegram
+   */
+  async deleteTelegramCommands(botId) {
+    const response = await api.delete(`/bots/${botId}/commands/telegram`);
+    return response.data;
+  },
+
+  /**
+   * Deleta um comando específico registrado no Telegram
+   */
+  async deleteTelegramCommand(botId, commandName) {
+    const response = await api.delete(`/bots/${botId}/commands/telegram/command`, {
+      data: { command: commandName }
+    });
+    return response.data;
   }
 };
 

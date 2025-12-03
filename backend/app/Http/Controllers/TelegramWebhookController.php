@@ -171,7 +171,21 @@ class TelegramWebhookController extends Controller
                 return response()->json(['error' => 'Acesso negado'], 403);
             }
 
-            $webhookUrl = $request->input('url') ?? config('app.url') . "/api/telegram/webhook/{$botId}";
+            // Gera URL do webhook - usa variável de ambiente se disponível, senão usa APP_URL
+            $baseUrl = env('TELEGRAM_WEBHOOK_URL') ?? config('app.url');
+            
+            // Se não foi fornecida URL explícita, gera automaticamente
+            if (!$request->has('url')) {
+                $webhookUrl = $baseUrl . "/api/telegram/webhook/{$botId}";
+            } else {
+                $webhookUrl = $request->input('url');
+            }
+            
+            // Converte HTTP para HTTPS se necessário (Telegram requer HTTPS)
+            if (str_starts_with($webhookUrl, 'http://')) {
+                $webhookUrl = str_replace('http://', 'https://', $webhookUrl);
+            }
+            
             $secretToken = $request->input('secret_token');
             $allowedUpdates = $request->input('allowed_updates', [
                 'message',
@@ -194,7 +208,7 @@ class TelegramWebhookController extends Controller
             if (!str_starts_with($webhookUrl, 'https://')) {
                 return response()->json([
                     'success' => false,
-                    'error' => 'Webhook requer HTTPS. URL deve começar com https://. URL atual: ' . $webhookUrl
+                    'error' => 'Webhook requer HTTPS. URL deve começar com https://. URL atual: ' . $webhookUrl . '. Configure TELEGRAM_WEBHOOK_URL no .env com URL HTTPS ou forneça uma URL HTTPS válida.'
                 ], 400);
             }
 

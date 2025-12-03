@@ -57,6 +57,32 @@ const botService = {
   validateAndActivate: async (id) => {
     const response = await api.post(`/bots/${id}/validate-and-activate`);
     return response.data;
+  },
+
+  uploadMedia: async (id, file, mediaNumber) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('media_number', mediaNumber);
+
+    const response = await api.post(`/bots/${id}/media/upload`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    });
+    return response.data;
+  },
+
+  deleteMedia: async (id, mediaNumber) => {
+    const response = await api.delete(`/bots/${id}/media`, {
+      data: { media_number: mediaNumber }
+    });
+    return response.data;
+  },
+
+  setWebhook: async (botId, webhookUrl = null) => {
+    const data = webhookUrl ? { url: webhookUrl } : {};
+    const response = await api.post(`/telegram/webhook/${botId}/set`, data);
+    return response.data;
   }
 };
 

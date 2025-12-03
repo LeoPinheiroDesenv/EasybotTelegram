@@ -15,6 +15,8 @@ use App\Http\Controllers\UserGroupController;
 use App\Http\Controllers\BotAdministratorController;
 use App\Http\Controllers\RedirectButtonController;
 use App\Http\Controllers\AlertController;
+use App\Http\Controllers\FtpController;
+use App\Http\Controllers\StorageController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -27,6 +29,10 @@ use Illuminate\Support\Facades\Route;
 // Public routes
 Route::post('/auth/login', [AuthController::class, 'login']);
 Route::post('/auth/verify-2fa', [AuthController::class, 'verifyTwoFactor']);
+
+// Rotas públicas de pagamento (sem autenticação)
+Route::get('/payment/transaction/{token}', [PaymentController::class, 'getTransaction']);
+Route::post('/payment/card/process', [PaymentController::class, 'processCreditCard']);
 
 // Protected routes
 Route::middleware('auth:api')->group(function () {
@@ -56,6 +62,8 @@ Route::middleware('auth:api')->group(function () {
     Route::get('/bots/{id}/status', [BotController::class, 'status']);
     Route::post('/bots/validate', [BotController::class, 'validate']);
     Route::post('/bots/validate-token-and-group', [BotController::class, 'validateTokenAndGroup']);
+    Route::post('/bots/{id}/media/upload', [BotController::class, 'uploadMedia']);
+    Route::delete('/bots/{id}/media', [BotController::class, 'deleteMedia']);
     
     // Bot commands routes
     Route::get('/bots/{botId}/commands', [BotCommandController::class, 'index']);
@@ -64,6 +72,8 @@ Route::middleware('auth:api')->group(function () {
     Route::delete('/bots/{botId}/commands/{commandId}', [BotCommandController::class, 'destroy']);
     Route::post('/bots/{botId}/commands/register', [BotCommandController::class, 'registerCommands']);
     Route::get('/bots/{botId}/commands/telegram', [BotCommandController::class, 'getTelegramCommands']);
+    Route::delete('/bots/{botId}/commands/telegram', [BotCommandController::class, 'deleteTelegramCommands']);
+    Route::delete('/bots/{botId}/commands/telegram/command', [BotCommandController::class, 'deleteTelegramCommand']);
     
     // Redirect buttons routes
     Route::get('/bots/{botId}/redirect-buttons', [RedirectButtonController::class, 'index']);
@@ -136,6 +146,19 @@ Route::middleware('auth:api')->group(function () {
     Route::get('/alerts/{id}', [AlertController::class, 'show']);
     Route::put('/alerts/{id}', [AlertController::class, 'update']);
     Route::delete('/alerts/{id}', [AlertController::class, 'destroy']);
+
+    // FTP routes
+    Route::get('/ftp/files', [FtpController::class, 'listFiles']);
+    Route::post('/ftp/upload', [FtpController::class, 'uploadFile']);
+    Route::get('/ftp/download', [FtpController::class, 'downloadFile']);
+    Route::delete('/ftp/delete', [FtpController::class, 'deleteFile']);
+    Route::post('/ftp/directory', [FtpController::class, 'createDirectory']);
+    Route::post('/ftp/test-connection', [FtpController::class, 'testConnection']);
+
+    // Storage routes
+    Route::get('/storage/link/status', [StorageController::class, 'checkStorageLink']);
+    Route::post('/storage/link/create', [StorageController::class, 'createStorageLink']);
+    Route::post('/storage/test', [StorageController::class, 'testStorageAccess']);
 
     // Log routes (super admin only)
     Route::middleware('super_admin')->group(function () {

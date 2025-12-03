@@ -244,22 +244,142 @@
   background-color: #f9fafb;
   border-radius: 8px;
   border: 1px solid #e5e7eb;
+  transition: all 0.2s;
 }
 
-.history-item p {
-  margin: 4px 0;
+.history-item:hover {
+  background-color: #f3f4f6;
+  border-color: #d1d5db;
+}
+
+.history-item.history-payment {
+  border-left: 4px solid #9333ea;
+}
+
+.history-item.history-command {
+  border-left: 4px solid #3b82f6;
+}
+
+.history-item.history-data_collection {
+  border-left: 4px solid #10b981;
+}
+
+.history-item.history-moderation {
+  border-left: 4px solid #ef4444;
+}
+
+.history-item.history-message {
+  border-left: 4px solid #f59e0b;
+}
+
+.history-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.history-action-label {
   font-size: 14px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.history-status {
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.history-status.status-pending {
+  background-color: #fef3c7;
+  color: #92400e;
+}
+
+.history-status.status-completed {
+  background-color: #d1fae5;
+  color: #065f46;
+}
+
+.history-status.status-failed {
+  background-color: #fee2e2;
+  color: #991b1b;
+}
+
+.history-description {
+  margin: 8px 0;
+  font-size: 14px;
+  color: #374151;
+  line-height: 1.5;
+}
+
+.history-transaction {
+  margin: 8px 0;
+  padding: 8px 12px;
+  background-color: #ffffff;
+  border-radius: 4px;
+  border: 1px solid #e5e7eb;
+  font-size: 13px;
   color: #374151;
 }
 
-.history-item strong {
+.history-transaction strong {
   color: #111827;
+  margin-right: 4px;
+}
+
+.history-metadata {
+  margin-top: 8px;
+  font-size: 12px;
+}
+
+.history-metadata summary {
+  cursor: pointer;
+  color: #9333ea;
+  font-weight: 500;
+  padding: 4px 0;
+}
+
+.history-metadata summary:hover {
+  color: #7e22ce;
+}
+
+.history-metadata pre {
+  margin-top: 8px;
+  padding: 12px;
+  background-color: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 4px;
+  font-size: 11px;
+  overflow-x: auto;
+  max-height: 200px;
+  overflow-y: auto;
 }
 
 .history-date {
   font-size: 12px;
   color: #6b7280;
   margin-top: 8px;
+  font-style: italic;
+}
+
+.no-history {
+  text-align: center;
+  padding: 24px;
+  color: #6b7280;
+  font-size: 14px;
+}
+
+.error-text {
+  color: #dc2626;
+  font-size: 14px;
+  padding: 12px;
+  background-color: #fee2e2;
+  border-radius: 4px;
 }
 
 .action-buttons {

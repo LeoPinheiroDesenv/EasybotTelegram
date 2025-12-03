@@ -14,11 +14,16 @@ class LogController extends Controller
     public function index(Request $request): JsonResponse
     {
         try {
-            $query = Log::query();
+            $query = Log::with('bot');
 
             // Filter by level
             if ($request->has('level') && !empty($request->level)) {
                 $query->where('level', $request->level);
+            }
+
+            // Filter by bot_id
+            if ($request->has('bot_id') && !empty($request->bot_id)) {
+                $query->where('bot_id', $request->bot_id);
             }
 
             // Filter by date range
@@ -28,6 +33,16 @@ class LogController extends Controller
 
             if ($request->has('endDate') && !empty($request->endDate)) {
                 $query->whereDate('created_at', '<=', $request->endDate);
+            }
+
+            // Filter by user_email
+            if ($request->has('user_email') && !empty($request->user_email)) {
+                $query->where('user_email', 'like', '%' . $request->user_email . '%');
+            }
+
+            // Filter by message content
+            if ($request->has('message') && !empty($request->message)) {
+                $query->where('message', 'like', '%' . $request->message . '%');
             }
 
             // Get total count before pagination
@@ -40,7 +55,32 @@ class LogController extends Controller
             $logs = $query->orderBy('created_at', 'desc')
                 ->limit($limit)
                 ->offset($offset)
-                ->get();
+                ->get()
+                ->map(function ($log) {
+                    // Formata o contexto e detalhes para melhor visualização
+                    $formatted = $log->toArray();
+                    
+                    // Garante que context seja um array
+                    if (is_string($formatted['context'])) {
+                        $formatted['context'] = json_decode($formatted['context'], true);
+                    }
+                    
+                    // Garante que details seja um objeto/array se for string JSON
+                    if (is_string($formatted['details'])) {
+                        $decoded = json_decode($formatted['details'], true);
+                        if (json_last_error() === JSON_ERROR_NONE) {
+                            $formatted['details'] = $decoded;
+                        }
+                    }
+                    
+                    // Adiciona informações do bot se disponível
+                    if ($log->bot) {
+                        $formatted['bot_name'] = $log->bot->name;
+                        $formatted['bot_username'] = $log->bot->username;
+                    }
+                    
+                    return $formatted;
+                });
 
             return response()->json([
                 'logs' => $logs,
@@ -49,7 +89,10 @@ class LogController extends Controller
                 'offset' => $offset
             ]);
         } catch (\Exception $e) {
-            return response()->json(['error' => 'Failed to fetch logs'], 500);
+            return response()->json([
+                'error' => 'Failed to fetch logs',
+                'message' => $e->getMessage()
+            ], 500);
         }
     }
 
@@ -59,12 +102,35 @@ class LogController extends Controller
     public function show(string $id): JsonResponse
     {
         try {
-            $log = Log::findOrFail($id);
-            return response()->json(['log' => $log]);
+            $log = Log::with('bot')->findOrFail($id);
+            
+            // Formata o contexto e detalhes
+            $formatted = $log->toArray();
+            
+            if (is_string($formatted['context'])) {
+                $formatted['context'] = json_decode($formatted['context'], true);
+            }
+            
+            if (is_string($formatted['details'])) {
+                $decoded = json_decode($formatted['details'], true);
+                if (json_last_error() === JSON_ERROR_NONE) {
+                    $formatted['details'] = $decoded;
+                }
+            }
+            
+            if ($log->bot) {
+                $formatted['bot_name'] = $log->bot->name;
+                $formatted['bot_username'] = $log->bot->username;
+            }
+            
+            return response()->json(['log' => $formatted]);
         } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
             return response()->json(['error' => 'Log not found'], 404);
         } catch (\Exception $e) {
-            return response()->json(['error' => 'Failed to fetch log'], 500);
+            return response()->json([
+                'error' => 'Failed to fetch log',
+                'message' => $e->getMessage()
+            ], 500);
         }
     }
 }

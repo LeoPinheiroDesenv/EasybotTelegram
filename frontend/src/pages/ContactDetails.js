@@ -74,10 +74,20 @@ const ContactDetails = () => {
     
     try {
       setLoadingHistory(true);
-      const history = await groupManagementService.getContactHistory(botId, id);
-      setContactHistory(history);
+      setError('');
+      const response = await groupManagementService.getContactHistory(botId, id);
+      // A resposta pode ser um array direto ou um objeto com history
+      if (Array.isArray(response)) {
+        setContactHistory(response);
+      } else if (response.history) {
+        setContactHistory(response.history);
+      } else {
+        setContactHistory([]);
+      }
     } catch (err) {
       console.error('Error loading contact history:', err);
+      setError('Erro ao carregar histórico');
+      setContactHistory([]);
     } finally {
       setLoadingHistory(false);
     }
@@ -300,22 +310,51 @@ const ContactDetails = () => {
               >
                 {loadingHistory ? 'Carregando...' : 'Carregar Histórico'}
               </button>
-              {contactHistory && (
+              {contactHistory !== null && (
                 <div className="history-list">
                   {Array.isArray(contactHistory) && contactHistory.length === 0 ? (
-                    <p>Nenhum histórico disponível</p>
+                    <p className="no-history">Nenhum histórico disponível</p>
                   ) : Array.isArray(contactHistory) ? (
                     contactHistory.map((entry, index) => (
-                      <div key={index} className="history-item">
-                        <p><strong>{entry.action || entry.type || 'Ação'}</strong></p>
-                        <p>{entry.message || entry.description || 'Sem mensagem'}</p>
+                      <div key={entry.id || index} className={`history-item history-${entry.action_type || 'default'}`}>
+                        <div className="history-header">
+                          <span className="history-action-label">
+                            {entry.action_label || entry.action || 'Ação'}
+                          </span>
+                          {entry.status && (
+                            <span className={`history-status status-${entry.status}`}>
+                              {entry.status === 'pending' ? '⏳ Pendente' : 
+                               entry.status === 'completed' ? '✅ Concluído' :
+                               entry.status === 'failed' ? '❌ Falhou' : entry.status}
+                            </span>
+                          )}
+                        </div>
+                        <p className="history-description">
+                          {entry.description || entry.message || 'Sem descrição'}
+                        </p>
+                        {entry.transaction && (
+                          <div className="history-transaction">
+                            <strong>Transação:</strong> R$ {parseFloat(entry.transaction.amount || 0).toFixed(2)}
+                            {entry.transaction.plan && (
+                              <span> - {entry.transaction.plan.title}</span>
+                            )}
+                          </div>
+                        )}
+                        {entry.metadata && Object.keys(entry.metadata).length > 0 && (
+                          <details className="history-metadata">
+                            <summary>Ver detalhes</summary>
+                            <pre>{JSON.stringify(entry.metadata, null, 2)}</pre>
+                          </details>
+                        )}
                         {entry.created_at && (
-                          <p className="history-date">{formatDate(entry.created_at)}</p>
+                          <p className="history-date">
+                            {entry.created_at_human || formatDate(entry.created_at)}
+                          </p>
                         )}
                       </div>
                     ))
                   ) : (
-                    <p>Erro ao carregar histórico</p>
+                    <p className="error-text">Erro ao carregar histórico</p>
                   )}
                 </div>
               )}

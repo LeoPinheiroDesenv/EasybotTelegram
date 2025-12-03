@@ -1,0 +1,1588 @@
+type: collection.insomnia.rest/5.0
+name: Easy Pagamentos
+meta:
+  id: wrk_1ea0fd61c603410bb61d244032c02d5b
+  created: 1764022120985
+  modified: 1764022141064
+collection:
+  - url: "{{ base_url }}/auth/login"
+    name: Login
+    meta:
+      id: req_d691db645dfa4fc5b2b56dceda776fe2
+      created: 1764022120988
+      modified: 1764684910862
+      isPrivate: false
+      description: "Fazer login e obter token. Se 2FA estiver ativado, retornará
+        requiresTwoFactor: true. Nesse caso, use a requisição 'Verify Two
+        Factor' para completar o login."
+      sortKey: 1000000000000
+    method: POST
+    body:
+      mimeType: application/json
+      text: |-
+        {
+          "email": "leonidasgbp@gmail.com",
+          "password": "admin123"
+        }
+    headers:
+      - name: Content-Type
+        value: application/json
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+  - url: "{{ base_url }}/auth/me"
+    name: Get Current User
+    meta:
+      id: req_e2ed34b9e9e148aaaafa8a450764dfc8
+      created: 1764022120989
+      modified: 1764022120989
+      isPrivate: false
+      description: Obter informações do usuário atual
+      sortKey: 1000000001000
+    method: GET
+    headers:
+      - name: Authorization
+        value: Bearer {{ token }}
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+  - url: "{{ base_url }}/auth/verify-2fa"
+    name: Verify Two Factor
+    meta:
+      id: req_5ed832f7b72c4e849221bae990fe8d99
+      created: 1764022120993
+      modified: 1764690534681
+      isPrivate: false
+      description: "Verificar código 2FA após login inicial. Use esta requisição
+        quando o Login retornar requiresTwoFactor: true. O userId será
+        preenchido automaticamente da resposta anterior. Substitua '123456' pelo
+        código real do seu aplicativo autenticador."
+      sortKey: 1000000002000
+    method: POST
+    body:
+      mimeType: application/json
+      text: |-
+        {
+          "userId": 1,
+          "token": "673167"
+        }
+    headers:
+      - name: Content-Type
+        value: application/json
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+  - url: "{{ base_url }}/auth/2fa/setup"
+    name: Setup 2FA
+    meta:
+      id: req_e6cdffc4f16542789e6fc7b0b0e3843c
+      created: 1764022120994
+      modified: 1764022120994
+      isPrivate: false
+      description: Configurar 2FA - gera secret e QR code
+      sortKey: 1000000003000
+    method: GET
+    headers:
+      - name: Authorization
+        value: Bearer {{ token }}
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+  - url: "{{ base_url }}/auth/2fa/disable"
+    name: Disable 2FA
+    meta:
+      id: req_4e79642c0191429b820ed0b7370d4895
+      created: 1764022120995
+      modified: 1764022120995
+      isPrivate: false
+      description: Desativar autenticação de dois fatores
+      sortKey: 1000000005000
+    method: POST
+    headers:
+      - name: Authorization
+        value: Bearer {{ token }}
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+  - url: "{{ base_url }}/auth/2fa/verify"
+    name: Verify and Enable 2FA
+    meta:
+      id: req_968dbca1898540b2989bca35e58848d4
+      created: 1764022120995
+      modified: 1764022120995
+      isPrivate: false
+      description: Verificar código e ativar 2FA
+      sortKey: 1000000004000
+    method: POST
+    body:
+      mimeType: application/json
+      text: |-
+        {
+          "token": "123456"
+        }
+    headers:
+      - name: Authorization
+        value: Bearer {{ token }}
+      - name: Content-Type
+        value: application/json
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+  - url: "{{ base_url }}/bots"
+    name: Get All Bots
+    meta:
+      id: req_501b90bb94434969a89ee25cfb6ea1ac
+      created: 1764022120996
+      modified: 1764022120996
+      isPrivate: false
+      description: Listar todos os bots
+      sortKey: 2000000000000
+    method: GET
+    headers:
+      - name: Authorization
+        value: Bearer {{ token }}
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+  - url: "{{ base_url }}/bots/1"
+    name: Get Bot by ID
+    meta:
+      id: req_fdbbb90b63c24e68912650f42fc46cb3
+      created: 1764022120996
+      modified: 1764022120996
+      isPrivate: false
+      description: Obter bot por ID
+      sortKey: 2000000001000
+    method: GET
+    headers:
+      - name: Authorization
+        value: Bearer {{ token }}
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+  - url: "{{ base_url }}/bots/1"
+    name: Update Bot
+    meta:
+      id: req_9aeb5f01524f4679acea83c785017bbc
+      created: 1764022120997
+      modified: 1764022120997
+      isPrivate: false
+      description: Atualizar bot existente
+      sortKey: 2000000003000
+    method: PUT
+    body:
+      mimeType: application/json
+      text: |-
+        {
+          "name": "Bot Atualizado",
+          "token": "123456789:ABCdefGHIjklMNOpqrsTUVwxyz",
+          "telegram_group_id": "@meugrupo"
+        }
+    headers:
+      - name: Authorization
+        value: Bearer {{ token }}
+      - name: Content-Type
+        value: application/json
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+  - url: "{{ base_url }}/bots"
+    name: Create Bot
+    meta:
+      id: req_a4c19464d4514b6e9fc1fedb92693223
+      created: 1764022120997
+      modified: 1764022120997
+      isPrivate: false
+      description: Criar novo bot
+      sortKey: 2000000002000
+    method: POST
+    body:
+      mimeType: application/json
+      text: |-
+        {
+          "name": "Meu Bot",
+          "token": "123456789:ABCdefGHIjklMNOpqrsTUVwxyz",
+          "telegram_group_id": "@meugrupo"
+        }
+    headers:
+      - name: Authorization
+        value: Bearer {{ token }}
+      - name: Content-Type
+        value: application/json
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+  - url: "{{ base_url }}/bots/6"
+    name: Delete Bot
+    meta:
+      id: req_5a9d76ccb4784c38b6067cdf27625837
+      created: 1764022120998
+      modified: 1764300410682
+      isPrivate: false
+      description: Excluir bot
+      sortKey: 2000000004000
+    method: DELETE
+    headers:
+      - name: Authorization
+        value: Bearer {{ token }}
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+  - url: "{{ base_url }}/bots/validate"
+    name: Validate Bot Token
+    meta:
+      id: req_3b8245a09eda4414b54d086bb2e40730
+      created: 1764022120999
+      modified: 1764022120999
+      isPrivate: false
+      description: Validar token do bot
+      sortKey: 2000000005000
+    method: POST
+    body:
+      mimeType: application/json
+      text: |-
+        {
+          "token": "123456789:ABCdefGHIjklMNOpqrsTUVwxyz"
+        }
+    headers:
+      - name: Authorization
+        value: Bearer {{ token }}
+      - name: Content-Type
+        value: application/json
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+  - url: "{{ base_url }}/bots/3/initialize"
+    name: Initialize Bot
+    meta:
+      id: req_d138f4f21cc34b56a635e89e8c87373c
+      created: 1764022120999
+      modified: 1764682827197
+      isPrivate: false
+      description: Inicializar bot (iniciar Telegram bot)
+      sortKey: 2000000006000
+    method: POST
+    headers:
+      - name: Authorization
+        value: Bearer {{ token }}
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+  - url: "{{ base_url }}/bots/5/status"
+    name: Get Bot Status
+    meta:
+      id: req_80d864763563481daaf0f9018eebe66d
+      created: 1764022121000
+      modified: 1764029293629
+      isPrivate: false
+      description: Obter status do bot
+      sortKey: 2000000008000
+    method: GET
+    headers:
+      - name: Authorization
+        value: Bearer {{ token }}
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+  - url: "{{ base_url }}/bots/1/stop"
+    name: Stop Bot
+    meta:
+      id: req_84e9849374bb4fc0892d2b0a937a1642
+      created: 1764022121000
+      modified: 1764022121000
+      isPrivate: false
+      description: Parar bot (parar Telegram bot)
+      sortKey: 2000000007000
+    method: POST
+    headers:
+      - name: Authorization
+        value: Bearer {{ token }}
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+  - url: "{{ base_url }}/bots/5/commands"
+    name: Create Bot Command
+    meta:
+      id: req_613d62cde17f4d5fb32ef8dc92213808
+      created: 1764022121001
+      modified: 1764226151626
+      isPrivate: false
+      description: Criar novo comando personalizado para um bot
+      sortKey: 2000000010000
+    method: POST
+    body:
+      mimeType: application/json
+      text: |-
+        {
+          "command": "info",
+          "response": "Este é um bot de exemplo criado com EasyBot Telegram!",
+          "description": "Mostra informações sobre o bot",
+          "active": true
+        }
+    headers:
+      - name: Authorization
+        value: Bearer {{ token }}
+      - name: Content-Type
+        value: application/json
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+  - url: "{{ base_url }}/bots/5/commands"
+    name: Get Bot Commands
+    meta:
+      id: req_b6e586b0d2234401b936ab4cf06e915b
+      created: 1764022121001
+      modified: 1764226128173
+      isPrivate: false
+      description: Listar comandos personalizados de um bot
+      sortKey: 2000000009000
+    method: GET
+    headers:
+      - name: Authorization
+        value: Bearer {{ token }}
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+  - url: "{{ base_url }}/bots/1/commands/1"
+    name: Delete Bot Command
+    meta:
+      id: req_5b0253fba9164806bb5fbbb10863d58b
+      created: 1764022121002
+      modified: 1764022121002
+      isPrivate: false
+      description: Excluir comando personalizado de um bot
+      sortKey: 2000000012000
+    method: DELETE
+    headers:
+      - name: Authorization
+        value: Bearer {{ token }}
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+  - url: "{{ base_url }}/bots/1/commands/1"
+    name: Update Bot Command
+    meta:
+      id: req_aa92671a86e0422794ee3208fc5e89d3
+      created: 1764022121002
+      modified: 1764022121002
+      isPrivate: false
+      description: Atualizar comando personalizado de um bot
+      sortKey: 2000000011000
+    method: PUT
+    body:
+      mimeType: application/json
+      text: |-
+        {
+          "response": "Nova resposta do comando",
+          "description": "Nova descrição",
+          "active": true
+        }
+    headers:
+      - name: Authorization
+        value: Bearer {{ token }}
+      - name: Content-Type
+        value: application/json
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+  - url: "{{ base_url }}/telegram/webhook/5/info"
+    name: Get Webhook Info
+    meta:
+      id: req_b361de66afa346c7872656c0bd3661ff
+      created: 1764022121003
+      modified: 1764211717956
+      isPrivate: false
+      description: Obter informações do webhook configurado para um bot
+      sortKey: 2000000013000
+    method: GET
+    headers:
+      - name: Authorization
+        value: Bearer {{ token }}
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+  - url: "{{ base_url }}/telegram/webhook/1/delete"
+    name: Delete Webhook
+    meta:
+      id: req_379fdaf7c1694b24acaf399129bace56
+      created: 1764022121004
+      modified: 1764022121004
+      isPrivate: false
+      description: Remover webhook de um bot
+      sortKey: 2000000015000
+    method: POST
+    headers:
+      - name: Authorization
+        value: Bearer {{ token }}
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+  - url: "{{ base_url }}/telegram/webhook/5/set"
+    name: Set Webhook
+    meta:
+      id: req_9d0de0da501b431dad9c09c86f0db4ec
+      created: 1764022121004
+      modified: 1764211843267
+      isPrivate: false
+      description: Configurar webhook para um bot (requer HTTPS)
+      sortKey: 2000000014000
+    method: POST
+    body:
+      mimeType: application/json
+      text: |-
+        {
+          "url": "https://api.easypagamentos.com/api/telegram/webhook/5" 
+        }
+    headers:
+      - name: Content-Type
+        value: application/json
+      - name: Authorization
+        value: Bearer {{ token }}
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+  - url: "{{ base_url }}/contacts"
+    name: Get All Contacts
+    meta:
+      id: req_ac79bcc7911140499664805466f1de90
+      created: 1764022121005
+      modified: 1764223728691
+      isPrivate: false
+      description: Listar todos os contatos
+      sortKey: 3000000000000
+    method: GET
+    parameters:
+      - id: pair_e81210c3dd17479b94c9ea0d1184be05
+        name: botId
+        value: "5"
+        disabled: false
+    headers:
+      - name: Authorization
+        value: Bearer {{ token }}
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+  - url: "{{ base_url }}/contacts/stats"
+    name: Get Contact Stats
+    meta:
+      id: req_887d9874ed9b470f8b7009fde9a83f3e
+      created: 1764022121015
+      modified: 1764022121015
+      isPrivate: false
+      description: Obter estatísticas de contatos
+      sortKey: 3000000001000
+    method: GET
+    headers:
+      - name: Authorization
+        value: Bearer {{ token }}
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+  - url: "{{ base_url }}/contacts/1"
+    name: Get Contact by ID
+    meta:
+      id: req_5ab757d842fd4082a9ebea8e8b1f9d7c
+      created: 1764022121017
+      modified: 1764216494474
+      isPrivate: false
+      description: Obter contato por ID
+      sortKey: 3000000003000
+    method: GET
+    headers:
+      - name: Authorization
+        value: Bearer {{ token }}
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+  - url: "{{ base_url }}/contacts/latest"
+    name: Get Latest Contacts
+    meta:
+      id: req_9421c1d25ff84ae49deab993e0244f14
+      created: 1764022121017
+      modified: 1764022121017
+      isPrivate: false
+      description: Obter contatos mais recentes
+      sortKey: 3000000002000
+    method: GET
+    headers:
+      - name: Authorization
+        value: Bearer {{ token }}
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+  - url: "{{ base_url }}/contacts/1"
+    name: Delete Contact
+    meta:
+      id: req_a46fca2ad3ba40e38cad06e21432e19f
+      created: 1764022121018
+      modified: 1764022121018
+      isPrivate: false
+      description: Excluir contato
+      sortKey: 3000000006000
+    method: DELETE
+    headers:
+      - name: Authorization
+        value: Bearer {{ token }}
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+  - url: "{{ base_url }}/contacts"
+    name: Create Contact
+    meta:
+      id: req_bcfbafe902404149ab74340c9f328558
+      created: 1764022121018
+      modified: 1764022121018
+      isPrivate: false
+      description: Criar novo contato
+      sortKey: 3000000004000
+    method: POST
+    body:
+      mimeType: application/json
+      text: |-
+        {
+          "bot_id": 1,
+          "telegram_id": 123456789,
+          "username": "usuario",
+          "first_name": "Nome",
+          "last_name": "Sobrenome"
+        }
+    headers:
+      - name: Authorization
+        value: Bearer {{ token }}
+      - name: Content-Type
+        value: application/json
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+  - url: "{{ base_url }}/contacts/1"
+    name: Update Contact
+    meta:
+      id: req_ed33c485db254327a1bc57f0ee16f336
+      created: 1764022121018
+      modified: 1764022121018
+      isPrivate: false
+      description: Atualizar contato
+      sortKey: 3000000005000
+    method: PUT
+    body:
+      mimeType: application/json
+      text: |-
+        {
+          "username": "usuario_atualizado",
+          "first_name": "Nome Atualizado"
+        }
+    headers:
+      - name: Authorization
+        value: Bearer {{ token }}
+      - name: Content-Type
+        value: application/json
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+  - url: "{{ base_url }}/payment-plans"
+    name: Get All Payment Plans
+    meta:
+      id: req_60133f81956d49bcb61ac47c69a4382d
+      created: 1764022121019
+      modified: 1764022121019
+      isPrivate: false
+      description: Listar todos os planos de pagamento
+      sortKey: 4000000000000
+    method: GET
+    headers:
+      - name: Authorization
+        value: Bearer {{ token }}
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+  - url: "{{ base_url }}/payment-plans/1"
+    name: Get Payment Plan by ID
+    meta:
+      id: req_c9168c8ddae94caabd56999b4b503530
+      created: 1764022121019
+      modified: 1764022121019
+      isPrivate: false
+      description: Obter plano de pagamento por ID
+      sortKey: 4000000001000
+    method: GET
+    headers:
+      - name: Authorization
+        value: Bearer {{ token }}
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+  - url: "{{ base_url }}/payment-plans"
+    name: Create Payment Plan
+    meta:
+      id: req_86cc49f12c554813958e6c9087941921
+      created: 1764022121020
+      modified: 1764022121020
+      isPrivate: false
+      description: Criar novo plano de pagamento
+      sortKey: 4000000002000
+    method: POST
+    body:
+      mimeType: application/json
+      text: |-
+        {
+          "bot_id": 1,
+          "title": "Plano Mensal",
+          "price": 29.90,
+          "charge_period": "month",
+          "cycle": 1,
+          "payment_cycle_id": 1,
+          "message": "Mensagem do plano",
+          "pix_message": "Mensagem PIX",
+          "active": true
+        }
+    headers:
+      - name: Authorization
+        value: Bearer {{ token }}
+      - name: Content-Type
+        value: application/json
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+  - url: "{{ base_url }}/payment-plans/1"
+    name: Update Payment Plan
+    meta:
+      id: req_9188173bf77d4d21ba7687711949f944
+      created: 1764022121020
+      modified: 1764022121020
+      isPrivate: false
+      description: Atualizar plano de pagamento
+      sortKey: 4000000003000
+    method: PUT
+    body:
+      mimeType: application/json
+      text: |-
+        {
+          "bot_id": 1,
+          "title": "Plano Mensal Atualizado",
+          "price": 39.90,
+          "charge_period": "month",
+          "cycle": 1,
+          "payment_cycle_id": 1,
+          "active": true
+        }
+    headers:
+      - name: Authorization
+        value: Bearer {{ token }}
+      - name: Content-Type
+        value: application/json
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+  - url: "{{ base_url }}/payment-plans/1"
+    name: Delete Payment Plan
+    meta:
+      id: req_45305834bb284649a5933da2d538431f
+      created: 1764022121021
+      modified: 1764022121021
+      isPrivate: false
+      description: Excluir plano de pagamento
+      sortKey: 4000000004000
+    method: DELETE
+    headers:
+      - name: Authorization
+        value: Bearer {{ token }}
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+  - url: "{{ base_url }}/payment-cycles"
+    name: Get All Payment Cycles
+    meta:
+      id: req_56dd37a1bb15493e8daba2d63df6f9b8
+      created: 1764022121021
+      modified: 1764022121021
+      isPrivate: false
+      description: Listar todos os ciclos de pagamento
+      sortKey: 4500000000000
+    method: GET
+    headers:
+      - name: Authorization
+        value: Bearer {{ token }}
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+  - url: "{{ base_url }}/payment-cycles/1"
+    name: Get Payment Cycle by ID
+    meta:
+      id: req_7b30aa61004f44a196f77d59b8f8b321
+      created: 1764022121021
+      modified: 1764022121021
+      isPrivate: false
+      description: Obter ciclo de pagamento por ID
+      sortKey: 4500000001000
+    method: GET
+    headers:
+      - name: Authorization
+        value: Bearer {{ token }}
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+  - url: "{{ base_url }}/payment-cycles"
+    name: Create Payment Cycle
+    meta:
+      id: req_87ac0a81d9c0419bb25e930b023166d8
+      created: 1764022121022
+      modified: 1764022121022
+      isPrivate: false
+      description: Criar novo ciclo de pagamento
+      sortKey: 4500000002000
+    method: POST
+    body:
+      mimeType: application/json
+      text: |-
+        {
+          "name": "Mensal",
+          "days": 30,
+          "description": "Ciclo de pagamento mensal",
+          "is_active": true
+        }
+    headers:
+      - name: Authorization
+        value: Bearer {{ token }}
+      - name: Content-Type
+        value: application/json
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+  - url: "{{ base_url }}/payment-cycles/1"
+    name: Update Payment Cycle
+    meta:
+      id: req_c3ec505633354b08ae5b88f94d5e0f4e
+      created: 1764022121022
+      modified: 1764022121022
+      isPrivate: false
+      description: Atualizar ciclo de pagamento
+      sortKey: 4500000003000
+    method: PUT
+    body:
+      mimeType: application/json
+      text: |-
+        {
+          "name": "Mensal Atualizado",
+          "days": 30,
+          "description": "Ciclo de pagamento mensal atualizado",
+          "is_active": true
+        }
+    headers:
+      - name: Authorization
+        value: Bearer {{ token }}
+      - name: Content-Type
+        value: application/json
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+  - url: "{{ base_url }}/payment-cycles/1"
+    name: Delete Payment Cycle
+    meta:
+      id: req_fcaf78b994574077b373b28df8dc5463
+      created: 1764022121022
+      modified: 1764022121022
+      isPrivate: false
+      description: Excluir ciclo de pagamento
+      sortKey: 4500000004000
+    method: DELETE
+    headers:
+      - name: Authorization
+        value: Bearer {{ token }}
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+  - url: "{{ base_url }}/payments/pix"
+    name: Process PIX Payment
+    meta:
+      id: req_1cfe62c48ac64214a85db88f6731d115
+      created: 1764022121023
+      modified: 1764022121023
+      isPrivate: false
+      description: Processar pagamento via PIX
+      sortKey: 4600000000000
+    method: POST
+    body:
+      mimeType: application/json
+      text: |-
+        {
+          "bot_id": 1,
+          "payment_plan_id": 1,
+          "contact_id": 1,
+          "amount": 29.90
+        }
+    headers:
+      - name: Authorization
+        value: Bearer {{ token }}
+      - name: Content-Type
+        value: application/json
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+  - url: "{{ base_url }}/payments/credit-card"
+    name: Process Credit Card Payment
+    meta:
+      id: req_bfcd7d42ac1a44728c8db27e36a98b91
+      created: 1764022121023
+      modified: 1764022121023
+      isPrivate: false
+      description: Processar pagamento via cartão de crédito
+      sortKey: 4600000001000
+    method: POST
+    body:
+      mimeType: application/json
+      text: |-
+        {
+          "bot_id": 1,
+          "payment_plan_id": 1,
+          "contact_id": 1,
+          "amount": 29.90,
+          "card_token": "card_token_here"
+        }
+    headers:
+      - name: Authorization
+        value: Bearer {{ token }}
+      - name: Content-Type
+        value: application/json
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+  - url: "{{ base_url }}/payments/webhook/stripe"
+    name: Stripe Webhook
+    meta:
+      id: req_1b4f2bc42a6e4269b39947a2b484a537
+      created: 1764022121024
+      modified: 1764022121024
+      isPrivate: false
+      description: Webhook do Stripe
+      sortKey: 4600000003000
+    method: POST
+    body:
+      mimeType: application/json
+      text: |-
+        {
+          "type": "payment_intent.succeeded",
+          "data": {
+            "object": {
+              "id": "pi_123456789"
+            }
+          }
+        }
+    headers:
+      - name: Content-Type
+        value: application/json
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+  - url: "{{ base_url }}/payment-gateway-configs"
+    name: Get All Payment Gateway Configs
+    meta:
+      id: req_397c93702f3c4572903ac4009d91d33f
+      created: 1764022121024
+      modified: 1764022121024
+      isPrivate: false
+      description: Listar todas as configurações de gateway
+      sortKey: 4700000000000
+    method: GET
+    headers:
+      - name: Authorization
+        value: Bearer {{ token }}
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+  - url: "{{ base_url }}/payments/webhook/mercadopago"
+    name: Mercado Pago Webhook
+    meta:
+      id: req_86a781f2dd0c4584a775d8ed6733a424
+      created: 1764022121024
+      modified: 1764022121024
+      isPrivate: false
+      description: Webhook do Mercado Pago
+      sortKey: 4600000002000
+    method: POST
+    body:
+      mimeType: application/json
+      text: |-
+        {
+          "type": "payment",
+          "data": {
+            "id": "123456789"
+          }
+        }
+    headers:
+      - name: Content-Type
+        value: application/json
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+  - url: "{{ base_url }}/payment-gateway-configs"
+    name: Create Payment Gateway Config
+    meta:
+      id: req_74d8721c982a4e2ba2649708cac17435
+      created: 1764022121025
+      modified: 1764022121025
+      isPrivate: false
+      description: Criar nova configuração de gateway
+      sortKey: 4700000002000
+    method: POST
+    body:
+      mimeType: application/json
+      text: |-
+        {
+          "bot_id": 1,
+          "gateway": "mercadopago",
+          "environment": "sandbox",
+          "api_key": "your_api_key",
+          "api_secret": "your_api_secret",
+          "active": true
+        }
+    headers:
+      - name: Authorization
+        value: Bearer {{ token }}
+      - name: Content-Type
+        value: application/json
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+  - url: "{{ base_url }}/payment-gateway-configs/1"
+    name: Update Payment Gateway Config
+    meta:
+      id: req_896d9addafb04f56bfd508709ca8108c
+      created: 1764022121025
+      modified: 1764022121025
+      isPrivate: false
+      description: Atualizar configuração de gateway
+      sortKey: 4700000003000
+    method: PUT
+    body:
+      mimeType: application/json
+      text: |-
+        {
+          "bot_id": 1,
+          "gateway": "mercadopago",
+          "environment": "production",
+          "api_key": "updated_api_key",
+          "active": true
+        }
+    headers:
+      - name: Authorization
+        value: Bearer {{ token }}
+      - name: Content-Type
+        value: application/json
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+  - url: "{{ base_url }}/payment-gateway-configs/1"
+    name: Get Payment Gateway Config by ID
+    meta:
+      id: req_9a710ddeda5c43ce9a4721dbfa3a9032
+      created: 1764022121025
+      modified: 1764022121025
+      isPrivate: false
+      description: Obter configuração de gateway por ID
+      sortKey: 4700000001000
+    method: GET
+    headers:
+      - name: Authorization
+        value: Bearer {{ token }}
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+  - url: "{{ base_url }}/users/1"
+    name: Get User by ID
+    meta:
+      id: req_8a742085c99748ed9444c92e70381ddc
+      created: 1764022121026
+      modified: 1764022121026
+      isPrivate: false
+      description: Obter usuário por ID (Admin only)
+      sortKey: 5000000001000
+    method: GET
+    headers:
+      - name: Authorization
+        value: Bearer {{ token }}
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+  - url: "{{ base_url }}/payment-gateway-configs/1"
+    name: Delete Payment Gateway Config
+    meta:
+      id: req_8ae78060f3904e18922aacfa4ad84351
+      created: 1764022121026
+      modified: 1764022121026
+      isPrivate: false
+      description: Excluir configuração de gateway
+      sortKey: 4700000004000
+    method: DELETE
+    headers:
+      - name: Authorization
+        value: Bearer {{ token }}
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+  - url: "{{ base_url }}/users"
+    name: Get All Users
+    meta:
+      id: req_ee1f4df81d5644cb85ba86f8fe0f3077
+      created: 1764022121026
+      modified: 1764022121026
+      isPrivate: false
+      description: Listar todos os usuários (Admin only)
+      sortKey: 5000000000000
+    method: GET
+    headers:
+      - name: Authorization
+        value: Bearer {{ token }}
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+  - url: "{{ base_url }}/users/1"
+    name: Update User
+    meta:
+      id: req_5b606482d0dc422e8d8b30222744455d
+      created: 1764022121027
+      modified: 1764022121027
+      isPrivate: false
+      description: Atualizar usuário (Admin only)
+      sortKey: 5000000003000
+    method: PUT
+    body:
+      mimeType: application/json
+      text: |-
+        {
+          "name": "Usuário Atualizado",
+          "email": "usuario_atualizado@example.com",
+          "role": "admin"
+        }
+    headers:
+      - name: Authorization
+        value: Bearer {{ token }}
+      - name: Content-Type
+        value: application/json
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+  - url: "{{ base_url }}/users/1"
+    name: Delete User
+    meta:
+      id: req_676ef04ee6de4af799fad23b603baa99
+      created: 1764022121027
+      modified: 1764022121027
+      isPrivate: false
+      description: Excluir usuário (Admin only)
+      sortKey: 5000000004000
+    method: DELETE
+    headers:
+      - name: Authorization
+        value: Bearer {{ token }}
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+  - url: "{{ base_url }}/users"
+    name: Create User
+    meta:
+      id: req_e2b0191dd86347599b7c36245783b96b
+      created: 1764022121027
+      modified: 1764022121027
+      isPrivate: false
+      description: Criar novo usuário (Admin only)
+      sortKey: 5000000002000
+    method: POST
+    body:
+      mimeType: application/json
+      text: |-
+        {
+          "name": "Novo Usuário",
+          "email": "usuario@example.com",
+          "password": "senha123",
+          "role": "user",
+          "active": true
+        }
+    headers:
+      - name: Authorization
+        value: Bearer {{ token }}
+      - name: Content-Type
+        value: application/json
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+  - url: http://172.18.0.3:8000/api/health
+    name: Health Check
+    meta:
+      id: req_3dc88829be93460bbe5938726b0288cf
+      created: 1764022121028
+      modified: 1764022121028
+      isPrivate: false
+      description: Verificar status do servidor
+      sortKey: 7000000000000
+    method: GET
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+  - url: "{{ base_url }}/logs/1"
+    name: Get Log by ID
+    meta:
+      id: req_e6fab478f7fd4008ab2c50425b666778
+      created: 1764022121028
+      modified: 1764022121028
+      isPrivate: false
+      description: Obter log por ID (Admin only)
+      sortKey: 6000000001000
+    method: GET
+    headers:
+      - name: Authorization
+        value: Bearer {{ token }}
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+  - url: "{{ base_url }}/logs?limit=100&offset=0"
+    name: Get All Logs
+    meta:
+      id: req_ed85da6664dd407392f363b9c8733cac
+      created: 1764022121028
+      modified: 1764022121028
+      isPrivate: false
+      description: Listar todos os logs (Admin only)
+      sortKey: 6000000000000
+    method: GET
+    parameters:
+      - name: level
+        description: Filter by level (error, warn, info, debug)
+      - name: limit
+        value: "100"
+        description: Number of logs to return
+      - name: offset
+        value: "0"
+        description: Offset for pagination
+    headers:
+      - name: Authorization
+        value: Bearer {{ token }}
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+  - url: "{{ _.base_url }}/bots/5/validate-and-activate"
+    name: Validar e ativar
+    meta:
+      id: req_0cbc96133472471599f4eb029aea2fac
+      created: 1764023746756
+      modified: 1764221295311
+      isPrivate: false
+      sortKey: -1764023746756
+    method: POST
+    headers:
+      - name: Authorization
+        value: Bearer {{ token }}
+        id: pair_948d132326614f56a08a329ee29e6276
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+  - url: http://api.easypagamentos.com/api/telegram/webhook/5
+    name: New Request
+    meta:
+      id: req_b555cac1c2b04ff181146fa7126f32a0
+      created: 1764031276319
+      modified: 1764031320414
+      isPrivate: false
+      sortKey: -1764031276319
+    method: POST
+    headers:
+      - name: User-Agent
+        value: insomnia/11.1.0
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+  - url: "{{ base_url }}/alerts/process-auto"
+    name: Processa Alerta
+    meta:
+      id: req_d124d7fcf2f84c29bb89ae7b3b147455
+      created: 1764296692151
+      modified: 1764297859297
+      isPrivate: false
+      sortKey: -1764296692151
+    method: POST
+    headers:
+      - id: pair_8e5cfed9d7114c7b85ee5229c905e4ce
+        name: Authorization
+        value: Bearer {{ token }}
+        disabled: false
+      - id: pair_d4377a0060824f9dae2561edcdbaff30
+        name: Content-Type
+        value: application/json
+        disabled: false
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+  - url: https://verticos.com.br/api/create-storage-link
+    name: New Request
+    meta:
+      id: req_35766e4246d94b2bb3eb148044d22a2c
+      created: 1764569638199
+      modified: 1764570598588
+      isPrivate: false
+      sortKey: -1764569638199
+    method: POST
+    headers:
+      - name: User-Agent
+        value: insomnia/11.1.0
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+  - url: https://api.easypagamentos.com/api/telegram/webhook/5
+    name: New Request
+    meta:
+      id: req_8c0ef8a938684f4f92a7794a480649fe
+      created: 1764685002392
+      modified: 1764685011299
+      isPrivate: false
+      sortKey: -1764685002392
+    method: POST
+    headers:
+      - name: User-Agent
+        value: insomnia/11.1.0
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+cookieJar:
+  name: Default Jar
+  meta:
+    id: jar_8cc0ed9f533f8716aa610f23981ae1e65e9a230a
+    created: 1764022121030
+    modified: 1764022121030
+environments:
+  name: Produção
+  meta:
+    id: env_8cc0ed9f533f8716aa610f23981ae1e65e9a230a
+    created: 1764022121030
+    modified: 1764371711222
+    isPrivate: false
+  data:
+    _id: req_env_production
+    _type: environment
+    name: Produção
+    base_url: https://api.easypagamentos.com/api
+    token: "{% response 'body', 'req_5ed832f7b72c4e849221bae990fe8d99',
+      'b64::JC50b2tlbg==::46b', 'never', 60 %}"
+    color: "#ff6b6b"
+    isPrivate: false
+    metaSortKey: 1000000001000
+  subEnvironments:
+    - name: Dev
+      meta:
+        id: env_96b07aa158ee477c9c0d2530ba9e5fbe
+        created: 1764216075172
+        modified: 1764682796092
+        isPrivate: false
+        sortKey: 1764216075172
+      data:
+        _id: req_env_dev
+        _type: environment
+        name: Desenvolvimento
+        base_url: http://172.18.0.3:8000/api
+        token: eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJodHRwOi8vMTcyLjE4LjAuMzo4MDAwL2FwaS9hdXRoL2xvZ2luIiwiaWF0IjoxNzY0NjgyNzQzLCJleHAiOjE3NjQ2ODYzNDMsIm5iZiI6MTc2NDY4Mjc0MywianRpIjoiZkljY0trRVYyOW9Od0l3VyIsInN1YiI6IjEiLCJwcnYiOiIyM2JkNWM4OTQ5ZjYwMGFkYjM5ZTcwMWM0MDA4NzJkYjdhNTk3NmY3IiwiZW1haWwiOiJhZG1pbkBhZG1pbi5jb20iLCJyb2xlIjoiYWRtaW4iLCJ1c2VyX3R5cGUiOiJzdXBlcl9hZG1pbiJ9.3NV-x78b__w2t7hqAi41Z14UoxMu1VfckRADVTS89TI
+        color: "#ff6b6b"
+        isPrivate: false
+        metaSortKey: 1000000001000

@@ -50,5 +50,13 @@ class Contact extends Model
     {
         return $this->belongsTo(Bot::class);
     }
+
+    /**
+     * Get the actions performed by this contact.
+     */
+    public function actions(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(ContactAction::class);
+    }
 }
 

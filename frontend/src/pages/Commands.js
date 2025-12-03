@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faEdit, faTrash, faPlus, faCheck, faTimes, faSync } from '@fortawesome/free-solid-svg-icons';
 import Layout from '../components/Layout';
@@ -8,16 +8,7 @@ import './Commands.css';
 
 const Commands = () => {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  let botId = searchParams.get('botId');
-  
-  // Tenta obter botId do localStorage se não estiver na URL
-  if (!botId) {
-    const storedBotId = localStorage.getItem('selectedBotId');
-    if (storedBotId) {
-      botId = storedBotId;
-    }
-  }
+  const { botId } = useParams();
   
   const [commands, setCommands] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -27,6 +18,9 @@ const Commands = () => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingCommand, setEditingCommand] = useState(null);
   const [registering, setRegistering] = useState(false);
+  const [deletingTelegramCommands, setDeletingTelegramCommands] = useState(false);
+  const [telegramCommands, setTelegramCommands] = useState([]);
+  const [showTelegramCommands, setShowTelegramCommands] = useState(false);
   const [formData, setFormData] = useState({
     command: '',
     response: '',
@@ -171,11 +165,44 @@ const Commands = () => {
       setError('');
       await botCommandService.registerCommands(botId);
       setSuccess('Comandos registrados no Telegram com sucesso!');
+      if (showTelegramCommands) {
+        await loadTelegramCommands();
+      }
       setTimeout(() => setSuccess(''), 3000);
     } catch (err) {
       setError(err.response?.data?.error || 'Erro ao registrar comandos no Telegram');
     } finally {
       setRegistering(false);
+    }
+  };
+
+  const loadTelegramCommands = async () => {
+    try {
+      const commands = await botCommandService.getTelegramCommands(botId);
+      setTelegramCommands(commands);
+    } catch (err) {
+      console.error('Erro ao carregar comandos do Telegram:', err);
+    }
+  };
+
+  const handleDeleteTelegramCommand = async (commandName) => {
+    if (!window.confirm(`Tem certeza que deseja deletar o comando "/${commandName}" do Telegram?`)) {
+      return;
+    }
+
+    setDeletingTelegramCommands(true);
+    setError('');
+    setSuccess('');
+
+    try {
+      await botCommandService.deleteTelegramCommand(botId, commandName);
+      setSuccess(`Comando "/${commandName}" deletado do Telegram com sucesso!`);
+      await loadTelegramCommands();
+      setTimeout(() => setSuccess(''), 5000);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Erro ao deletar comando do Telegram');
+    } finally {
+      setDeletingTelegramCommands(false);
     }
   };
 
@@ -217,6 +244,18 @@ const Commands = () => {
               {registering ? ' Registrando...' : ' Registrar no Telegram'}
             </button>
             <button
+              className="btn btn-secondary"
+              onClick={() => {
+                setShowTelegramCommands(!showTelegramCommands);
+                if (!showTelegramCommands) {
+                  loadTelegramCommands();
+                }
+              }}
+              title="Ver comandos registrados no Telegram"
+            >
+              {showTelegramCommands ? 'Ocultar' : 'Ver'} Comandos no Telegram
+            </button>
+            <button
               className="btn btn-primary"
               onClick={handleAdd}
               disabled={loading}
@@ -236,6 +275,53 @@ const Commands = () => {
         {success && (
           <div className="alert alert-success">
             {success}
+          </div>
+        )}
+
+        {showTelegramCommands && (
+          <div className="telegram-commands-section">
+            <div className="section-header">
+              <h3>Comandos Registrados no Telegram</h3>
+            </div>
+            {telegramCommands.length === 0 ? (
+              <div className="empty-state">
+                <p>Nenhum comando registrado no Telegram.</p>
+              </div>
+            ) : (
+              <div className="telegram-commands-list">
+                <table className="commands-table">
+                  <thead>
+                    <tr>
+                      <th>Comando</th>
+                      <th>Descrição</th>
+                      <th>Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {telegramCommands.map((cmd, index) => (
+                      <tr key={index}>
+                        <td>
+                          <code>/{cmd.command}</code>
+                        </td>
+                        <td>{cmd.description || '-'}</td>
+                        <td>
+                          <div className="action-buttons">
+                            <button
+                              className="btn-icon btn-delete"
+                              onClick={() => handleDeleteTelegramCommand(cmd.command)}
+                              disabled={deletingTelegramCommands}
+                              title="Deletar comando do Telegram"
+                            >
+                              <FontAwesomeIcon icon={faTrash} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         )}
 
@@ -289,6 +375,7 @@ const Commands = () => {
                           className="btn-icon btn-edit"
                           onClick={() => handleEdit(command)}
                           title="Editar comando"
+                          disabled={loading}
                         >
                           <FontAwesomeIcon icon={faEdit} />
                         </button>
@@ -296,6 +383,7 @@ const Commands = () => {
                           className="btn-icon btn-delete"
                           onClick={() => handleDelete(command.id)}
                           title="Excluir comando"
+                          disabled={loading}
                         >
                           <FontAwesomeIcon icon={faTrash} />
                         </button>

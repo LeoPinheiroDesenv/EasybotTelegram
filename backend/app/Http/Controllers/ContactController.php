@@ -217,8 +217,14 @@ class ContactController extends Controller
                 ->where('bot_id', $request->botId)
                 ->firstOrFail();
 
+            $wasBlocked = $contact->is_blocked;
             $contact->is_blocked = !$contact->is_blocked;
             $contact->save();
+
+            // Registra ação de bloqueio/desbloqueio
+            $bot = \App\Models\Bot::findOrFail($request->botId);
+            $actionService = new \App\Services\ContactActionService();
+            $actionService->logBlockAction($bot, $contact, $contact->is_blocked, 'Ação manual via interface');
 
             return response()->json([
                 'message' => $contact->is_blocked ? 'Contact blocked successfully' : 'Contact unblocked successfully',

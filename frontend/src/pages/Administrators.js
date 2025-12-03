@@ -1,21 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import Layout from '../components/Layout';
 import botAdministratorService from '../services/botAdministratorService';
 import './Administrators.css';
 
 const Administrators = () => {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  let botId = searchParams.get('botId');
-  
-  // Try to get botId from localStorage if not in URL
-  if (!botId) {
-    const storedBotId = localStorage.getItem('selectedBotId');
-    if (storedBotId) {
-      botId = storedBotId;
-    }
-  }
+  const { botId } = useParams();
   
   const [administrators, setAdministrators] = useState([]);
   const [loading, setLoading] = useState(false);

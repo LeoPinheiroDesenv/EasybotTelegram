@@ -6,6 +6,8 @@ use App\Models\Bot;
 use App\Models\BotCommand;
 use App\Models\Contact;
 use App\Models\Log;
+use App\Services\PaymentService;
+use App\Services\ContactActionService;
 use Exception;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log as LogFacade;
@@ -996,7 +998,13 @@ class TelegramService
 
         // Salva ou atualiza contato (apenas para chats privados)
         if ($chatType === 'private') {
-            $this->saveOrUpdateContact($bot, $from);
+            $contact = $this->saveOrUpdateContact($bot, $from);
+            
+            // Processa contato compartilhado (telefone compartilhado via botão)
+            if (isset($message['contact'])) {
+                $this->processSharedContact($bot, $chatId, $from, $message['contact'], $contact);
+                return;
+            }
         }
 
         // Verifica se é um grupo ou supergrupo
@@ -1105,70 +1113,174 @@ class TelegramService
             }
         }
 
-        // Processa comandos em grupos (se o bot foi mencionado ou é comando direto)
-        if ($text && str_starts_with($text, '/')) {
-            $commandParts = explode(' ', $text);
+        // Processa comandos em grupos
+        // IMPORTANTE: Em grupos, o Telegram só envia mensagens de comandos para o bot se:
+        // 1. O bot foi mencionado explicitamente no comando (ex: /start@botname), OU
+        // 2. O bot tem can_read_all_group_messages = true (privacidade desabilitada)
+        // Se o bot recebeu a mensagem, significa que uma dessas condições foi atendida.
+        if ($text && str_starts_with(trim($text), '/')) {
+            // Extrai o comando do texto
+            $commandParts = explode(' ', trim($text));
             $command = $commandParts[0];
             
-            // Obtém o username do bot do bot_info
+            // Log detalhado para debug
+            $this->logBotAction($bot, "Processando comando em grupo", 'info', [
+                'chat_id' => $chatId,
+                'user_id' => $from['id'] ?? null,
+                'command' => $command,
+                'full_text' => substr($text, 0, 100),
+                'has_entities' => isset($message['entities']),
+                'entities' => $message['entities'] ?? []
+            ]);
+            
+            // Obtém o username do bot (cache para evitar múltiplas chamadas)
             $botUsername = null;
+            $botIdFromToken = null;
             try {
                 $botInfo = $this->validateToken($bot->token);
                 if ($botInfo['valid'] && isset($botInfo['bot']['username'])) {
                     $botUsername = $botInfo['bot']['username'];
+                    $botIdFromToken = $botInfo['bot']['id'] ?? null;
                 }
             } catch (Exception $e) {
-                // Se não conseguir obter, tenta usar o nome do bot como fallback
                 LogFacade::warning('Não foi possível obter username do bot', [
                     'bot_id' => $bot->id,
                     'error' => $e->getMessage()
                 ]);
             }
             
-            // Verifica se o comando menciona o bot
-            $commandMentionsBot = false;
-            if ($botUsername && str_contains($command, '@' . $botUsername)) {
-                $commandMentionsBot = true;
+            // Verifica se o comando menciona algum bot pelo texto
+            $commandMentionsOurBot = false;
+            $commandMentionsOtherBot = false;
+            
+            if (str_contains($command, '@')) {
+                if ($botUsername && str_contains($command, '@' . $botUsername)) {
+                    $commandMentionsOurBot = true;
+                } else {
+                    // Menciona outro bot
+                    $commandMentionsOtherBot = true;
+                }
             }
             
-            // Verifica se há entities que indicam menção ao bot
-            $botMentioned = false;
-            if (isset($message['entities'])) {
+            // Verifica entities para detecção mais precisa
+            $entityMentionsOurBot = false;
+            $entityMentionsOtherBot = false;
+            $hasCommandEntity = false;
+            
+            if (isset($message['entities']) && is_array($message['entities'])) {
                 foreach ($message['entities'] as $entity) {
                     if (($entity['type'] ?? '') === 'bot_command') {
-                        // Se o comando tem @username, verifica se é do nosso bot
-                        if ($botUsername && isset($entity['user'])) {
-                            // Entity pode ter user_id do bot mencionado
-                            $mentionedBotId = $entity['user']['id'] ?? null;
-                            if ($mentionedBotId) {
-                                try {
-                                    $botIdFromToken = $this->getBotIdFromToken($bot->token);
-                                    if ($mentionedBotId == $botIdFromToken) {
-                                        $botMentioned = true;
-                                        break;
-                                    }
-                                } catch (Exception $e) {
-                                    // Ignora erro
+                        $hasCommandEntity = true;
+                        
+                        // Se a entity tem 'user', significa que menciona um bot específico
+                        // Isso é a forma mais confiável de detectar qual bot foi mencionado
+                        if (isset($entity['user']) && isset($entity['user']['id'])) {
+                            $mentionedBotId = $entity['user']['id'];
+                            if ($botIdFromToken) {
+                                if ($mentionedBotId == $botIdFromToken) {
+                                    $entityMentionsOurBot = true;
+                                    $this->logBotAction($bot, "Entity indica menção ao nosso bot via user.id", 'info', [
+                                        'mentioned_bot_id' => $mentionedBotId,
+                                        'our_bot_id' => $botIdFromToken
+                                    ]);
+                                    break;
+                                } else {
+                                    $entityMentionsOtherBot = true;
+                                    $this->logBotAction($bot, "Entity indica menção a outro bot", 'info', [
+                                        'mentioned_bot_id' => $mentionedBotId,
+                                        'our_bot_id' => $botIdFromToken
+                                    ]);
+                                    break;
                                 }
                             }
                         }
-                        // Se não tem user na entity, verifica pelo texto
-                        if (!$botMentioned && $botUsername) {
-                            $entityText = substr($text, $entity['offset'] ?? 0, $entity['length'] ?? 0);
-                            if (str_contains($entityText, '@' . $botUsername)) {
-                                $botMentioned = true;
-                                break;
+                        
+                        // Se não tem 'user', verifica pelo texto da entity
+                        // Isso é um fallback para casos onde a entity não tem user.id
+                        if (!$entityMentionsOurBot && !$entityMentionsOtherBot) {
+                            $entityOffset = $entity['offset'] ?? 0;
+                            $entityLength = $entity['length'] ?? 0;
+                            
+                            if ($entityOffset >= 0 && $entityLength > 0 && $entityOffset + $entityLength <= strlen($text)) {
+                                $entityText = substr($text, $entityOffset, $entityLength);
+                                
+                                if (str_contains($entityText, '@')) {
+                                    if ($botUsername && str_contains($entityText, '@' . $botUsername)) {
+                                        $entityMentionsOurBot = true;
+                                        $this->logBotAction($bot, "Entity indica menção ao nosso bot via texto", 'info', [
+                                            'entity_text' => $entityText,
+                                            'bot_username' => $botUsername
+                                        ]);
+                                        break;
+                                    } else {
+                                        $entityMentionsOtherBot = true;
+                                        $this->logBotAction($bot, "Entity indica menção a outro bot via texto", 'info', [
+                                            'entity_text' => $entityText
+                                        ]);
+                                        break;
+                                    }
+                                }
                             }
                         }
                     }
                 }
             }
             
-            // Processa o comando se mencionar o bot ou se for um comando sem menção (em grupos, comandos sem @ são para todos os bots)
-            // Mas vamos processar apenas se mencionar nosso bot especificamente
-            if ($commandMentionsBot || $botMentioned) {
-                // Remove o @username do comando antes de processar
+            // Se não encontrou entity de comando, mas o texto começa com /, 
+            // significa que é um comando genérico (sem menção a bot específico)
+            if (!$hasCommandEntity && str_starts_with(trim($text), '/')) {
+                $this->logBotAction($bot, "Comando sem entity de bot_command (comando genérico)", 'info', [
+                    'command' => $command
+                ]);
+            }
+            
+            // Decide se deve processar o comando
+            // REGRA PRINCIPAL: Se o bot recebeu a mensagem de comando em um grupo, significa que:
+            // 1. O bot foi mencionado explicitamente (ex: /start@botname), OU
+            // 2. O bot tem can_read_all_group_messages = true (privacidade desabilitada)
+            // Em ambos os casos, devemos processar o comando, EXCETO se mencionar outro bot
+            $shouldProcess = false;
+            $processReason = '';
+            
+            // Caso 1: Comando menciona nosso bot explicitamente (via texto ou entity)
+            if ($commandMentionsOurBot || $entityMentionsOurBot) {
+                $shouldProcess = true;
+                $processReason = 'menciona_nosso_bot';
+            }
+            // Caso 2: Comando não menciona nenhum bot (genérico como /start)
+            // Se o bot recebeu a mensagem, significa que tem permissão para ler todas as mensagens
+            // IMPORTANTE: Se não há entity de comando, também processa (comando genérico)
+            elseif (!$commandMentionsOtherBot && !$entityMentionsOtherBot) {
+                $shouldProcess = true;
+                $processReason = 'comando_generico_bot_tem_permissao';
+            }
+            // Caso 3: Comando menciona outro bot - não processa
+            else {
+                $processReason = 'menciona_outro_bot';
+            }
+            
+            // Log da decisão
+            $this->logBotAction($bot, "Decisão de processamento: {$processReason}", 'info', [
+                'chat_id' => $chatId,
+                'user_id' => $from['id'] ?? null,
+                'command' => $command,
+                'should_process' => $shouldProcess,
+                'command_mentions_our_bot' => $commandMentionsOurBot,
+                'command_mentions_other_bot' => $commandMentionsOtherBot,
+                'entity_mentions_our_bot' => $entityMentionsOurBot,
+                'entity_mentions_other_bot' => $entityMentionsOtherBot,
+                'bot_username' => $botUsername
+            ]);
+            
+            if ($shouldProcess) {
+                // Remove @username do comando antes de processar
                 $cleanCommand = preg_replace('/@\w+/', '', $command);
+                $this->logBotAction($bot, "Processando comando limpo: {$cleanCommand}", 'info', [
+                    'chat_id' => $chatId,
+                    'user_id' => $from['id'] ?? null,
+                    'original_command' => $command,
+                    'clean_command' => $cleanCommand
+                ]);
                 $this->processCommand($bot, $chatId, $from, $cleanCommand);
             }
         }
@@ -1268,17 +1380,38 @@ class TelegramService
             'command_name' => $commandName
         ]);
         
+        // Busca ou cria contato para registrar ações
+        $contact = $this->saveOrUpdateContact($bot, $from);
+        $actionService = new ContactActionService();
+
         // Comandos padrão do sistema (verifica múltiplos formatos)
         if ($commandLower === '/start' || $commandNameLower === 'start' || 
             $command === '/start' || $command === 'start') {
             $this->logBotAction($bot, "Comando /start detectado, executando...", 'info');
+            $actionService->logCommand($bot, $contact, 'start', [
+                'chat_id' => $chatId,
+                'command' => $commandName
+            ]);
             $this->handleStartCommand($bot, $chatId, $from);
             return;
         }
         
         if ($commandLower === '/help' || $commandLower === '/comandos' || 
             $commandNameLower === 'help' || $commandNameLower === 'comandos') {
+            $actionService->logCommand($bot, $contact, 'help', [
+                'chat_id' => $chatId,
+                'command' => $commandName
+            ]);
             $this->handleHelpCommand($bot, $chatId);
+            return;
+        }
+
+        if ($commandLower === '/planos' || $commandNameLower === 'planos') {
+            $actionService->logCommand($bot, $contact, 'planos', [
+                'chat_id' => $chatId,
+                'command' => $commandName
+            ]);
+            $this->handlePlansCommand($bot, $chatId, $from);
             return;
         }
 
@@ -1292,6 +1425,14 @@ class TelegramService
             // Incrementa contador de uso
             $customCommand->incrementUsage();
             
+            // Registra ação
+            $actionService->logCommand($bot, $contact, $commandName, [
+                'chat_id' => $chatId,
+                'command' => $commandName,
+                'command_id' => $customCommand->id,
+                'is_custom' => true
+            ]);
+            
             // Envia resposta do comando personalizado
             $this->sendMessage($bot, $chatId, $customCommand->response);
             
@@ -1300,6 +1441,11 @@ class TelegramService
             ]);
         } else {
             // Comando não encontrado
+            $actionService->logCommand($bot, $contact, 'unknown', [
+                'chat_id' => $chatId,
+                'command' => $commandName,
+                'error' => 'Comando não reconhecido'
+            ]);
             $this->sendMessage($bot, $chatId, "Comando não reconhecido. Use /help para ver os comandos disponíveis.");
         }
     }
@@ -1356,15 +1502,27 @@ class TelegramService
 
             // Se o bot está configurado para solicitar dados, solicita após mensagem inicial
             // Verifica na ordem: email -> telefone -> idioma
+            // IMPORTANTE: Sempre solicita email primeiro se configurado e não tiver
             if ($bot->request_email && !$contact->email) {
                 $this->logBotAction($bot, "Solicitando email", 'info');
-                $this->sendMessage($bot, $chatId, 'Por favor, envie seu email:');
+                $this->sendMessage($bot, $chatId, '📧 Por favor, envie seu email:');
             } elseif ($bot->request_phone && !$contact->phone) {
+                // Usa botão nativo do Telegram para solicitar telefone
                 $this->logBotAction($bot, "Solicitando telefone", 'info');
-                $this->sendMessage($bot, $chatId, 'Por favor, envie seu número de telefone:');
+                $phoneKeyboard = [
+                    'keyboard' => [[
+                        [
+                            'text' => '📱 Compartilhar meu telefone',
+                            'request_contact' => true
+                        ]
+                    ]],
+                    'resize_keyboard' => true,
+                    'one_time_keyboard' => true
+                ];
+                $this->sendMessage($bot, $chatId, '📱 Por favor, compartilhe seu número de telefone ou envie o número:', $phoneKeyboard);
             } elseif ($bot->request_language && !$contact->language) {
                 $this->logBotAction($bot, "Solicitando idioma", 'info');
-                $this->sendMessage($bot, $chatId, 'Por favor, escolha um idioma (pt, en, es, fr):');
+                $this->sendMessage($bot, $chatId, '🌐 Por favor, escolha um idioma (pt, en, es, fr):');
             }
 
             $this->logBotAction($bot, "Comando /start processado com sucesso para chat {$chatId}", 'info');
@@ -1397,7 +1555,8 @@ class TelegramService
             $helpText = "📋 <b>Comandos disponíveis:</b>\n\n";
             $helpText .= "/start - Iniciar conversa com o bot\n";
             $helpText .= "/help - Ver esta mensagem de ajuda\n";
-            $helpText .= "/comandos - Listar comandos disponíveis\n\n";
+            $helpText .= "/comandos - Listar comandos disponíveis\n";
+            $helpText .= "/planos - Ver planos de pagamento disponíveis\n\n";
 
             // Busca comandos personalizados ativos
             $customCommands = BotCommand::where('bot_id', $bot->id)
@@ -1416,6 +1575,394 @@ class TelegramService
             $this->sendMessage($bot, $chatId, $helpText);
         } catch (Exception $e) {
             $this->logBotAction($bot, 'Erro ao processar /help: ' . $e->getMessage(), 'error');
+        }
+    }
+
+    /**
+     * Processa comando /planos
+     *
+     * @param Bot $bot
+     * @param int $chatId
+     * @param array $from
+     * @return void
+     */
+    protected function handlePlansCommand(Bot $bot, int $chatId, array $from): void
+    {
+        try {
+            $this->logBotAction($bot, "Comando /planos detectado", 'info', [
+                'chat_id' => $chatId,
+                'user_id' => $from['id']
+            ]);
+
+            // Busca planos ativos do bot
+            $paymentPlans = \App\Models\PaymentPlan::where('bot_id', $bot->id)
+                ->where('active', true)
+                ->orderBy('price', 'asc')
+                ->get();
+
+            if ($paymentPlans->isEmpty()) {
+                $this->sendMessage($bot, $chatId, '📋 Não há planos de pagamento disponíveis no momento.');
+                return;
+            }
+
+            $message = "💳 <b>Planos Disponíveis:</b>\n\n";
+            
+            $keyboardButtons = [];
+            foreach ($paymentPlans as $plan) {
+                $price = number_format($plan->price, 2, ',', '.');
+                $message .= "📦 <b>{$plan->title}</b>\n";
+                $message .= "💰 R$ {$price}\n";
+                
+                if ($plan->message) {
+                    $message .= "📝 " . substr($plan->message, 0, 100) . "\n";
+                }
+                
+                $message .= "\n";
+                
+                // Adiciona botão para cada plano
+                $keyboardButtons[] = [[
+                    'text' => "📦 {$plan->title} - R$ {$price}",
+                    'callback_data' => "plan_{$plan->id}"
+                ]];
+            }
+
+            $keyboard = [
+                'inline_keyboard' => $keyboardButtons
+            ];
+
+            $this->sendMessage($bot, $chatId, $message, $keyboard);
+        } catch (Exception $e) {
+            $this->logBotAction($bot, 'Erro ao processar /planos: ' . $e->getMessage(), 'error', [
+                'chat_id' => $chatId,
+                'trace' => $e->getTraceAsString()
+            ]);
+            $this->sendMessage($bot, $chatId, 'Desculpe, ocorreu um erro ao carregar os planos. Por favor, tente novamente.');
+        }
+    }
+
+    /**
+     * Configura o menu fixo de comandos no Telegram
+     * O menu fixo exibirá todos os comandos registrados, incluindo /planos
+     *
+     * @param Bot $bot
+     * @return void
+     */
+    protected function setPlansMenuButton(Bot $bot): void
+    {
+        try {
+            // Configura o menu button para exibir os comandos disponíveis
+            // Isso faz com que o botão "Menu" no chat mostre todos os comandos registrados
+            // O Laravel HTTP client já faz o JSON encoding automaticamente quando usamos asJson()
+            $response = $this->http()
+                ->asJson()
+                ->post("https://api.telegram.org/bot{$bot->token}/setChatMenuButton", [
+                    'menu_button' => [
+                        'type' => 'commands'
+                    ]
+                ]);
+
+            if ($response->successful() && $response->json()['ok']) {
+                $this->logBotAction($bot, 'Menu de comandos configurado com sucesso', 'info');
+            } else {
+                $error = $response->json()['description'] ?? 'Erro desconhecido';
+                $this->logBotAction($bot, 'Erro ao configurar menu de comandos: ' . $error, 'warning', [
+                    'response' => $response->json()
+                ]);
+            }
+        } catch (Exception $e) {
+            // Não é crítico se falhar, o Telegram ainda mostrará os comandos
+            $this->logBotAction($bot, 'Aviso ao configurar menu de comandos: ' . $e->getMessage(), 'warning');
+        }
+    }
+
+    /**
+     * Processa seleção de plano pelo usuário
+     *
+     * @param Bot $bot
+     * @param int $chatId
+     * @param array $from
+     * @param int $planId
+     * @param string $callbackQueryId
+     * @return void
+     */
+    protected function handlePlanSelection(Bot $bot, int $chatId, array $from, int $planId, string $callbackQueryId): void
+    {
+        try {
+            $plan = \App\Models\PaymentPlan::where('bot_id', $bot->id)
+                ->where('id', $planId)
+                ->where('active', true)
+                ->first();
+
+            if (!$plan) {
+                $this->http()->post("https://api.telegram.org/bot{$bot->token}/answerCallbackQuery", [
+                    'callback_query_id' => $callbackQueryId,
+                    'text' => 'Plano não encontrado ou indisponível',
+                    'show_alert' => true
+                ]);
+                return;
+            }
+
+            // Busca ou cria contato e registra ação
+            $contact = $this->saveOrUpdateContact($bot, $from);
+            $actionService = new ContactActionService();
+            $actionService->logPlanSelection($bot, $contact, $planId, $plan->title, $plan->price);
+
+            $price = number_format($plan->price, 2, ',', '.');
+            $message = "💳 <b>{$plan->title}</b>\n\n";
+            $message .= "💰 <b>Valor:</b> R$ {$price}\n\n";
+
+            if ($plan->message) {
+                $message .= "📝 {$plan->message}\n\n";
+            }
+
+            $message .= "Escolha o método de pagamento:";
+
+            // Cria botões para métodos de pagamento
+            $keyboard = [
+                'inline_keyboard' => [
+                    [
+                        [
+                            'text' => '💳 Pagar com PIX',
+                            'callback_data' => "payment_{$planId}_pix"
+                        ]
+                    ],
+                    [
+                        [
+                            'text' => '💳 Pagar com Cartão de Crédito',
+                            'callback_data' => "payment_{$planId}_card"
+                        ]
+                    ]
+                ]
+            ];
+
+            $this->http()->post("https://api.telegram.org/bot{$bot->token}/answerCallbackQuery", [
+                'callback_query_id' => $callbackQueryId
+            ]);
+
+            $this->sendMessage($bot, $chatId, $message, $keyboard);
+
+            $this->logBotAction($bot, "Plano selecionado pelo usuário", 'info', [
+                'chat_id' => $chatId,
+                'user_id' => $from['id'] ?? null,
+                'plan_id' => $planId,
+                'plan_title' => $plan->title
+            ]);
+        } catch (Exception $e) {
+            $this->logBotAction($bot, 'Erro ao processar seleção de plano: ' . $e->getMessage(), 'error', [
+                'chat_id' => $chatId,
+                'plan_id' => $planId,
+                'trace' => $e->getTraceAsString()
+            ]);
+        }
+    }
+
+    /**
+     * Processa seleção de método de pagamento
+     *
+     * @param Bot $bot
+     * @param int $chatId
+     * @param array $from
+     * @param int $planId
+     * @param string $method
+     * @param string $callbackQueryId
+     * @return void
+     */
+    protected function handlePaymentMethod(Bot $bot, int $chatId, array $from, int $planId, string $method, string $callbackQueryId): void
+    {
+        try {
+            $plan = \App\Models\PaymentPlan::where('bot_id', $bot->id)
+                ->where('id', $planId)
+                ->where('active', true)
+                ->first();
+
+            if (!$plan) {
+                $this->http()->post("https://api.telegram.org/bot{$bot->token}/answerCallbackQuery", [
+                    'callback_query_id' => $callbackQueryId,
+                    'text' => 'Plano não encontrado',
+                    'show_alert' => true
+                ]);
+                return;
+            }
+
+            $price = number_format($plan->price, 2, ',', '.');
+
+            if ($method === 'pix') {
+                // Responde ao callback query
+                $this->http()->post("https://api.telegram.org/bot{$bot->token}/answerCallbackQuery", [
+                    'callback_query_id' => $callbackQueryId,
+                    'text' => 'Gerando QR Code PIX...'
+                ]);
+
+                // Busca ou cria contato
+                $contact = $this->saveOrUpdateContact($bot, $from);
+
+                // Busca ou cria contato e registra início de pagamento
+                $contact = $this->saveOrUpdateContact($bot, $from);
+                $actionService = new ContactActionService();
+                
+                // Gera QR Code PIX
+                $paymentService = new PaymentService();
+                $pixResult = $paymentService->generatePixQrCode($bot, $plan, $contact);
+
+                if (!$pixResult['success']) {
+                    $this->sendMessage($bot, $chatId, "❌ Erro ao gerar QR Code PIX. Por favor, tente novamente.");
+                    $this->logBotAction($bot, "Erro ao gerar QR Code PIX", 'error', [
+                        'chat_id' => $chatId,
+                        'user_id' => $from['id'] ?? null,
+                        'plan_id' => $planId,
+                        'error' => $pixResult['error'] ?? 'Erro desconhecido'
+                    ]);
+                    return;
+                }
+
+                // Registra pagamento pendente
+                $transaction = $pixResult['transaction'] ?? null;
+                if ($transaction) {
+                    $actionService->logPaymentPending(
+                        $bot,
+                        $contact,
+                        $transaction,
+                        'pix',
+                        $pixResult['pix_key'] ?? null,
+                        $pixResult['pix_code'] ?? null
+                    );
+                }
+
+                // Monta mensagem
+                $message = "💳 <b>Pagamento via PIX</b>\n\n";
+                $message .= "📦 <b>Plano:</b> {$plan->title}\n";
+                $message .= "💰 <b>Valor:</b> R$ {$price}\n\n";
+
+                if ($plan->pix_message) {
+                    $message .= $plan->pix_message . "\n\n";
+                }
+
+                $message .= "📱 <b>Escaneie o QR Code abaixo para pagar:</b>\n\n";
+                $message .= "🔑 <b>Chave PIX:</b> <code>{$pixResult['pix_key']}</code>\n\n";
+                $message .= "📋 <b>Código PIX:</b>\n<code>{$pixResult['pix_code']}</code>\n\n";
+                $message .= "⏰ Este QR Code expira em 30 minutos.";
+
+                // Envia mensagem com texto
+                $this->sendMessage($bot, $chatId, $message);
+
+                // Envia QR Code como imagem
+                try {
+                    $qrCodeImageData = base64_decode($pixResult['qr_code_image']);
+                    $tempFile = tempnam(sys_get_temp_dir(), 'pix_qr_') . '.png';
+                    file_put_contents($tempFile, $qrCodeImageData);
+
+                    // Envia foto usando multipart/form-data
+                    $response = $this->http()->asMultipart()
+                        ->attach('photo', file_get_contents($tempFile), 'qrcode.png')
+                        ->post("https://api.telegram.org/bot{$bot->token}/sendPhoto", [
+                            'chat_id' => $chatId,
+                            'caption' => "📱 QR Code PIX - {$plan->title} - R$ {$price}"
+                        ]);
+
+                    // Remove arquivo temporário
+                    if (file_exists($tempFile)) {
+                        unlink($tempFile);
+                    }
+
+                    if (!$response->successful()) {
+                        throw new Exception('Erro ao enviar foto: ' . $response->body());
+                    }
+                } catch (Exception $e) {
+                    $this->logBotAction($bot, "Erro ao enviar QR Code como imagem", 'warning', [
+                        'chat_id' => $chatId,
+                        'error' => $e->getMessage()
+                    ]);
+                    // Continua mesmo se falhar ao enviar imagem
+                }
+
+                $this->logBotAction($bot, "QR Code PIX gerado com sucesso", 'info', [
+                    'chat_id' => $chatId,
+                    'user_id' => $from['id'] ?? null,
+                    'plan_id' => $planId,
+                    'plan_title' => $plan->title,
+                    'price' => $plan->price,
+                    'transaction_id' => $pixResult['transaction']->id ?? null
+                ]);
+
+            } elseif ($method === 'card') {
+                // Responde ao callback query
+                $this->http()->post("https://api.telegram.org/bot{$bot->token}/answerCallbackQuery", [
+                    'callback_query_id' => $callbackQueryId,
+                    'text' => 'Gerando link de pagamento...'
+                ]);
+
+                // Busca ou cria contato
+                $contact = $this->saveOrUpdateContact($bot, $from);
+                $actionService = new ContactActionService();
+
+                // Gera link de pagamento
+                $paymentService = new PaymentService();
+                $cardResult = $paymentService->generateCardPaymentLink($bot, $plan, $contact);
+
+                if (!$cardResult['success']) {
+                    $this->sendMessage($bot, $chatId, "❌ Erro ao gerar link de pagamento. Por favor, tente novamente.");
+                    $this->logBotAction($bot, "Erro ao gerar link de pagamento com cartão", 'error', [
+                        'chat_id' => $chatId,
+                        'user_id' => $from['id'] ?? null,
+                        'plan_id' => $planId,
+                        'error' => $cardResult['error'] ?? 'Erro desconhecido'
+                    ]);
+                    return;
+                }
+
+                $transaction = $cardResult['transaction'];
+                $paymentUrl = $cardResult['payment_url'];
+
+                // Registra início de pagamento
+                $actionService->logPaymentInitiated($bot, $contact, 'card', $planId, $plan->title, $plan->price, $transaction);
+
+                // Monta mensagem com link de pagamento
+                $message = "💳 <b>Pagamento com Cartão de Crédito</b>\n\n";
+                $message .= "📦 <b>Plano:</b> {$plan->title}\n";
+                $message .= "💰 <b>Valor:</b> R$ {$price}\n\n";
+                $message .= "🔗 <b>Clique no botão abaixo para acessar o formulário de pagamento:</b>\n\n";
+                $message .= "⏰ Este link expira em 24 horas.";
+
+                // Cria botão inline com o link de pagamento
+                $keyboard = [
+                    'inline_keyboard' => [
+                        [
+                            [
+                                'text' => '💳 Preencher Dados do Cartão',
+                                'url' => $paymentUrl
+                            ]
+                        ]
+                    ]
+                ];
+
+                $this->sendMessage($bot, $chatId, $message, $keyboard);
+
+                // Envia também o link como texto para facilitar cópia
+                $this->sendMessage($bot, $chatId, "🔗 <b>Ou copie e cole este link no seu navegador:</b>\n\n<code>{$paymentUrl}</code>", null, true);
+
+                $this->logBotAction($bot, "Link de pagamento com cartão gerado", 'info', [
+                    'chat_id' => $chatId,
+                    'user_id' => $from['id'] ?? null,
+                    'plan_id' => $planId,
+                    'plan_title' => $plan->title,
+                    'price' => $plan->price,
+                    'transaction_id' => $transaction->id,
+                    'payment_url' => $paymentUrl
+                ]);
+            } else {
+                $this->http()->post("https://api.telegram.org/bot{$bot->token}/answerCallbackQuery", [
+                    'callback_query_id' => $callbackQueryId,
+                    'text' => 'Método de pagamento inválido',
+                    'show_alert' => true
+                ]);
+            }
+        } catch (Exception $e) {
+            $this->logBotAction($bot, 'Erro ao processar método de pagamento: ' . $e->getMessage(), 'error', [
+                'chat_id' => $chatId,
+                'plan_id' => $planId,
+                'method' => $method,
+                'trace' => $e->getTraceAsString()
+            ]);
         }
     }
 
@@ -1446,24 +1993,48 @@ class TelegramService
 
         // Se o bot está configurado para solicitar email/telefone/idioma
         if ($contact) {
+            $actionService = new ContactActionService();
+            
             // Verifica se precisa coletar email
             if ($bot->request_email && !$contact->email) {
                 if (filter_var($text, FILTER_VALIDATE_EMAIL)) {
                     $contact->email = $text;
                     $contact->save();
+                    
+                    // Registra coleta de email
+                    $actionService->logDataCollection($bot, $contact, 'email', $text);
+                    
                     $this->sendMessage($bot, $chatId, '✅ Email registrado com sucesso!');
                     
                     // Recarrega o contato para ter os dados atualizados
                     $contact->refresh();
                     
                     // Verifica se ainda precisa coletar outros dados
+                    // IMPORTANTE: Verifica telefone primeiro se configurado
                     if ($bot->request_phone && !$contact->phone) {
-                        $this->sendMessage($bot, $chatId, 'Por favor, envie seu número de telefone:');
+                        // Usa botão nativo do Telegram para solicitar telefone
+                        $phoneKeyboard = [
+                            'keyboard' => [[
+                                [
+                                    'text' => '📱 Compartilhar meu telefone',
+                                    'request_contact' => true
+                                ]
+                            ]],
+                            'resize_keyboard' => true,
+                            'one_time_keyboard' => true
+                        ];
+                        $this->sendMessage($bot, $chatId, '📱 Por favor, compartilhe seu número de telefone ou envie o número:', $phoneKeyboard);
                         return;
                     } elseif ($bot->request_language && !$contact->language) {
-                        $this->sendMessage($bot, $chatId, 'Por favor, escolha um idioma (pt, en, es, fr):');
+                        $this->sendMessage($bot, $chatId, '🌐 Por favor, escolha um idioma (pt, en, es, fr):');
                         return;
                     }
+                    
+                    // Remove teclado se todos os dados foram coletados
+                    $this->removeKeyboard($bot, $chatId);
+                    
+                    // Mensagem de confirmação final
+                    $this->sendMessage($bot, $chatId, '✅ Obrigado! Seus dados foram registrados com sucesso.');
                     return;
                 } else {
                     $this->sendMessage($bot, $chatId, '❌ Email inválido. Por favor, envie um email válido:');
@@ -1473,24 +2044,37 @@ class TelegramService
 
             // Verifica se precisa coletar telefone (apenas se já tem email ou não precisa de email)
             if ($bot->request_phone && !$contact->phone) {
-                // Remove caracteres não numéricos
-                $phone = preg_replace('/\D/', '', $text);
+                // Remove caracteres não numéricos (exceto + no início)
+                $phone = preg_replace('/[^\d+]/', '', $text);
+                // Remove + se estiver no início para normalizar
+                $phone = ltrim($phone, '+');
+                
                 if (strlen($phone) >= 10) {
                     $contact->phone = $phone;
                     $contact->save();
+                    
+                    // Registra coleta de telefone
+                    $actionService->logDataCollection($bot, $contact, 'phone', $phone);
+                    
                     $this->sendMessage($bot, $chatId, '✅ Telefone registrado com sucesso!');
                     
                     // Recarrega o contato
                     $contact->refresh();
                     
+                    // Remove o teclado
+                    $this->removeKeyboard($bot, $chatId);
+                    
                     // Verifica se ainda precisa coletar idioma
                     if ($bot->request_language && !$contact->language) {
-                        $this->sendMessage($bot, $chatId, 'Por favor, escolha um idioma (pt, en, es, fr):');
+                        $this->sendMessage($bot, $chatId, '🌐 Por favor, escolha um idioma (pt, en, es, fr):');
                         return;
                     }
+                    
+                    // Mensagem de confirmação final
+                    $this->sendMessage($bot, $chatId, '✅ Obrigado! Seus dados foram registrados com sucesso.');
                     return;
                 } else {
-                    $this->sendMessage($bot, $chatId, '❌ Telefone inválido. Por favor, envie um número de telefone válido (mínimo 10 dígitos):');
+                    $this->sendMessage($bot, $chatId, '❌ Telefone inválido. Por favor, envie um número de telefone válido (mínimo 10 dígitos) ou use o botão para compartilhar:');
                     return;
                 }
             }
@@ -1501,7 +2085,17 @@ class TelegramService
                 if (in_array(strtolower($text), $validLanguages)) {
                     $contact->language = strtolower($text);
                     $contact->save();
+                    
+                    // Registra coleta de idioma
+                    $actionService->logDataCollection($bot, $contact, 'language', strtolower($text));
+                    
                     $this->sendMessage($bot, $chatId, '✅ Idioma registrado com sucesso!');
+                    
+                    // Remove teclado se todos os dados foram coletados
+                    $this->removeKeyboard($bot, $chatId);
+                    
+                    // Mensagem de confirmação final
+                    $this->sendMessage($bot, $chatId, '✅ Obrigado! Seus dados foram registrados com sucesso.');
                     return;
                 } else {
                     $this->sendMessage($bot, $chatId, '❌ Idioma inválido. Por favor, escolha um idioma válido (pt, en, es, fr):');
@@ -1529,6 +2123,7 @@ class TelegramService
     {
         try {
             $data = $callbackQuery['data'] ?? null;
+            $from = $callbackQuery['from'] ?? null;
             $chatId = $callbackQuery['message']['chat']['id'] ?? null;
             $messageId = $callbackQuery['message']['message_id'] ?? null;
             $callbackQueryId = $callbackQuery['id'] ?? null;
@@ -1537,11 +2132,43 @@ class TelegramService
                 return;
             }
 
+            // Se não tem informações do usuário, tenta obter do message
+            if (!$from && isset($callbackQuery['message']['from'])) {
+                $from = $callbackQuery['message']['from'];
+            }
+
+            // Se ainda não tem $from, cria um array básico com o chat_id
+            if (!$from) {
+                $from = [
+                    'id' => $chatId,
+                    'first_name' => 'Usuário',
+                    'is_bot' => false
+                ];
+            }
+
             // Responde ao callback query
             $this->http()->post("https://api.telegram.org/bot{$bot->token}/answerCallbackQuery", [
                 'callback_query_id' => $callbackQueryId,
                 'text' => 'Processando...'
             ]);
+
+            // Processa callbacks de planos (plan_{id})
+            if (str_starts_with($data, 'plan_')) {
+                $planId = str_replace('plan_', '', $data);
+                $this->handlePlanSelection($bot, $chatId, $from, (int)$planId, $callbackQueryId);
+                return;
+            }
+
+            // Processa callbacks de método de pagamento (payment_{planId}_{method})
+            if (str_starts_with($data, 'payment_')) {
+                $parts = explode('_', $data);
+                if (count($parts) >= 3) {
+                    $planId = (int)$parts[1];
+                    $method = $parts[2]; // 'pix' ou 'card'
+                    $this->handlePaymentMethod($bot, $chatId, $from, $planId, $method, $callbackQueryId);
+                }
+                return;
+            }
 
             switch ($data) {
                 case 'activate':
@@ -1550,7 +2177,10 @@ class TelegramService
                     break;
             }
         } catch (Exception $e) {
-            $this->logBotAction($bot, 'Erro ao processar callback: ' . $e->getMessage(), 'error');
+            $this->logBotAction($bot, 'Erro ao processar callback: ' . $e->getMessage(), 'error', [
+                'callback_query' => $callbackQuery,
+                'trace' => $e->getTraceAsString()
+            ]);
         }
     }
 
@@ -1682,6 +2312,10 @@ class TelegramService
                 [
                     'command' => 'help',
                     'description' => 'Ver comandos disponíveis'
+                ],
+                [
+                    'command' => 'planos',
+                    'description' => 'Ver planos de pagamento disponíveis'
                 ]
             ];
 
@@ -1699,21 +2333,121 @@ class TelegramService
             }
 
             // Registra comandos no Telegram
-            $response = $this->http()->post("https://api.telegram.org/bot{$bot->token}/setMyCommands", [
-                'commands' => json_encode($commands)
-            ]);
+            // O Laravel HTTP client já faz o JSON encoding automaticamente quando usamos asJson()
+            $response = $this->http()
+                ->asJson()
+                ->post("https://api.telegram.org/bot{$bot->token}/setMyCommands", [
+                    'commands' => $commands
+                ]);
 
             if ($response->successful() && $response->json()['ok']) {
                 $this->logBotAction($bot, 'Comandos registrados no Telegram com sucesso', 'info', [
-                    'commands_count' => count($commands)
+                    'commands_count' => count($commands),
+                    'commands' => $commands
                 ]);
+                
+                // Configura menu button para exibir os comandos
+                $this->setPlansMenuButton($bot);
+                
                 return true;
+            } else {
+                $error = $response->json()['description'] ?? 'Erro desconhecido';
+                $this->logBotAction($bot, 'Erro ao registrar comandos no Telegram: ' . $error, 'error', [
+                    'response' => $response->json()
+                ]);
             }
 
             return false;
         } catch (Exception $e) {
             $this->logBotAction($bot, 'Erro ao registrar comandos: ' . $e->getMessage(), 'error');
             return false;
+        }
+    }
+
+    /**
+     * Processa contato compartilhado (telefone compartilhado via botão)
+     *
+     * @param Bot $bot
+     * @param int $chatId
+     * @param array $from
+     * @param array $contactData
+     * @param Contact|null $contact
+     * @return void
+     */
+    protected function processSharedContact(Bot $bot, int $chatId, array $from, array $contactData, ?Contact $contact = null): void
+    {
+        try {
+            if (!$contact) {
+                $contact = $this->saveOrUpdateContact($bot, $from);
+            }
+
+            $actionService = new ContactActionService();
+            
+            // Extrai o número de telefone do contato compartilhado
+            $phoneNumber = $contactData['phone_number'] ?? null;
+            
+            if ($phoneNumber) {
+                // Remove caracteres não numéricos (exceto + no início)
+                $phone = preg_replace('/[^\d+]/', '', $phoneNumber);
+                if (strlen($phone) >= 10) {
+                    $contact->phone = $phone;
+                    $contact->save();
+                    
+                    // Registra coleta de telefone
+                    $actionService->logDataCollection($bot, $contact, 'phone', $phone);
+                    
+                    $this->sendMessage($bot, $chatId, '✅ Telefone registrado com sucesso!');
+                    
+                    // Recarrega o contato
+                    $contact->refresh();
+                    
+                    // Remove o teclado
+                    $this->removeKeyboard($bot, $chatId);
+                    
+                    // Verifica se ainda precisa coletar outros dados
+                    if ($bot->request_email && !$contact->email) {
+                        $this->sendMessage($bot, $chatId, '📧 Por favor, envie seu email:');
+                    } elseif ($bot->request_language && !$contact->language) {
+                        $this->sendMessage($bot, $chatId, '🌐 Por favor, escolha um idioma (pt, en, es, fr):');
+                    }
+                } else {
+                    $this->sendMessage($bot, $chatId, '❌ Telefone inválido. Por favor, tente novamente.');
+                }
+            } else {
+                $this->sendMessage($bot, $chatId, '❌ Não foi possível obter o número de telefone. Por favor, tente novamente.');
+            }
+        } catch (\Exception $e) {
+            $this->logBotAction($bot, 'Erro ao processar contato compartilhado: ' . $e->getMessage(), 'error', [
+                'chat_id' => $chatId,
+                'contact_data' => $contactData,
+                'trace' => $e->getTraceAsString()
+            ]);
+        }
+    }
+
+    /**
+     * Remove o teclado personalizado
+     *
+     * @param Bot $bot
+     * @param int $chatId
+     * @return void
+     */
+    protected function removeKeyboard(Bot $bot, int $chatId): void
+    {
+        try {
+            // Usa editMessageReplyMarkup se houver mensagem recente, senão usa sendMessage com texto vazio
+            $this->http()
+                ->asJson()
+                ->post("https://api.telegram.org/bot{$bot->token}/sendMessage", [
+                    'chat_id' => $chatId,
+                    'text' => ' ',
+                    'reply_markup' => [
+                        'remove_keyboard' => true
+                    ]
+                ]);
+        } catch (\Exception $e) {
+            // Ignora erro ao remover teclado
+            $this->logBotAction($bot, 'Aviso ao remover teclado: ' . $e->getMessage(), 'warning');
         }
     }
 
@@ -1736,6 +2470,91 @@ class TelegramService
         } catch (Exception $e) {
             $this->logBotAction($bot, 'Erro ao obter comandos: ' . $e->getMessage(), 'error');
             return [];
+        }
+    }
+
+    /**
+     * Deleta todos os comandos registrados no Telegram
+     *
+     * @param Bot $bot
+     * @return bool
+     */
+    public function deleteBotCommands(Bot $bot): bool
+    {
+        try {
+            // Envia array vazio para deletar todos os comandos
+            $response = $this->http()
+                ->asJson()
+                ->post("https://api.telegram.org/bot{$bot->token}/setMyCommands", [
+                    'commands' => []
+                ]);
+
+            if ($response->successful() && $response->json()['ok']) {
+                $this->logBotAction($bot, 'Todos os comandos foram deletados do Telegram', 'info');
+                return true;
+            } else {
+                $error = $response->json()['description'] ?? 'Erro desconhecido';
+                $this->logBotAction($bot, 'Erro ao deletar comandos do Telegram: ' . $error, 'error', [
+                    'response' => $response->json()
+                ]);
+                return false;
+            }
+        } catch (Exception $e) {
+            $this->logBotAction($bot, 'Erro ao deletar comandos: ' . $e->getMessage(), 'error');
+            return false;
+        }
+    }
+
+    /**
+     * Deleta um comando específico do Telegram
+     *
+     * @param Bot $bot
+     * @param string $commandName Nome do comando a ser deletado (sem a barra /)
+     * @return bool
+     */
+    public function deleteBotCommand(Bot $bot, string $commandName): bool
+    {
+        try {
+            // Remove a barra se houver
+            $commandName = ltrim($commandName, '/');
+            
+            // Obtém lista atual de comandos do Telegram
+            $currentCommands = $this->getMyCommands($bot);
+            
+            // Filtra removendo o comando específico
+            $filteredCommands = array_filter($currentCommands, function($cmd) use ($commandName) {
+                return ($cmd['command'] ?? '') !== $commandName;
+            });
+            
+            // Reindexa o array
+            $filteredCommands = array_values($filteredCommands);
+            
+            // Re-registra os comandos restantes
+            $response = $this->http()
+                ->asJson()
+                ->post("https://api.telegram.org/bot{$bot->token}/setMyCommands", [
+                    'commands' => $filteredCommands
+                ]);
+
+            if ($response->successful() && $response->json()['ok']) {
+                $this->logBotAction($bot, "Comando '{$commandName}' deletado do Telegram", 'info', [
+                    'command' => $commandName,
+                    'remaining_commands' => count($filteredCommands)
+                ]);
+                return true;
+            } else {
+                $error = $response->json()['description'] ?? 'Erro desconhecido';
+                $this->logBotAction($bot, 'Erro ao deletar comando do Telegram: ' . $error, 'error', [
+                    'command' => $commandName,
+                    'response' => $response->json()
+                ]);
+                return false;
+            }
+        } catch (Exception $e) {
+            $this->logBotAction($bot, 'Erro ao deletar comando: ' . $e->getMessage(), 'error', [
+                'command' => $commandName
+            ]);
+            return false;
         }
     }
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import Layout from '../components/Layout';
 import paymentPlanService from '../services/paymentPlanService';
 import paymentCycleService from '../services/paymentCycleService';
@@ -7,7 +7,7 @@ import './PaymentPlans.css';
 
 const PaymentPlans = () => {
   const navigate = useNavigate();
-  const [botId, setBotId] = useState(null);
+  const { botId } = useParams();
   const [paymentPlans, setPaymentPlans] = useState([]);
   const [paymentCycles, setPaymentCycles] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -17,6 +17,7 @@ const PaymentPlans = () => {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showPixModal, setShowPixModal] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState(null);
+  const [selectedPlanForPix, setSelectedPlanForPix] = useState(null);
   const [language, setLanguage] = useState('pt');
   const [formData, setFormData] = useState({
     title: '',
@@ -30,16 +31,15 @@ const PaymentPlans = () => {
   });
 
   useEffect(() => {
-    const storedBotId = localStorage.getItem('selectedBotId');
-    if (!storedBotId) {
+    if (!botId) {
       setError('Bot não selecionado. Por favor, selecione um bot primeiro.');
       setLoading(false);
       return;
     }
-    setBotId(storedBotId);
-    loadPaymentPlans(storedBotId);
+    localStorage.setItem('selectedBotId', botId);
+    loadPaymentPlans(botId);
     loadPaymentCycles();
-  }, []);
+  }, [botId]);
 
   const loadPaymentCycles = async () => {
     try {
@@ -174,30 +174,48 @@ const PaymentPlans = () => {
   };
 
 
+  const handleOpenPixModal = () => {
+    setSelectedPlanForPix(null);
+    setFormData(prev => ({
+      ...prev,
+      pix_message: ''
+    }));
+    setShowPixModal(true);
+  };
+
+  const handlePlanSelectForPix = (planId) => {
+    const plan = paymentPlans.find(p => p.id === planId);
+    if (plan) {
+      setSelectedPlanForPix(plan);
+      setFormData(prev => ({
+        ...prev,
+        pix_message: plan.pix_message || ''
+      }));
+    }
+  };
+
   const handleSavePixMessage = async () => {
-    if (!selectedPlan) {
-      // If no plan is selected, update all plans' pix_message
-      try {
-        // Get bot data first to update bot's pix_message
-        // For now, we'll just show an error
-        setError('Selecione um plano primeiro');
-        return;
-      } catch (err) {
-        setError(err.response?.data?.error || 'Erro ao salvar mensagem PIX');
-      }
-    } else {
-      try {
-        await paymentPlanService.updatePaymentPlan(selectedPlan.id, {
-          bot_id: botId,
-          pix_message: formData.pix_message
-        });
-        setSuccess('Mensagem PIX atualizada com sucesso!');
-        setShowPixModal(false);
-        loadPaymentPlans(botId);
-        setTimeout(() => setSuccess(''), 3000);
-      } catch (err) {
-        setError(err.response?.data?.error || 'Erro ao salvar mensagem PIX');
-      }
+    if (!selectedPlanForPix) {
+      setError('Selecione um plano primeiro');
+      return;
+    }
+
+    try {
+      await paymentPlanService.updatePaymentPlan(selectedPlanForPix.id, {
+        bot_id: botId,
+        pix_message: formData.pix_message
+      });
+      setSuccess('Mensagem PIX atualizada com sucesso!');
+      setShowPixModal(false);
+      setSelectedPlanForPix(null);
+      setFormData(prev => ({
+        ...prev,
+        pix_message: ''
+      }));
+      loadPaymentPlans(botId);
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Erro ao salvar mensagem PIX');
     }
   };
 
@@ -278,7 +296,7 @@ const PaymentPlans = () => {
                 Criar plano
               </button>
               <button
-                onClick={() => setShowPixModal(true)}
+                onClick={handleOpenPixModal}
                 className="btn btn-edit-pix"
               >
                 Editar mensagem pix
@@ -511,32 +529,74 @@ const PaymentPlans = () => {
 
         {/* Pix Message Modal */}
         {showPixModal && (
-          <div className="modal-overlay" onClick={() => setShowPixModal(false)}>
+          <div className="modal-overlay" onClick={() => {
+            setShowPixModal(false);
+            setSelectedPlanForPix(null);
+            setFormData(prev => ({
+              ...prev,
+              pix_message: ''
+            }));
+          }}>
             <div className="modal-content" onClick={(e) => e.stopPropagation()}>
               <div className="modal-header">
                 <h2>Editar mensagem PIX</h2>
                 <button
                   className="modal-close"
-                  onClick={() => setShowPixModal(false)}
+                  onClick={() => {
+                    setShowPixModal(false);
+                    setSelectedPlanForPix(null);
+                    setFormData(prev => ({
+                      ...prev,
+                      pix_message: ''
+                    }));
+                  }}
                 >
                   ×
                 </button>
               </div>
               <div className="modal-form">
                 <div className="form-group">
-                  <label>Mensagem PIX</label>
-                  <textarea
-                    name="pix_message"
-                    value={formData.pix_message}
-                    onChange={handleChange}
-                    rows="5"
-                    placeholder="Digite a mensagem PIX que será enviada aos usuários"
-                  />
+                  <label>Selecione o plano *</label>
+                  <select
+                    value={selectedPlanForPix?.id || ''}
+                    onChange={(e) => handlePlanSelectForPix(parseInt(e.target.value))}
+                    className="form-input"
+                    required
+                  >
+                    <option value="">Selecione um plano</option>
+                    {paymentPlans.map((plan) => (
+                      <option key={plan.id} value={plan.id}>
+                        {plan.title} - R$ {parseFloat(plan.price).toFixed(2)}
+                      </option>
+                    ))}
+                  </select>
+                  {paymentPlans.length === 0 && (
+                    <small style={{ color: '#999' }}>Nenhum plano disponível. Crie um plano primeiro.</small>
+                  )}
                 </div>
+                {selectedPlanForPix && (
+                  <div className="form-group">
+                    <label>Mensagem PIX</label>
+                    <textarea
+                      name="pix_message"
+                      value={formData.pix_message}
+                      onChange={handleChange}
+                      rows="5"
+                      placeholder="Digite a mensagem PIX que será enviada aos usuários"
+                    />
+                  </div>
+                )}
                 <div className="modal-footer">
                   <button
                     type="button"
-                    onClick={() => setShowPixModal(false)}
+                    onClick={() => {
+                      setShowPixModal(false);
+                      setSelectedPlanForPix(null);
+                      setFormData(prev => ({
+                        ...prev,
+                        pix_message: ''
+                      }));
+                    }}
                     className="btn btn-cancel"
                   >
                     Cancelar
@@ -544,6 +604,7 @@ const PaymentPlans = () => {
                   <button
                     onClick={handleSavePixMessage}
                     className="btn btn-primary"
+                    disabled={!selectedPlanForPix}
                   >
                     Salvar
                   </button>
