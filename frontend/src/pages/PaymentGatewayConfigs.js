@@ -64,15 +64,16 @@ const PaymentGatewayConfigs = () => {
     
     if (existingConfig) {
       setEditingConfig(existingConfig);
+      // Mapear dados do backend para o formulário
       setFormData({
-        gateway: existingConfig.gateway,
-        environment: existingConfig.environment,
-        access_token: existingConfig.access_token || '',
-        secret_key: existingConfig.secret_key || '',
+        gateway: existingConfig.gateway || gateway,
+        environment: existingConfig.environment || environment,
+        access_token: existingConfig.access_token || existingConfig.api_key || '',
+        secret_key: existingConfig.secret_key || existingConfig.api_secret || '',
         webhook_secret: existingConfig.webhook_secret || '',
         webhook_url: existingConfig.webhook_url || '',
         public_key: existingConfig.public_key || '',
-        is_active: existingConfig.is_active || false
+        is_active: existingConfig.is_active !== undefined ? existingConfig.is_active : (existingConfig.active !== undefined ? existingConfig.active : false)
       });
     } else {
       setEditingConfig(null);
@@ -230,7 +231,7 @@ const PaymentGatewayConfigs = () => {
                 </div>
                 {getConfigForGateway('mercadopago', 'test') ? (
                   <div className="config-card-content">
-                    <p><strong>Access Token:</strong> {maskToken(getConfigForGateway('mercadopago', 'test').access_token)}</p>
+                    <p><strong>Access Token:</strong> {maskToken(getConfigForGateway('mercadopago', 'test').access_token || getConfigForGateway('mercadopago', 'test').api_key || '')}</p>
                     <p><strong>Webhook URL:</strong> {getConfigForGateway('mercadopago', 'test').webhook_url || 'Não configurado'}</p>
                     <div className="config-card-actions">
                       <button
@@ -270,7 +271,7 @@ const PaymentGatewayConfigs = () => {
                 </div>
                 {getConfigForGateway('mercadopago', 'production') ? (
                   <div className="config-card-content">
-                    <p><strong>Access Token:</strong> {maskToken(getConfigForGateway('mercadopago', 'production').access_token)}</p>
+                    <p><strong>Access Token:</strong> {maskToken(getConfigForGateway('mercadopago', 'production').access_token || getConfigForGateway('mercadopago', 'production').api_key || '')}</p>
                     <p><strong>Webhook URL:</strong> {getConfigForGateway('mercadopago', 'production').webhook_url || 'Não configurado'}</p>
                     <div className="config-card-actions">
                       <button
@@ -333,7 +334,7 @@ const PaymentGatewayConfigs = () => {
                 </div>
                 {getConfigForGateway('stripe', 'test') ? (
                   <div className="config-card-content">
-                    <p><strong>Secret Key:</strong> {maskToken(getConfigForGateway('stripe', 'test').secret_key)}</p>
+                    <p><strong>Secret Key:</strong> {maskToken(getConfigForGateway('stripe', 'test').secret_key || getConfigForGateway('stripe', 'test').api_secret || '')}</p>
                     <p><strong>Public Key:</strong> {maskToken(getConfigForGateway('stripe', 'test').public_key) || 'Não configurado'}</p>
                     <p><strong>Webhook Secret:</strong> {maskToken(getConfigForGateway('stripe', 'test').webhook_secret) || 'Não configurado'}</p>
                     <div className="config-card-actions">
@@ -374,7 +375,7 @@ const PaymentGatewayConfigs = () => {
                 </div>
                 {getConfigForGateway('stripe', 'production') ? (
                   <div className="config-card-content">
-                    <p><strong>Secret Key:</strong> {maskToken(getConfigForGateway('stripe', 'production').secret_key)}</p>
+                    <p><strong>Secret Key:</strong> {maskToken(getConfigForGateway('stripe', 'production').secret_key || getConfigForGateway('stripe', 'production').api_secret || '')}</p>
                     <p><strong>Public Key:</strong> {maskToken(getConfigForGateway('stripe', 'production').public_key) || 'Não configurado'}</p>
                     <p><strong>Webhook Secret:</strong> {maskToken(getConfigForGateway('stripe', 'production').webhook_secret) || 'Não configurado'}</p>
                     <div className="config-card-actions">

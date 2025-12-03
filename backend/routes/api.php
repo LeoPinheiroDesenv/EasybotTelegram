@@ -29,6 +29,8 @@ use Illuminate\Support\Facades\Route;
 // Public routes
 Route::post('/auth/login', [AuthController::class, 'login']);
 Route::post('/auth/verify-2fa', [AuthController::class, 'verifyTwoFactor']);
+Route::post('/auth/password/request-reset', [AuthController::class, 'requestPasswordReset']);
+Route::post('/auth/password/reset', [AuthController::class, 'resetPassword']);
 
 // Rotas públicas de pagamento (sem autenticação)
 Route::get('/payment/transaction/{token}', [PaymentController::class, 'getTransaction']);

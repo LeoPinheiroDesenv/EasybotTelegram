@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faChevronRight, faRobot, faPlus } from '@fortawesome/free-solid-svg-icons';
+import { faChevronRight, faRobot, faPlus, faInfoCircle, faTimes } from '@fortawesome/free-solid-svg-icons';
 import Layout from '../components/Layout';
 import botService from '../services/botService';
 import './UpdateBot.css';
@@ -28,6 +28,9 @@ const UpdateBot = () => {
   const [validationResult, setValidationResult] = useState(null);
   const [initializing, setInitializing] = useState(false);
   const [settingWebhook, setSettingWebhook] = useState(false);
+  const [showStatusModal, setShowStatusModal] = useState(false);
+  const [botStatus, setBotStatus] = useState(null);
+  const [loadingStatus, setLoadingStatus] = useState(false);
 
   useEffect(() => {
     loadBots();
@@ -92,6 +95,34 @@ const UpdateBot = () => {
     // Implementar lógica de atualização de link
     setSuccess('Link atualizado com sucesso!');
     setTimeout(() => setSuccess(''), 3000);
+  };
+
+  const handleGetBotStatus = async () => {
+    if (!id) {
+      setError('ID do bot não encontrado');
+      return;
+    }
+
+    setLoadingStatus(true);
+    setError('');
+    setShowStatusModal(true);
+
+    try {
+      const status = await botService.getBotStatus(id);
+      setBotStatus(status);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Erro ao obter status do bot');
+      setBotStatus({
+        error: err.response?.data?.error || 'Erro ao obter status do bot'
+      });
+    } finally {
+      setLoadingStatus(false);
+    }
+  };
+
+  const closeStatusModal = () => {
+    setShowStatusModal(false);
+    setBotStatus(null);
   };
 
   const handleInitialize = async () => {
@@ -250,17 +281,39 @@ const UpdateBot = () => {
           <div className="update-section">
             <div className="section-header">
               <h2 className="section-title">Informações gerais</h2>
-              <p className="section-description">
-                Altere as informações do seu bot por esse campo.
-              </p>
-              <button onClick={handleUpdateLink} className="btn btn-update-link">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <polyline points="23 4 23 10 17 10"></polyline>
-                  <polyline points="1 20 1 14 7 14"></polyline>
-                  <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
-                </svg>
-                Atualizar link
-              </button>
+              
+              <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                <button 
+                  onClick={handleInitialize}
+                  className="btn btn-primary"
+                  disabled={loading || initializing}
+                  style={{ flex: 1, minWidth: '200px' }}
+                >
+                  {initializing ? 'Verificando e iniciando...' : '🔍 Verificar e iniciar o bot'}
+                </button>
+                
+                <button 
+                  onClick={handleUpdateLink} 
+                  className="btn btn-update-link"
+                  style={{ flex: 1, minWidth: '200px' }}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <polyline points="23 4 23 10 17 10"></polyline>
+                    <polyline points="1 20 1 14 7 14"></polyline>
+                    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                  </svg>
+                  Atualizar link
+                </button>
+                <button 
+                  onClick={handleGetBotStatus} 
+                  className="btn btn-status-bot" 
+                  disabled={loadingStatus}
+                  style={{ flex: 1, minWidth: '200px' }}
+                >
+                  <FontAwesomeIcon icon={faInfoCircle} />
+                  {loadingStatus ? 'Carregando...' : 'Status do bot'}
+                </button>
+              </div>
             </div>
 
             <div className="form-grid">
@@ -499,13 +552,7 @@ const UpdateBot = () => {
           <div className="update-section">
             <h2 className="section-title">Verificação e Configuração</h2>
             <div className="action-buttons-vertical">
-              <button
-                onClick={handleInitialize}
-                className="btn btn-primary"
-                disabled={loading || initializing}
-              >
-                {initializing ? 'Verificando e iniciando...' : '🔍 Verificar e iniciar o bot'}
-              </button>
+              
               <button
                 onClick={handleSetWebhook}
                 className="btn btn-secondary"
@@ -571,6 +618,177 @@ const UpdateBot = () => {
           </div>
         </div>
       </div>
+
+      {/* Modal de Status do Bot */}
+      {showStatusModal && (
+        <div className="modal-overlay" onClick={closeStatusModal}>
+          <div className="modal-content status-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2 className="modal-title">Status do Bot</h2>
+              <button className="modal-close" onClick={closeStatusModal}>
+                <FontAwesomeIcon icon={faTimes} />
+              </button>
+            </div>
+            <div className="modal-body">
+              {loadingStatus ? (
+                <div className="loading-status">
+                  <div className="spinner"></div>
+                  <p>Carregando status do bot...</p>
+                </div>
+              ) : botStatus ? (
+                <div className="status-content">
+                  {/* Status Geral */}
+                  <div className="status-section">
+                    <h3 className="status-section-title">Status Geral</h3>
+                    <div className="status-grid">
+                      <div className="status-item">
+                        <span className="status-label">ID do Bot:</span>
+                        <span className="status-value">{botStatus.bot_id || 'N/A'}</span>
+                      </div>
+                      <div className="status-item">
+                        <span className="status-label">Ativo:</span>
+                        <span className={`status-badge ${botStatus.active ? 'status-success' : 'status-error'}`}>
+                          {botStatus.active ? '✓ Sim' : '✗ Não'}
+                        </span>
+                      </div>
+                      <div className="status-item">
+                        <span className="status-label">Ativado:</span>
+                        <span className={`status-badge ${botStatus.activated ? 'status-success' : 'status-warning'}`}>
+                          {botStatus.activated ? '✓ Sim' : '⚠ Não'}
+                        </span>
+                      </div>
+                      <div className="status-item">
+                        <span className="status-label">Token Válido:</span>
+                        <span className={`status-badge ${botStatus.token_valid ? 'status-success' : 'status-error'}`}>
+                          {botStatus.token_valid ? '✓ Válido' : '✗ Inválido'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Informações do Bot */}
+                  {botStatus.bot_info && (
+                    <div className="status-section">
+                      <h3 className="status-section-title">Informações do Bot</h3>
+                      <div className="status-grid">
+                        <div className="status-item">
+                          <span className="status-label">Nome:</span>
+                          <span className="status-value">{botStatus.bot_info.first_name || 'N/A'}</span>
+                        </div>
+                        <div className="status-item">
+                          <span className="status-label">Username:</span>
+                          <span className="status-value">@{botStatus.bot_info.username || 'N/A'}</span>
+                        </div>
+                        <div className="status-item">
+                          <span className="status-label">ID:</span>
+                          <span className="status-value">{botStatus.bot_info.id || 'N/A'}</span>
+                        </div>
+                        {botStatus.bot_info.is_bot !== undefined && (
+                          <div className="status-item">
+                            <span className="status-label">É Bot:</span>
+                            <span className={`status-badge ${botStatus.bot_info.is_bot ? 'status-success' : 'status-error'}`}>
+                              {botStatus.bot_info.is_bot ? '✓ Sim' : '✗ Não'}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Permissões */}
+                  {botStatus.permissions && (
+                    <div className="status-section">
+                      <h3 className="status-section-title">Permissões</h3>
+                      <div className="status-grid">
+                        <div className="status-item">
+                          <span className="status-label">Ler todas as mensagens do grupo:</span>
+                          <span className={`status-badge ${botStatus.permissions.can_read_all_group_messages ? 'status-success' : 'status-error'}`}>
+                            {botStatus.permissions.can_read_all_group_messages ? '✓ Habilitado' : '✗ Desabilitado'}
+                          </span>
+                          <p className="status-description">
+                            {botStatus.permissions.can_read_all_group_messages 
+                              ? 'O bot pode ler todas as mensagens do grupo, permitindo gerenciamento adequado.'
+                              : 'O bot não pode ler todas as mensagens. Configure no BotFather usando /setprivacy e selecione "Disable".'}
+                          </p>
+                        </div>
+                        <div className="status-item">
+                          <span className="status-label">Pode entrar em grupos:</span>
+                          <span className={`status-badge ${botStatus.permissions.can_join_groups ? 'status-success' : 'status-error'}`}>
+                            {botStatus.permissions.can_join_groups ? '✓ Habilitado' : '✗ Desabilitado'}
+                          </span>
+                          <p className="status-description">
+                            {botStatus.permissions.can_join_groups
+                              ? 'O bot pode ser adicionado a grupos.'
+                              : 'O bot não pode entrar em grupos. Configure no BotFather usando /setjoingroups e selecione "Enable".'}
+                          </p>
+                        </div>
+                        {botStatus.can_manage_groups !== undefined && (
+                          <div className="status-item">
+                            <span className="status-label">Pode gerenciar grupos:</span>
+                            <span className={`status-badge ${botStatus.can_manage_groups ? 'status-success' : 'status-error'}`}>
+                              {botStatus.can_manage_groups ? '✓ Sim' : '✗ Não'}
+                            </span>
+                            <p className="status-description">
+                              {botStatus.can_manage_groups
+                                ? 'O bot tem todas as permissões necessárias para gerenciar grupos.'
+                                : 'O bot não tem todas as permissões necessárias para gerenciar grupos adequadamente.'}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Avisos */}
+                  {botStatus.warnings && botStatus.warnings.length > 0 && (
+                    <div className="status-section">
+                      <h3 className="status-section-title">Avisos e Recomendações</h3>
+                      <div className="warnings-list">
+                        {botStatus.warnings.map((warning, index) => (
+                          <div key={index} className={`warning-item warning-${warning.type}`}>
+                            <div className="warning-header">
+                              <span className="warning-icon">
+                                {warning.type === 'critical' ? '⚠️' : 'ℹ️'}
+                              </span>
+                              <span className="warning-title">
+                                {warning.type === 'critical' ? 'Crítico' : 'Aviso'}
+                              </span>
+                            </div>
+                            <p className="warning-message">{warning.message}</p>
+                            {warning.solution && (
+                              <div className="warning-solution">
+                                <strong>Solução:</strong> {warning.solution}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Erro */}
+                  {botStatus.error && (
+                    <div className="status-section">
+                      <div className="error-message">
+                        <strong>Erro:</strong> {botStatus.error}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="no-status">
+                  <p>Não foi possível carregar o status do bot.</p>
+                </div>
+              )}
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-primary" onClick={closeStatusModal}>
+                Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </Layout>
   );
 };

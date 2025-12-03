@@ -214,6 +214,32 @@
   line-height: 1.4;
 }
 
+.forgot-password-link {
+  text-align: center;
+  margin-top: 16px;
+}
+
+.btn-link {
+  background: none;
+  border: none;
+  color: var(--color-light-green);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  text-decoration: underline;
+  padding: 0;
+  transition: color 0.2s;
+}
+
+.btn-link:hover:not(:disabled) {
+  color: var(--color-dark-green);
+}
+
+.btn-link:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 /* Mobile */
 @media (max-width: 768px) {
   .login-container {

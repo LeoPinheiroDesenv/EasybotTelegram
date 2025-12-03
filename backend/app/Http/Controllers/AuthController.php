@@ -5,9 +5,15 @@ namespace App\Http\Controllers;
 use App\Services\AuthService;
 use App\Services\PermissionService;
 use App\Services\TwoFactorService;
+use App\Models\User;
+use App\Mail\PasswordResetMail;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Str;
 use Tymon\JWTAuth\Facades\JWTAuth;
 
 class AuthController extends Controller
@@ -254,6 +260,170 @@ class AuthController extends Controller
             return response()->json($result);
         } catch (\Exception $e) {
             return response()->json(['error' => 'Internal server error'], 500);
+        }
+    }
+
+    /**
+     * Request password reset
+     */
+    public function requestPasswordReset(Request $request): JsonResponse
+    {
+        $validator = Validator::make($request->all(), [
+            'email' => 'required|email',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 400);
+        }
+
+        try {
+            $user = User::where('email', $request->email)->first();
+
+            // Sempre retorna sucesso para não revelar se o email existe
+            if (!$user) {
+                return response()->json([
+                    'message' => 'Se o email existir, você receberá um link de recuperação de senha.'
+                ], 200);
+            }
+
+            // Gera token único
+            $token = Str::random(64);
+            
+            // Remove tokens antigos
+            DB::table('password_resets')->where('email', $request->email)->delete();
+            
+            // Salva novo token
+            DB::table('password_resets')->insert([
+                'email' => $request->email,
+                'token' => Hash::make($token),
+                'created_at' => now(),
+            ]);
+
+            // Gera URL de reset
+            $resetUrl = env('FRONTEND_URL', env('APP_URL')) . '/reset-password?token=' . $token . '&email=' . urlencode($request->email);
+
+            // Log antes de enviar
+            \Log::info('Attempting to send password reset email', [
+                'email' => $request->email,
+                'mail_mailer' => env('MAIL_MAILER', 'not set'),
+                'mail_host' => env('MAIL_HOST', 'not set'),
+                'mail_port' => env('MAIL_PORT', 'not set'),
+                'mail_encryption' => env('MAIL_ENCRYPTION', 'not set'),
+                'mail_username' => env('MAIL_USERNAME', 'not set'),
+                'mail_from_address' => env('MAIL_FROM_ADDRESS', 'not set'),
+            ]);
+
+            // Envia email
+            try {
+                $mailResult = Mail::to($user->email)->send(new PasswordResetMail($resetUrl));
+                
+                \Log::info('Password reset email sent successfully', [
+                    'email' => $request->email,
+                    'result' => $mailResult !== null ? 'sent' : 'queued',
+                ]);
+            } catch (\Symfony\Component\Mailer\Exception\TransportExceptionInterface $e) {
+                \Log::error('Mail Transport Error sending password reset email', [
+                    'error' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString(),
+                    'email' => $request->email,
+                ]);
+            } catch (\Exception $e) {
+                \Log::error('Error sending password reset email', [
+                    'error' => $e->getMessage(),
+                    'class' => get_class($e),
+                    'file' => $e->getFile(),
+                    'line' => $e->getLine(),
+                    'trace' => $e->getTraceAsString(),
+                    'email' => $request->email,
+                ]);
+            }
+
+            return response()->json([
+                'message' => 'Se o email existir, você receberá um link de recuperação de senha.'
+            ], 200);
+        } catch (\Exception $e) {
+            \Log::error('Error requesting password reset', [
+                'error' => $e->getMessage(),
+                'email' => $request->email,
+            ]);
+
+            return response()->json([
+                'message' => 'Se o email existir, você receberá um link de recuperação de senha.'
+            ], 200);
+        }
+    }
+
+    /**
+     * Reset password
+     */
+    public function resetPassword(Request $request): JsonResponse
+    {
+        $validator = Validator::make($request->all(), [
+            'email' => 'required|email',
+            'token' => 'required|string',
+            'password' => 'required|string|min:8',
+            'password_confirmation' => 'required|string|same:password',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 400);
+        }
+
+        try {
+            // Busca o token
+            $passwordReset = DB::table('password_resets')
+                ->where('email', $request->email)
+                ->first();
+
+            if (!$passwordReset) {
+                return response()->json([
+                    'error' => 'Token inválido ou expirado.'
+                ], 400);
+            }
+
+            // Verifica se o token é válido (válido por 1 hora)
+            if (now()->diffInMinutes($passwordReset->created_at) > 60) {
+                DB::table('password_resets')->where('email', $request->email)->delete();
+                return response()->json([
+                    'error' => 'Token expirado. Solicite um novo link de recuperação.'
+                ], 400);
+            }
+
+            // Verifica se o token corresponde
+            if (!Hash::check($request->token, $passwordReset->token)) {
+                return response()->json([
+                    'error' => 'Token inválido.'
+                ], 400);
+            }
+
+            // Busca o usuário
+            $user = User::where('email', $request->email)->first();
+
+            if (!$user) {
+                return response()->json([
+                    'error' => 'Usuário não encontrado.'
+                ], 404);
+            }
+
+            // Atualiza a senha
+            $user->password = $request->password;
+            $user->save();
+
+            // Remove o token usado
+            DB::table('password_resets')->where('email', $request->email)->delete();
+
+            return response()->json([
+                'message' => 'Senha redefinida com sucesso!'
+            ], 200);
+        } catch (\Exception $e) {
+            \Log::error('Error resetting password', [
+                'error' => $e->getMessage(),
+                'email' => $request->email,
+            ]);
+
+            return response()->json([
+                'error' => 'Erro ao redefinir senha. Tente novamente.'
+            ], 500);
         }
     }
 }

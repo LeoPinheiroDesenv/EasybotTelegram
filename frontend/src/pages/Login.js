@@ -120,6 +120,16 @@ const Login = () => {
             <button type="submit" className="btn btn-primary" disabled={loading}>
               {loading ? 'Entrando...' : 'Entrar'}
             </button>
+            <div className="forgot-password-link">
+              <button
+                type="button"
+                onClick={() => navigate('/forgot-password')}
+                className="btn-link"
+                disabled={loading}
+              >
+                Esqueci minha senha
+              </button>
+            </div>
           </form>
         ) : (
           <form onSubmit={handleVerifyTwoFactor}>
