@@ -2,9 +2,11 @@ import React, { useState, useEffect, useContext } from 'react';
 import Layout from '../components/Layout';
 import { AuthContext } from '../contexts/AuthContext';
 import authService from '../services/authService';
+import useConfirm from '../hooks/useConfirm';
 import './SecuritySettings.css';
 
 const SecuritySettings = () => {
+  const { confirm, DialogComponent } = useConfirm();
   const { user, refreshUser } = useContext(AuthContext);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -70,7 +72,12 @@ const SecuritySettings = () => {
   };
 
   const handleDisable2FA = async () => {
-    if (!window.confirm('Tem certeza que deseja desativar o 2FA? Isso reduzirá a segurança da sua conta.')) {
+    const confirmed = await confirm({
+      message: 'Tem certeza que deseja desativar o 2FA? Isso reduzirá a segurança da sua conta.',
+      type: 'warning',
+    });
+    
+    if (!confirmed) {
       return;
     }
 
@@ -103,6 +110,7 @@ const SecuritySettings = () => {
 
   return (
     <Layout>
+      <DialogComponent />
       <div className="security-settings-container">
         <div className="security-settings-header">
           <h1>Configurações de Segurança</h1>

@@ -16,9 +16,11 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import { AuthContext } from '../contexts/AuthContext';
 import billingService from '../services/billingService';
+import useAlert from '../hooks/useAlert';
 import './Sidebar.css';
 
 const Sidebar = ({ isOpen, onClose }) => {
+  const { alert, DialogComponent: AlertDialog } = useAlert();
   const location = useLocation();
   const navigate = useNavigate();
   const { isAdmin, logout, user } = useContext(AuthContext);
@@ -30,7 +32,8 @@ const Sidebar = ({ isOpen, onClose }) => {
     location.pathname === '/users' || 
     location.pathname === '/user-groups' || 
     location.pathname === '/logs' ||
-    location.pathname === '/ftp'
+    location.pathname === '/ftp' ||
+    location.pathname === '/settings/artisan'
   );
   const [monthlyBilling, setMonthlyBilling] = useState({ total: 0, transaction_count: 0 });
   const [loadingBilling, setLoadingBilling] = useState(true);
@@ -138,8 +141,10 @@ const Sidebar = ({ isOpen, onClose }) => {
   };
 
   return (
-    <div className={`sidebar ${isOpen ? 'open' : ''}`}>
-      <div className="sidebar-content">
+    <>
+      <AlertDialog />
+      <div className={`sidebar ${isOpen ? 'open' : ''}`}>
+        <div className="sidebar-content">
         <div className="sidebar-logo">
           <div className="logo-circles">
             <span className="circle circle-1"></span>
@@ -266,10 +271,10 @@ const Sidebar = ({ isOpen, onClose }) => {
                       key={item.path}
                       to={path}
                       className={`sidebar-submenu-item ${isActive ? 'active' : ''}`}
-                      onClick={(e) => {
+                      onClick={async (e) => {
                         if (item.requiresBot && !localStorage.getItem('selectedBotId')) {
                           e.preventDefault();
-                          alert('Por favor, selecione um bot primeiro.');
+                          await alert('Por favor, selecione um bot primeiro.', 'Atenção', 'info');
                         } else {
                           onClose();
                         }
@@ -403,6 +408,15 @@ const Sidebar = ({ isOpen, onClose }) => {
                     </>
                   )}
                   {user?.user_type === 'super_admin' && (
+                    <Link
+                      to="/settings/artisan"
+                      className={`sidebar-submenu-item ${location.pathname === '/settings/artisan' ? 'active' : ''}`}
+                      onClick={onClose}
+                    >
+                      Comandos Artisan
+                    </Link>
+                  )}
+                  {user?.user_type === 'super_admin' && (
                     <>
                       <Link
                         to="/users"
@@ -432,8 +446,7 @@ const Sidebar = ({ isOpen, onClose }) => {
             </div>
           )}
         </div>
-
-        
+        </div>
 
         <div className="sidebar-footer">
           <Link to="/billing" className="sidebar-billing-link" onClick={onClose}>
@@ -480,7 +493,7 @@ const Sidebar = ({ isOpen, onClose }) => {
           </button>
         </div>
       </div>
-    </div>
+    </>
   );
 };
 

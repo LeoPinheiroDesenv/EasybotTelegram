@@ -1,8 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import Layout from '../components/Layout';
+import useConfirm from '../hooks/useConfirm';
+import useAlert from '../hooks/useAlert';
 import './Downsell.css';
 
 const Downsell = () => {
+  const { confirm, DialogComponent: ConfirmDialog } = useConfirm();
+  const { alert, DialogComponent: AlertDialog } = useAlert();
   const [downsells, setDownsells] = useState([]);
   const [loading, setLoading] = useState(false);
   const [loadingData, setLoadingData] = useState(true);
@@ -75,7 +79,12 @@ const Downsell = () => {
   };
 
   const handleDelete = async (downsellId) => {
-    if (!window.confirm('Tem certeza que deseja deletar este downsell?')) {
+    const confirmed = await confirm({
+      message: 'Tem certeza que deseja deletar este downsell?',
+      type: 'warning',
+    });
+    
+    if (!confirmed) {
       return;
     }
 
@@ -94,7 +103,7 @@ const Downsell = () => {
 
   const handleSave = async () => {
     if (!formData.message || !formData.plan_id) {
-      alert('Por favor, preencha todos os campos obrigatórios');
+      await alert('Por favor, preencha todos os campos obrigatórios', 'Atenção', 'info');
       return;
     }
 
@@ -137,6 +146,8 @@ const Downsell = () => {
 
   return (
     <Layout>
+      <ConfirmDialog />
+      <AlertDialog />
       <div className="downsell-page">
         <div className="downsell-content">
           <div className="downsell-header">

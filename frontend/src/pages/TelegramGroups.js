@@ -5,9 +5,11 @@ import { faEdit, faTrash, faPlus, faLink, faRefresh, faCopy, faCheck } from '@fo
 import Layout from '../components/Layout';
 import telegramGroupService from '../services/telegramGroupService';
 import paymentPlanService from '../services/paymentPlanService';
+import useConfirm from '../hooks/useConfirm';
 import './TelegramGroups.css';
 
 const TelegramGroups = () => {
+  const { confirm, DialogComponent } = useConfirm();
   const navigate = useNavigate();
   const { botId } = useParams();
   
@@ -135,7 +137,12 @@ const TelegramGroups = () => {
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm('Tem certeza que deseja excluir este grupo/canal?')) {
+    const confirmed = await confirm({
+      message: 'Tem certeza que deseja excluir este grupo/canal?',
+      type: 'warning',
+    });
+    
+    if (!confirmed) {
       return;
     }
 
@@ -234,6 +241,7 @@ const TelegramGroups = () => {
   if (!botId) {
     return (
       <Layout>
+        <DialogComponent />
         <div className="telegram-groups-page">
           <div className="error-message">
             <h2>Bot não selecionado</h2>

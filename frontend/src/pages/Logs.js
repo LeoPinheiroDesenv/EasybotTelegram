@@ -3,6 +3,8 @@ import { AuthContext } from '../contexts/AuthContext';
 import Layout from '../components/Layout';
 import logService from '../services/logService';
 import botService from '../services/botService';
+import useConfirm from '../hooks/useConfirm';
+import useAlert from '../hooks/useAlert';
 import './Logs.css';
 
 const Logs = () => {
@@ -23,7 +25,10 @@ const Logs = () => {
     message: ''
   });
   const [total, setTotal] = useState(0);
+  const [deleting, setDeleting] = useState(false);
   const { isAdmin } = useContext(AuthContext);
+  const { confirm, DialogComponent } = useConfirm();
+  const { alert, DialogComponent: AlertDialog } = useAlert();
 
   useEffect(() => {
     if (isAdmin) {
@@ -155,6 +160,40 @@ const Logs = () => {
     });
   };
 
+  const handleDeleteAll = async () => {
+    const confirmed = await confirm(
+      'Remover todos os logs?',
+      `Tem certeza que deseja remover todos os ${total} registro(s) de log? Esta ação não pode ser desfeita.`,
+      'warning'
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      setDeleting(true);
+      setError('');
+      
+      const result = await logService.deleteAllLogs();
+      
+      if (result.success) {
+        // Recarrega os logs após deletar
+        await loadLogs();
+        // Mostra mensagem de sucesso
+        setError('');
+        // Mostra alerta de sucesso
+        await alert(result.message || 'Todos os logs foram removidos com sucesso!', 'Sucesso', 'success');
+      } else {
+        throw new Error(result.error || 'Erro ao remover logs');
+      }
+    } catch (err) {
+      setError(err.response?.data?.error || err.message || 'Erro ao remover logs');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   if (!isAdmin) {
     return (
       <Layout>
@@ -174,9 +213,27 @@ const Logs = () => {
 
   return (
     <Layout>
+      <DialogComponent />
+      <AlertDialog />
       <div className="logs-page">
         <div className="logs-container">
-          <h1 className="logs-title">Logs da Aplicação</h1>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+            <h1 className="logs-title" style={{ margin: 0 }}>Logs da Aplicação</h1>
+            {total > 0 && (
+              <button
+                onClick={handleDeleteAll}
+                disabled={deleting || loading}
+                className="btn btn-danger"
+                style={{ 
+                  padding: '10px 20px',
+                  fontSize: '14px',
+                  fontWeight: '500'
+                }}
+              >
+                {deleting ? 'Removendo...' : '🗑️ Remover Todos os Logs'}
+              </button>
+            )}
+          </div>
           
           {error && <div className="alert alert-error">{error}</div>}
 
@@ -326,7 +383,7 @@ const Logs = () => {
                       logs.map((log) => {
                         const context = log.context;
                         const details = log.details;
-                        const hasDetails = context || details;
+                        const hasDetails = context || details || log.request || log.response;
                         
                         return (
                           <tr key={log.id} className={log.level === 'error' ? 'log-row-error' : ''}>
@@ -472,6 +529,24 @@ const Logs = () => {
                   <h3>Detalhes</h3>
                   <div className="json-viewer">
                     <pre className="json-pre">{formatJson(selectedLog.details)}</pre>
+                  </div>
+                </div>
+              )}
+
+              {selectedLog.request && (
+                <div className="log-detail-section">
+                  <h3>Request</h3>
+                  <div className="json-viewer">
+                    <pre className="json-pre">{formatJson(selectedLog.request)}</pre>
+                  </div>
+                </div>
+              )}
+
+              {selectedLog.response && (
+                <div className="log-detail-section">
+                  <h3>Response</h3>
+                  <div className="json-viewer">
+                    <pre className="json-pre">{formatJson(selectedLog.response)}</pre>
                   </div>
                 </div>
               )}

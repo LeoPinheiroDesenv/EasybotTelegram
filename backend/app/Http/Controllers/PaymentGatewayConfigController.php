@@ -65,6 +65,26 @@ class PaymentGatewayConfigController extends Controller
             $active = $request->has('is_active') ? $request->is_active : ($request->active ?? true);
             $environment = $request->environment ?? 'test';
 
+            // Validação específica por gateway
+            if ($request->gateway === 'stripe') {
+                if (empty($request->secret_key) && empty($apiSecret)) {
+                    return response()->json([
+                        'errors' => ['secret_key' => ['Secret Key é obrigatória para Stripe']]
+                    ], 400);
+                }
+                if (empty($request->public_key)) {
+                    return response()->json([
+                        'errors' => ['public_key' => ['Public Key é obrigatória para Stripe']]
+                    ], 400);
+                }
+            } elseif ($request->gateway === 'mercadopago') {
+                if (empty($request->access_token) && empty($apiKey)) {
+                    return response()->json([
+                        'errors' => ['access_token' => ['Access Token é obrigatório para Mercado Pago']]
+                    ], 400);
+                }
+            }
+
             // Check if config already exists for this bot/gateway/environment combination
             $existing = PaymentGatewayConfig::where('bot_id', $request->bot_id)
                 ->where('gateway', $request->gateway)
@@ -74,17 +94,27 @@ class PaymentGatewayConfigController extends Controller
             $dataToSave = [
                 'api_key' => $apiKey,
                 'api_secret' => $apiSecret,
-                'webhook_url' => $request->webhook_url,
+                'webhook_url' => $request->webhook_url ?? null,
                 'active' => $active,
             ];
 
             // Para Stripe, salvar public_key e webhook_secret no api_secret como JSON
             if ($request->gateway === 'stripe') {
-                $stripeData = [
-                    'secret_key' => $apiSecret,
-                    'public_key' => $request->public_key ?? null,
-                    'webhook_secret' => $request->webhook_secret ?? null,
-                ];
+                // Se já existe uma configuração, preserva os dados existentes
+                $stripeData = [];
+                if ($existing && $existing->api_secret) {
+                    $decoded = json_decode($existing->api_secret, true);
+                    if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                        $stripeData = $decoded;
+                    }
+                }
+                
+                // Atualiza com os novos valores
+                $stripeData['secret_key'] = $request->secret_key ?? $apiSecret ?? $stripeData['secret_key'] ?? null;
+                $stripeData['public_key'] = $request->public_key ?? $stripeData['public_key'] ?? null;
+                $stripeData['webhook_secret'] = $request->webhook_secret ?? $stripeData['webhook_secret'] ?? null;
+                
+                // Sempre salva como JSON
                 $dataToSave['api_secret'] = json_encode($stripeData);
             }
 
@@ -149,6 +179,29 @@ class PaymentGatewayConfigController extends Controller
         try {
             $config = PaymentGatewayConfig::findOrFail($id);
             
+            // Validação específica por gateway
+            if ($config->gateway === 'stripe') {
+                // Se está atualizando secret_key, valida se foi enviada
+                if ($request->has('secret_key') && empty($request->secret_key)) {
+                    return response()->json([
+                        'errors' => ['secret_key' => ['Secret Key é obrigatória para Stripe']]
+                    ], 400);
+                }
+                // Se está atualizando public_key, valida se foi enviada
+                if ($request->has('public_key') && empty($request->public_key)) {
+                    return response()->json([
+                        'errors' => ['public_key' => ['Public Key é obrigatória para Stripe']]
+                    ], 400);
+                }
+            } elseif ($config->gateway === 'mercadopago') {
+                // Se está atualizando access_token, valida se foi enviado
+                if ($request->has('access_token') && empty($request->access_token)) {
+                    return response()->json([
+                        'errors' => ['access_token' => ['Access Token é obrigatório para Mercado Pago']]
+                    ], 400);
+                }
+            }
+            
             // Mapear campos do frontend para o banco de dados
             $updateData = [];
             
@@ -166,35 +219,51 @@ class PaymentGatewayConfigController extends Controller
                 $updateData['api_key'] = $request->access_token;
             }
             
-            // Mapear api_secret / secret_key
-            if ($request->has('api_secret')) {
-                $updateData['api_secret'] = $request->api_secret;
-            } elseif ($request->has('secret_key')) {
-                $updateData['api_secret'] = $request->secret_key;
-            }
-            
             // Para Stripe, salvar public_key e webhook_secret no api_secret como JSON
             if ($config->gateway === 'stripe') {
-                $stripeData = json_decode($config->api_secret, true) ?? [];
+                // Tenta decodificar dados existentes
+                $stripeData = [];
+                if ($config->api_secret) {
+                    $decoded = json_decode($config->api_secret, true);
+                    if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                        $stripeData = $decoded;
+                    } else {
+                        // Se não for JSON, assume que é apenas a secret_key antiga
+                        $stripeData = [
+                            'secret_key' => $config->api_secret,
+                            'public_key' => null,
+                            'webhook_secret' => null,
+                        ];
+                    }
+                }
+                
+                // Atualiza apenas os campos que foram enviados (preserva os existentes se não foram enviados)
                 if ($request->has('secret_key')) {
+                    // Se foi enviado, atualiza (mesmo que seja vazio, mas validação já foi feita acima)
                     $stripeData['secret_key'] = $request->secret_key;
                 }
+                // Se não foi enviado, preserva o valor existente
+                
                 if ($request->has('public_key')) {
+                    // Se foi enviado, atualiza
                     $stripeData['public_key'] = $request->public_key;
                 }
+                // Se não foi enviado, preserva o valor existente
+                
                 if ($request->has('webhook_secret')) {
-                    $stripeData['webhook_secret'] = $request->webhook_secret;
+                    // Se foi enviado, atualiza (pode ser vazio/null)
+                    $stripeData['webhook_secret'] = $request->webhook_secret ?: null;
                 }
-                // Se não tinha dados anteriores, criar estrutura
-                if (empty($stripeData) && ($request->has('secret_key') || $request->has('public_key') || $request->has('webhook_secret'))) {
-                    $stripeData = [
-                        'secret_key' => $request->secret_key ?? null,
-                        'public_key' => $request->public_key ?? null,
-                        'webhook_secret' => $request->webhook_secret ?? null,
-                    ];
-                }
-                if (!empty($stripeData)) {
-                    $updateData['api_secret'] = json_encode($stripeData);
+                // Se não foi enviado, preserva o valor existente
+                
+                // Sempre salva como JSON
+                $updateData['api_secret'] = json_encode($stripeData);
+            } else {
+                // Para outros gateways (Mercado Pago), atualiza api_secret normalmente
+                if ($request->has('api_secret')) {
+                    $updateData['api_secret'] = $request->api_secret;
+                } elseif ($request->has('secret_key')) {
+                    $updateData['api_secret'] = $request->secret_key;
                 }
             }
             

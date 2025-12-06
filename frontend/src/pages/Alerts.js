@@ -3,9 +3,11 @@ import { useSearchParams } from 'react-router-dom';
 import Layout from '../components/Layout';
 import alertService from '../services/alertService';
 import paymentPlanService from '../services/paymentPlanService';
+import useConfirm from '../hooks/useConfirm';
 import './Alerts.css';
 
 const Alerts = () => {
+  const { confirm, DialogComponent } = useConfirm();
   const [searchParams] = useSearchParams();
   let botId = searchParams.get('botId');
   
@@ -139,7 +141,12 @@ const Alerts = () => {
   };
 
   const handleDelete = async (alertId) => {
-    if (!window.confirm('Tem certeza que deseja deletar este alerta?')) {
+    const confirmed = await confirm({
+      message: 'Tem certeza que deseja deletar este alerta?',
+      type: 'warning',
+    });
+    
+    if (!confirmed) {
       return;
     }
 
@@ -212,7 +219,12 @@ const Alerts = () => {
   };
 
   const handleProcessAlerts = async () => {
-    if (!window.confirm('Deseja processar e enviar os alertas que estão prontos?')) {
+    const confirmed = await confirm({
+      message: 'Deseja processar e enviar os alertas que estão prontos?',
+      type: 'info',
+    });
+    
+    if (!confirmed) {
       return;
     }
 
@@ -261,6 +273,7 @@ const Alerts = () => {
 
   return (
     <Layout>
+      <DialogComponent />
       <div className="alerts-page">
         <div className="alerts-content">
           {error && (

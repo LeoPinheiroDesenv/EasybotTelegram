@@ -19,6 +19,11 @@ const logService = {
   getLogById: async (id) => {
     const response = await api.get(`/logs/${id}`);
     return response.data.log;
+  },
+
+  deleteAllLogs: async () => {
+    const response = await api.delete('/logs');
+    return response.data;
   }
 };
 

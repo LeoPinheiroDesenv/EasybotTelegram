@@ -30,6 +30,7 @@ import Commands from './pages/Commands';
 import FtpManager from './pages/FtpManager';
 import CardPayment from './pages/CardPayment';
 import StorageSettings from './pages/StorageSettings';
+import ArtisanCommands from './pages/ArtisanCommands';
 import './App.css';
 
 function App() {
@@ -235,6 +236,14 @@ function App() {
               element={
                 <ProtectedRoute>
                   <StorageSettings />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/settings/artisan"
+              element={
+                <ProtectedRoute>
+                  <ArtisanCommands />
                 </ProtectedRoute>
               }
             />

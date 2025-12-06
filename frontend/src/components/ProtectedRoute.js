@@ -24,6 +24,8 @@ const routeToMenuMap = {
   '/settings/payment-cycles': 'settings',
   '/settings/payment-gateways': 'settings',
   '/settings/security': 'settings',
+  '/settings/storage': 'settings',
+  '/settings/artisan': 'settings',
   '/users': 'settings',
   '/user-groups': 'settings',
   '/logs': 'settings',

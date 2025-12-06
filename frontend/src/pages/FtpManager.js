@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import Layout from '../components/Layout';
 import ftpService from '../services/ftpService';
+import useConfirm from '../hooks/useConfirm';
 import './FtpManager.css';
 
 const FtpManager = () => {
+  const { confirm, DialogComponent } = useConfirm();
   const [files, setFiles] = useState([]);
   const [currentPath, setCurrentPath] = useState('/');
   const [loading, setLoading] = useState(false);
@@ -105,7 +107,12 @@ const FtpManager = () => {
   };
 
   const handleDelete = async (path) => {
-    if (!window.confirm(`Tem certeza que deseja deletar "${path.split('/').pop()}"?`)) {
+    const confirmed = await confirm({
+      message: `Tem certeza que deseja deletar "${path.split('/').pop()}"?`,
+      type: 'warning',
+    });
+    
+    if (!confirmed) {
       return;
     }
 
@@ -175,6 +182,7 @@ const FtpManager = () => {
 
   return (
     <Layout>
+      <DialogComponent />
       <div className="ftp-manager">
         <div className="ftp-header">
           <h1>Gerenciador FTP</h1>

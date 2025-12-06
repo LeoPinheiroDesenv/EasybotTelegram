@@ -1,30 +1,75 @@
-import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useRef } from 'react';
+import { useParams } from 'react-router-dom';
 import api from '../services/api';
 import './CardPayment.css';
 
 const CardPayment = () => {
   const { token } = useParams();
-  const navigate = useNavigate();
-  
   const [transaction, setTransaction] = useState(null);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  
-  const [formData, setFormData] = useState({
-    card_number: '',
-    card_name: '',
-    card_expiry: '',
-    card_cvv: ''
-  });
+  const [stripe, setStripe] = useState(null);
+  const [clientSecret, setClientSecret] = useState(null);
+  const [paymentIntentId, setPaymentIntentId] = useState(null);
+  const [stripePublicKey, setStripePublicKey] = useState(null);
+  const elementsRef = useRef(null);
+  const cardElementRef = useRef(null);
 
   useEffect(() => {
     if (token) {
       loadTransaction();
     }
   }, [token]);
+
+  useEffect(() => {
+    // Carrega Stripe.js quando temos a public key
+    if (stripePublicKey && window.Stripe) {
+      const stripeInstance = window.Stripe(stripePublicKey);
+      setStripe(stripeInstance);
+    }
+  }, [stripePublicKey]);
+
+  useEffect(() => {
+    // Cria Stripe Elements quando temos o client_secret
+    if (stripe && clientSecret && !elementsRef.current) {
+      const elements = stripe.elements();
+      elementsRef.current = elements;
+
+      const cardElement = elements.create('card', {
+        style: {
+          base: {
+            fontSize: '16px',
+            color: '#424770',
+            '::placeholder': {
+              color: '#aab7c4',
+            },
+          },
+          invalid: {
+            color: '#9e2146',
+          },
+        },
+      });
+
+      cardElement.mount('#card-element');
+      cardElementRef.current = cardElement;
+
+      cardElement.on('change', ({ error }) => {
+        if (error) {
+          setError(error.message);
+        } else {
+          setError('');
+        }
+      });
+    }
+
+    return () => {
+      if (cardElementRef.current) {
+        cardElementRef.current.unmount();
+      }
+    };
+  }, [stripe, clientSecret]);
 
   const loadTransaction = async () => {
     try {
@@ -35,6 +80,8 @@ const CardPayment = () => {
       
       if (response.data.success) {
         setTransaction(response.data.transaction);
+        // Cria PaymentIntent e obtém public key
+        await createPaymentIntent();
       } else {
         throw new Error(response.data.error || 'Erro ao carregar transação');
       }
@@ -45,51 +92,115 @@ const CardPayment = () => {
     }
   };
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    
-    if (name === 'card_number') {
-      // Formata número do cartão
-      let formatted = value.replace(/\s/g, '');
-      formatted = formatted.match(/.{1,4}/g)?.join(' ') || formatted;
-      setFormData({ ...formData, [name]: formatted });
-    } else if (name === 'card_expiry') {
-      // Formata validade
-      let formatted = value.replace(/\D/g, '');
-      if (formatted.length >= 2) {
-        formatted = formatted.substring(0, 2) + '/' + formatted.substring(2, 4);
+  const createPaymentIntent = async () => {
+    try {
+      // Primeiro, busca a public key do Stripe passando o token
+      try {
+        const configResponse = await api.get(`/payment/stripe-config?token=${token}`);
+        if (configResponse.data.success && configResponse.data.public_key) {
+          setStripePublicKey(configResponse.data.public_key);
+        } else {
+          throw new Error(configResponse.data.error || 'Chave pública não retornada');
+        }
+      } catch (e) {
+        // Tenta usar variável de ambiente como fallback
+        const publicKey = process.env.REACT_APP_STRIPE_PUBLIC_KEY || '';
+        if (publicKey) {
+          setStripePublicKey(publicKey);
+        } else {
+          const errorMessage = e.response?.data?.error || e.message || 'Chave pública do Stripe não configurada.';
+          setError(errorMessage);
+          return;
+        }
       }
-      setFormData({ ...formData, [name]: formatted });
-    } else if (name === 'card_cvv') {
-      // Apenas números
-      setFormData({ ...formData, [name]: value.replace(/\D/g, '') });
-    } else {
-      setFormData({ ...formData, [name]: value });
+
+      // Cria o PaymentIntent
+      const response = await api.post('/payment/card/create-intent', {
+        token: token
+      });
+
+      if (response.data.success) {
+        setClientSecret(response.data.client_secret);
+        setPaymentIntentId(response.data.payment_intent_id);
+      } else {
+        throw new Error(response.data.error || 'Erro ao criar PaymentIntent');
+      }
+    } catch (err) {
+      setError(err.response?.data?.error || err.message || 'Erro ao inicializar pagamento');
     }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     
+    if (!stripe || !elementsRef.current || !cardElementRef.current) {
+      setError('Stripe não está carregado. Por favor, recarregue a página.');
+      return;
+    }
+
     setProcessing(true);
     setError('');
     setSuccess('');
 
     try {
-      const response = await api.post('/payment/card/process', {
-        token: token,
-        ...formData
-      });
+      if (!stripe || !cardElementRef.current) {
+        setError('Stripe não está carregado. Aguarde um momento e tente novamente.');
+        setProcessing(false);
+        return;
+      }
 
-      if (response.data.success) {
-        setSuccess(response.data.message || 'Pagamento processado com sucesso!');
-        
-        // Redireciona após 3 segundos
-        setTimeout(() => {
-          window.close();
-        }, 3000);
+      // Confirma o pagamento usando Stripe.js com confirmation_method automatic
+      const { error: confirmError, paymentIntent } = await stripe.confirmCardPayment(
+        clientSecret,
+        {
+          payment_method: {
+            card: cardElementRef.current,
+            billing_details: {
+              name: document.getElementById('card-name')?.value || 'Cliente',
+            },
+          },
+        }
+      );
+
+      if (confirmError) {
+        setError(confirmError.message || 'Erro ao processar pagamento');
+        setProcessing(false);
+        return;
+      }
+
+      // Verifica o status do pagamento
+      if (paymentIntent.status === 'succeeded') {
+        // Pagamento aprovado - confirma no backend
+        try {
+          const response = await api.post('/payment/card/confirm', {
+            token: token,
+            payment_intent_id: paymentIntent.id
+          });
+
+          if (response.data.success) {
+            setSuccess(response.data.message || 'Pagamento processado com sucesso!');
+            
+            // Redireciona após 3 segundos
+            setTimeout(() => {
+              window.close();
+            }, 3000);
+          } else {
+            throw new Error(response.data.error || 'Erro ao confirmar pagamento no servidor');
+          }
+        } catch (err) {
+          // Mesmo que o backend falhe, o pagamento já foi processado no Stripe
+          setError(err.response?.data?.error || err.message || 'Pagamento processado, mas houve erro ao atualizar status. Entre em contato com o suporte.');
+        }
+      } else if (paymentIntent.status === 'requires_action') {
+        // Requer ação adicional (3D Secure) - Stripe.js já deve ter tratado isso
+        // Mas vamos tentar confirmar novamente se necessário
+        setError('Pagamento requer autenticação adicional. Por favor, complete a autenticação.');
+      } else if (paymentIntent.status === 'requires_payment_method') {
+        setError('Método de pagamento inválido. Por favor, verifique os dados do cartão.');
+      } else if (paymentIntent.status === 'canceled') {
+        setError('Pagamento cancelado.');
       } else {
-        throw new Error(response.data.error || 'Erro ao processar pagamento');
+        setError(`Status do pagamento: ${paymentIntent.status}. Entre em contato com o suporte.`);
       }
     } catch (err) {
       setError(err.response?.data?.error || err.message || 'Erro ao processar pagamento. Tente novamente.');
@@ -171,78 +282,44 @@ const CardPayment = () => {
           </div>
         )}
 
+        {!stripePublicKey && (
+          <div className="alert alert-error">
+            ⚠️ Configuração do Stripe não encontrada. Entre em contato com o suporte.
+          </div>
+        )}
+
         <form onSubmit={handleSubmit} id="payment-form">
           <div className="form-group">
-            <label htmlFor="card_number">Número do Cartão</label>
+            <label htmlFor="card-name">Nome no Cartão</label>
             <input
               type="text"
-              id="card_number"
-              name="card_number"
-              value={formData.card_number}
-              onChange={handleChange}
-              placeholder="0000 0000 0000 0000"
-              maxLength="19"
+              id="card-name"
+              name="card-name"
+              placeholder="NOME COMO ESTÁ NO CARTÃO"
               required
-              disabled={processing}
+              disabled={processing || !stripe}
             />
           </div>
 
           <div className="form-group">
-            <label htmlFor="card_name">Nome no Cartão</label>
-            <input
-              type="text"
-              id="card_name"
-              name="card_name"
-              value={formData.card_name}
-              onChange={handleChange}
-              placeholder="NOME COMO ESTÁ NO CARTÃO"
-              required
-              disabled={processing}
-            />
-          </div>
-
-          <div className="form-row">
-            <div className="form-group">
-              <label htmlFor="card_expiry">Validade</label>
-              <input
-                type="text"
-                id="card_expiry"
-                name="card_expiry"
-                value={formData.card_expiry}
-                onChange={handleChange}
-                placeholder="MM/AA"
-                maxLength="5"
-                required
-                disabled={processing}
-              />
+            <label htmlFor="card-element">Dados do Cartão</label>
+            <div id="card-element" style={{ padding: '10px', border: '1px solid #ddd', borderRadius: '4px' }}>
+              {/* Stripe Elements será montado aqui */}
             </div>
-            <div className="form-group">
-              <label htmlFor="card_cvv">CVV</label>
-              <input
-                type="text"
-                id="card_cvv"
-                name="card_cvv"
-                value={formData.card_cvv}
-                onChange={handleChange}
-                placeholder="123"
-                maxLength="4"
-                required
-                disabled={processing}
-              />
-            </div>
+            <div id="card-errors" role="alert" style={{ color: '#dc3545', marginTop: '8px' }}></div>
           </div>
 
           <button 
             type="submit" 
             className="btn-submit" 
-            disabled={processing}
+            disabled={processing || !stripe || !clientSecret}
           >
             {processing ? 'Processando...' : `Pagar R$ ${parseFloat(transaction.amount || 0).toFixed(2).replace('.', ',')}`}
           </button>
         </form>
 
         <div className="security-info">
-          🔒 Seus dados estão seguros e criptografados
+          🔒 Seus dados estão seguros e criptografados pelo Stripe
         </div>
       </div>
     </div>
@@ -250,4 +327,3 @@ const CardPayment = () => {
 };
 
 export default CardPayment;
-

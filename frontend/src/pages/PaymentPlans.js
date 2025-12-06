@@ -3,9 +3,11 @@ import { useNavigate, useParams } from 'react-router-dom';
 import Layout from '../components/Layout';
 import paymentPlanService from '../services/paymentPlanService';
 import paymentCycleService from '../services/paymentCycleService';
+import useConfirm from '../hooks/useConfirm';
 import './PaymentPlans.css';
 
 const PaymentPlans = () => {
+  const { confirm, DialogComponent } = useConfirm();
   const navigate = useNavigate();
   const { botId } = useParams();
   const [paymentPlans, setPaymentPlans] = useState([]);
@@ -159,7 +161,12 @@ const PaymentPlans = () => {
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm('Tem certeza que deseja excluir este plano de pagamento?')) {
+    const confirmed = await confirm({
+      message: 'Tem certeza que deseja excluir este plano de pagamento?',
+      type: 'warning',
+    });
+    
+    if (!confirmed) {
       return;
     }
 
@@ -280,6 +287,7 @@ const PaymentPlans = () => {
 
   return (
     <Layout>
+      <DialogComponent />
       <div className="payment-plans-page">
         <div className="payment-plans-content">
           {/* Header Section */}

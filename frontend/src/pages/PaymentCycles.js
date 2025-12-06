@@ -2,9 +2,11 @@ import React, { useState, useEffect, useContext } from 'react';
 import Layout from '../components/Layout';
 import paymentCycleService from '../services/paymentCycleService';
 import { AuthContext } from '../contexts/AuthContext';
+import useConfirm from '../hooks/useConfirm';
 import './PaymentCycles.css';
 
 const PaymentCycles = () => {
+  const { confirm, DialogComponent } = useConfirm();
   const { isAdmin } = useContext(AuthContext);
   const [cycles, setCycles] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -99,7 +101,12 @@ const PaymentCycles = () => {
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm('Tem certeza que deseja excluir este ciclo de pagamento?')) {
+    const confirmed = await confirm({
+      message: 'Tem certeza que deseja excluir este ciclo de pagamento?',
+      type: 'warning',
+    });
+    
+    if (!confirmed) {
       return;
     }
 
@@ -125,6 +132,7 @@ const PaymentCycles = () => {
 
   return (
     <Layout>
+      <DialogComponent />
       <div className="payment-cycles-page">
         <div className="page-header">
           <h1 className="page-title">Ciclos de Pagamento</h1>

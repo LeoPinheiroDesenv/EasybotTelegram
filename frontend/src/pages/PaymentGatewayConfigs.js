@@ -2,9 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout';
 import paymentGatewayConfigService from '../services/paymentGatewayConfigService';
+import useConfirm from '../hooks/useConfirm';
 import './PaymentGatewayConfigs.css';
 
 const PaymentGatewayConfigs = () => {
+  const { confirm, DialogComponent } = useConfirm();
   const navigate = useNavigate();
   const [botId, setBotId] = useState(null);
   const [configs, setConfigs] = useState([]);
@@ -121,10 +123,23 @@ const PaymentGatewayConfigs = () => {
     setSuccess('');
 
     try {
+      // Prepara os dados para envio, garantindo que todos os campos sejam enviados
       const configToSave = {
-        ...formData,
-        bot_id: botId
+        gateway: formData.gateway || selectedGateway,
+        environment: formData.environment || selectedEnvironment,
+        bot_id: botId,
+        is_active: formData.is_active !== undefined ? formData.is_active : false,
+        webhook_url: formData.webhook_url || null,
       };
+
+      // Adiciona campos específicos por gateway
+      if (formData.gateway === 'mercadopago' || selectedGateway === 'mercadopago') {
+        configToSave.access_token = formData.access_token || '';
+      } else if (formData.gateway === 'stripe' || selectedGateway === 'stripe') {
+        configToSave.secret_key = formData.secret_key || '';
+        configToSave.public_key = formData.public_key || '';
+        configToSave.webhook_secret = formData.webhook_secret || null;
+      }
 
       if (editingConfig) {
         await paymentGatewayConfigService.updateConfig(editingConfig.id, configToSave);
@@ -138,12 +153,26 @@ const PaymentGatewayConfigs = () => {
       loadConfigs(botId);
       setTimeout(() => setSuccess(''), 3000);
     } catch (err) {
-      setError(err.response?.data?.error || 'Erro ao salvar configuração');
+      // Trata erros de validação
+      if (err.response?.data?.errors) {
+        const errors = err.response.data.errors;
+        const errorMessages = Object.keys(errors).map(key => {
+          return `${key}: ${Array.isArray(errors[key]) ? errors[key].join(', ') : errors[key]}`;
+        }).join('\n');
+        setError(errorMessages);
+      } else {
+        setError(err.response?.data?.error || err.message || 'Erro ao salvar configuração');
+      }
     }
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm('Tem certeza que deseja excluir esta configuração?')) {
+    const confirmed = await confirm({
+      message: 'Tem certeza que deseja excluir esta configuração?',
+      type: 'warning',
+    });
+    
+    if (!confirmed) {
       return;
     }
 
@@ -190,6 +219,7 @@ const PaymentGatewayConfigs = () => {
 
   return (
     <Layout>
+      <DialogComponent />
       <div className="payment-gateway-configs-page">
         <div className="payment-gateway-configs-content">
           <div className="page-header">
@@ -461,15 +491,16 @@ const PaymentGatewayConfigs = () => {
                       <small>Chave secreta do Stripe</small>
                     </div>
                     <div className="form-group">
-                      <label>Public Key</label>
+                      <label>Public Key *</label>
                       <input
                         type="text"
                         name="public_key"
                         value={formData.public_key}
                         onChange={handleChange}
+                        required
                         placeholder="pk_test_..."
                       />
-                      <small>Chave pública do Stripe (para uso no frontend)</small>
+                      <small>Chave pública do Stripe (para uso no frontend) - Obrigatória</small>
                     </div>
                     <div className="form-group">
                       <label>Webhook Secret</label>

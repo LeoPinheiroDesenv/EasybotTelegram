@@ -4,9 +4,11 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faUpload, faTrash } from '@fortawesome/free-solid-svg-icons';
 import Layout from '../components/Layout';
 import botService from '../services/botService';
+import useConfirm from '../hooks/useConfirm';
 import './WelcomeMessage.css';
 
 const WelcomeMessage = () => {
+  const { confirm, DialogComponent } = useConfirm();
   const navigate = useNavigate();
   const { botId } = useParams();
   
@@ -125,7 +127,12 @@ const WelcomeMessage = () => {
   };
 
   const handleMediaDelete = async (mediaNumber) => {
-    if (!window.confirm(`Tem certeza que deseja remover a mídia ${mediaNumber}?`)) {
+    const confirmed = await confirm({
+      message: `Tem certeza que deseja remover a mídia ${mediaNumber}?`,
+      type: 'warning',
+    });
+    
+    if (!confirmed) {
       return;
     }
 
@@ -177,6 +184,7 @@ const WelcomeMessage = () => {
   if (loadingData) {
     return (
       <Layout>
+        <DialogComponent />
         <div className="welcome-message-page">
           <div className="loading-container">Carregando...</div>
         </div>
@@ -187,6 +195,7 @@ const WelcomeMessage = () => {
   if (!botId) {
     return (
       <Layout>
+        <DialogComponent />
         <div className="welcome-message-page">
           <div className="error-container">
             <p>{error}</p>

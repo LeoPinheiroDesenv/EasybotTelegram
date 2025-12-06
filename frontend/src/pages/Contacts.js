@@ -4,9 +4,11 @@ import Layout from '../components/Layout';
 import contactService from '../services/contactService';
 import botService from '../services/botService';
 import groupManagementService from '../services/groupManagementService';
+import useConfirm from '../hooks/useConfirm';
 import './Contacts.css';
 
 const Contacts = () => {
+  const { confirm, DialogComponent } = useConfirm();
   const navigate = useNavigate();
   const [botId, setBotId] = useState(null);
   const [bots, setBots] = useState([]);
@@ -114,7 +116,12 @@ const Contacts = () => {
   };
 
   const handleBlock = async (contactId) => {
-    if (!window.confirm('Tem certeza que deseja bloquear este contato?')) {
+    const confirmed = await confirm({
+      message: 'Tem certeza que deseja bloquear este contato?',
+      type: 'warning',
+    });
+    
+    if (!confirmed) {
       return;
     }
 
@@ -205,7 +212,12 @@ const Contacts = () => {
       return;
     }
 
-    if (!window.confirm('Deseja sincronizar os membros do grupo? Isso irá buscar os administradores do grupo e salvá-los como contatos.')) {
+    const confirmed = await confirm({
+      message: 'Deseja sincronizar os membros do grupo? Isso irá buscar os administradores do grupo e salvá-los como contatos.',
+      type: 'info',
+    });
+    
+    if (!confirmed) {
       return;
     }
 
@@ -291,6 +303,7 @@ const Contacts = () => {
 
   return (
     <Layout>
+      <DialogComponent />
       <div className="contacts-page">
         <div className="contacts-main">
           <div className="contacts-content">

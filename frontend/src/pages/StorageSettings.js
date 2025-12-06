@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import Layout from '../components/Layout';
 import api from '../services/api';
+import useConfirm from '../hooks/useConfirm';
 import './StorageSettings.css';
 
 const StorageSettings = () => {
+  const { confirm, DialogComponent } = useConfirm();
   const [linkStatus, setLinkStatus] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -27,7 +29,12 @@ const StorageSettings = () => {
   };
 
   const createLink = async () => {
-    if (!window.confirm('Tem certeza que deseja criar o link simbólico do storage? Isso pode substituir um link existente.')) {
+    const confirmed = await confirm({
+      message: 'Tem certeza que deseja criar o link simbólico do storage? Isso pode substituir um link existente.',
+      type: 'warning',
+    });
+    
+    if (!confirmed) {
       return;
     }
 
@@ -86,6 +93,7 @@ const StorageSettings = () => {
 
   return (
     <Layout>
+      <DialogComponent />
       <div className="storage-settings-page">
         <div className="storage-settings-header">
           <h1>Configurações de Storage</h1>

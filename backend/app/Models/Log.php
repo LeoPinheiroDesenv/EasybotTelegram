@@ -20,6 +20,8 @@ class Log extends Model
         'details',
         'user_email',
         'ip_address',
+        'request',
+        'response',
     ];
 
     /**
@@ -31,6 +33,8 @@ class Log extends Model
     {
         return [
             'context' => 'array',
+            'request' => 'array',
+            'response' => 'array',
         ];
     }
 

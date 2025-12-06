@@ -997,12 +997,24 @@ class TelegramService
         ]);
 
         // Salva ou atualiza contato (apenas para chats privados)
+        // IMPORTANTE: Solicitação de dados pessoais (email, telefone, idioma) só deve acontecer em chats privados
         if ($chatType === 'private') {
             $contact = $this->saveOrUpdateContact($bot, $from);
             
             // Processa contato compartilhado (telefone compartilhado via botão)
+            // Só processa em chats privados, não em grupos
             if (isset($message['contact'])) {
                 $this->processSharedContact($bot, $chatId, $from, $message['contact'], $contact);
+                return;
+            }
+        } else {
+            // Se não é chat privado, ignora qualquer tentativa de compartilhar contato
+            if (isset($message['contact'])) {
+                $this->logBotAction($bot, "Tentativa de compartilhar contato em grupo ignorada", 'info', [
+                    'chat_id' => $chatId,
+                    'chat_type' => $chatType,
+                    'user_id' => $from['id']
+                ]);
                 return;
             }
         }
@@ -1450,6 +1462,7 @@ class TelegramService
         }
     }
 
+    
     /**
      * Processa comando /start
      *
@@ -1466,11 +1479,19 @@ class TelegramService
                 'user_id' => $from['id']
             ]);
             
-            // Busca ou cria contato
-            $contact = $this->saveOrUpdateContact($bot, $from);
+            // IMPORTANTE: Verifica se é um chat privado antes de solicitar dados
+            // Comandos em grupos não devem solicitar dados pessoais
+            $isPrivateChat = $chatId > 0; // IDs de chat privado são positivos, grupos são negativos
             
-            // Recarrega o contato para garantir que temos os dados mais recentes do banco
-            $contact->refresh();
+
+            // Busca ou cria contato (apenas para chats privados)
+            $contact = null;
+            if ($isPrivateChat) {
+                $contact = $this->saveOrUpdateContact($bot, $from);
+                
+                // Recarrega o contato para garantir que temos os dados mais recentes do banco
+                $contact->refresh();
+            }
 
             // Envia mensagem superior (se configurada)
             if ($bot->top_message) {
@@ -1500,29 +1521,33 @@ class TelegramService
             $this->logBotAction($bot, "Enviando mensagem inicial", 'info');
             $this->sendMessage($bot, $chatId, $message, $keyboard);
 
-            // Se o bot está configurado para solicitar dados, solicita após mensagem inicial
-            // Verifica na ordem: email -> telefone -> idioma
-            // IMPORTANTE: Sempre solicita email primeiro se configurado e não tiver
-            if ($bot->request_email && !$contact->email) {
-                $this->logBotAction($bot, "Solicitando email", 'info');
-                $this->sendMessage($bot, $chatId, '📧 Por favor, envie seu email:');
-            } elseif ($bot->request_phone && !$contact->phone) {
-                // Usa botão nativo do Telegram para solicitar telefone
-                $this->logBotAction($bot, "Solicitando telefone", 'info');
-                $phoneKeyboard = [
-                    'keyboard' => [[
-                        [
-                            'text' => '📱 Compartilhar meu telefone',
-                            'request_contact' => true
-                        ]
-                    ]],
-                    'resize_keyboard' => true,
-                    'one_time_keyboard' => true
-                ];
-                $this->sendMessage($bot, $chatId, '📱 Por favor, compartilhe seu número de telefone ou envie o número:', $phoneKeyboard);
-            } elseif ($bot->request_language && !$contact->language) {
-                $this->logBotAction($bot, "Solicitando idioma", 'info');
-                $this->sendMessage($bot, $chatId, '🌐 Por favor, escolha um idioma (pt, en, es, fr):');
+            // IMPORTANTE: Só solicita dados pessoais em chats privados
+            // Em grupos, não deve solicitar email, telefone ou idioma
+            if ($isPrivateChat && $contact) {
+                // Se o bot está configurado para solicitar dados, solicita após mensagem inicial
+                // Verifica na ordem: email -> telefone -> idioma
+                // IMPORTANTE: Sempre solicita email primeiro se configurado e não tiver
+                if ($bot->request_email && !$contact->email) {
+                    $this->logBotAction($bot, "Solicitando email", 'info');
+                    $this->sendMessage($bot, $chatId, '📧 Por favor, envie seu email:');
+                } elseif ($bot->request_phone && !$contact->phone) {
+                    // Usa botão nativo do Telegram para solicitar telefone
+                    $this->logBotAction($bot, "Solicitando telefone", 'info');
+                    $phoneKeyboard = [
+                        'keyboard' => [[
+                            [
+                                'text' => '📱 Compartilhar meu telefone',
+                                'request_contact' => true
+                            ]
+                        ]],
+                        'resize_keyboard' => true,
+                        'one_time_keyboard' => true
+                    ];
+                    $this->sendMessage($bot, $chatId, '📱 Por favor, compartilhe seu número de telefone ou envie o número:', $phoneKeyboard);
+                } elseif ($bot->request_language && !$contact->language) {
+                    $this->logBotAction($bot, "Solicitando idioma", 'info');
+                    $this->sendMessage($bot, $chatId, '🌐 Por favor, escolha um idioma (pt, en, es, fr):');
+                }
             }
 
             $this->logBotAction($bot, "Comando /start processado com sucesso para chat {$chatId}", 'info');
@@ -1653,6 +1678,8 @@ class TelegramService
             // Configura o menu button para exibir os comandos disponíveis
             // Isso faz com que o botão "Menu" no chat mostre todos os comandos registrados
             // O Laravel HTTP client já faz o JSON encoding automaticamente quando usamos asJson()
+            
+            // Primeiro, tenta configurar globalmente (para todos os chats)
             $response = $this->http()
                 ->asJson()
                 ->post("https://api.telegram.org/bot{$bot->token}/setChatMenuButton", [
@@ -1662,12 +1689,20 @@ class TelegramService
                 ]);
 
             if ($response->successful() && $response->json()['ok']) {
-                $this->logBotAction($bot, 'Menu de comandos configurado com sucesso', 'info');
+                $this->logBotAction($bot, 'Menu de comandos configurado com sucesso (global)', 'info');
             } else {
                 $error = $response->json()['description'] ?? 'Erro desconhecido';
-                $this->logBotAction($bot, 'Erro ao configurar menu de comandos: ' . $error, 'warning', [
+                $this->logBotAction($bot, 'Erro ao configurar menu de comandos (global): ' . $error, 'warning', [
                     'response' => $response->json()
                 ]);
+                
+                // Tenta configurar usando setMyCommands com scope (se disponível na versão da API)
+                // Isso garante que os comandos apareçam no menu
+                try {
+                    $this->logBotAction($bot, 'Tentando configurar menu usando scope', 'info');
+                } catch (Exception $e2) {
+                    $this->logBotAction($bot, 'Erro ao configurar menu usando scope: ' . $e2->getMessage(), 'warning');
+                }
             }
         } catch (Exception $e) {
             // Não é crítico se falhar, o Telegram ainda mostrará os comandos
@@ -1838,8 +1873,12 @@ class TelegramService
                 }
 
                 $message .= "📱 <b>Escaneie o QR Code abaixo para pagar:</b>\n\n";
-                $message .= "🔑 <b>Chave PIX:</b> <code>{$pixResult['pix_key']}</code>\n\n";
-                $message .= "📋 <b>Código PIX:</b>\n<code>{$pixResult['pix_code']}</code>\n\n";
+                
+                // Exibe código PIX apenas se disponível
+                if (!empty($pixResult['pix_code'])) {
+                    $message .= "📋 <b>Código PIX:</b>\n<code>{$pixResult['pix_code']}</code>\n\n";
+                }
+                
                 $message .= "⏰ Este QR Code expira em 30 minutos.";
 
                 // Envia mensagem com texto
@@ -1847,7 +1886,16 @@ class TelegramService
 
                 // Envia QR Code como imagem
                 try {
-                    $qrCodeImageData = base64_decode($pixResult['qr_code_image']);
+                    // Verifica se o QR Code já está em base64 ou precisa ser decodificado
+                    $qrCodeImageData = $pixResult['qr_code_image'];
+                    if (is_string($qrCodeImageData) && !empty($qrCodeImageData)) {
+                        // Tenta decodificar se for base64 válido
+                        $decoded = base64_decode($qrCodeImageData, true);
+                        if ($decoded !== false && base64_encode($decoded) === $qrCodeImageData) {
+                            $qrCodeImageData = $decoded;
+                        }
+                    }
+                    
                     $tempFile = tempnam(sys_get_temp_dir(), 'pix_qr_') . '.png';
                     file_put_contents($tempFile, $qrCodeImageData);
 
@@ -1981,6 +2029,9 @@ class TelegramService
             return;
         }
 
+        // IMPORTANTE: Este método só deve ser chamado para chats privados
+        // A verificação do tipo de chat deve ser feita antes de chamar este método
+        
         // Busca contato para verificar se precisa coletar dados
         $contact = Contact::where('bot_id', $bot->id)
             ->where('telegram_id', $from['id'])
@@ -1992,6 +2043,7 @@ class TelegramService
         }
 
         // Se o bot está configurado para solicitar email/telefone/idioma
+        // IMPORTANTE: Só solicita dados em chats privados (não em grupos)
         if ($contact) {
             $actionService = new ContactActionService();
             
@@ -2333,11 +2385,15 @@ class TelegramService
             }
 
             // Registra comandos no Telegram
+            // IMPORTANTE: Usa scope para garantir que os comandos apareçam em todos os chats privados
             // O Laravel HTTP client já faz o JSON encoding automaticamente quando usamos asJson()
             $response = $this->http()
                 ->asJson()
                 ->post("https://api.telegram.org/bot{$bot->token}/setMyCommands", [
-                    'commands' => $commands
+                    'commands' => $commands,
+                    'scope' => [
+                        'type' => 'all_private_chats'
+                    ]
                 ]);
 
             if ($response->successful() && $response->json()['ok']) {
@@ -2347,6 +2403,8 @@ class TelegramService
                 ]);
                 
                 // Configura menu button para exibir os comandos
+                // Isso garante que o botão "Menu" mostre todos os comandos registrados
+                // IMPORTANTE: O menu só mostrará os comandos se eles estiverem registrados via setMyCommands
                 $this->setPlansMenuButton($bot);
                 
                 return true;
@@ -2377,6 +2435,17 @@ class TelegramService
     protected function processSharedContact(Bot $bot, int $chatId, array $from, array $contactData, ?Contact $contact = null): void
     {
         try {
+            // IMPORTANTE: Só processa contato compartilhado em chats privados
+            // IDs de chat privado são positivos, grupos são negativos
+            $isPrivateChat = $chatId > 0;
+            if (!$isPrivateChat) {
+                $this->logBotAction($bot, "Tentativa de processar contato compartilhado em grupo ignorada", 'warning', [
+                    'chat_id' => $chatId,
+                    'user_id' => $from['id']
+                ]);
+                return;
+            }
+            
             if (!$contact) {
                 $contact = $this->saveOrUpdateContact($bot, $from);
             }

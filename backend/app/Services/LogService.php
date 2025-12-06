@@ -14,13 +14,17 @@ class LogService
      * @param string $level
      * @param array $context
      * @param int|null $botId
+     * @param array|null $request
+     * @param array|null $response
      * @return Log|null
      */
     public static function log(
         string $message,
         string $level = 'info',
         array $context = [],
-        ?int $botId = null
+        ?int $botId = null,
+        ?array $request = null,
+        ?array $response = null
     ): ?Log {
         try {
             $userEmail = null;
@@ -57,6 +61,8 @@ class LogService
                 'context' => !empty($context) ? $context : null,
                 'user_email' => $userEmail,
                 'ip_address' => $ipAddress,
+                'request' => $request,
+                'response' => $response,
             ]);
         } catch (\Exception $e) {
             // Se falhar, registra no log padrão do Laravel

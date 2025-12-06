@@ -2,9 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import Layout from '../components/Layout';
 import botAdministratorService from '../services/botAdministratorService';
+import useConfirm from '../hooks/useConfirm';
 import './Administrators.css';
 
 const Administrators = () => {
+  const { confirm, DialogComponent } = useConfirm();
   const navigate = useNavigate();
   const { botId } = useParams();
   
@@ -66,7 +68,12 @@ const Administrators = () => {
   };
 
   const handleDelete = async (adminId) => {
-    if (!window.confirm('Tem certeza que deseja remover este administrador?')) {
+    const confirmed = await confirm({
+      message: 'Tem certeza que deseja remover este administrador?',
+      type: 'warning',
+    });
+    
+    if (!confirmed) {
       return;
     }
 
@@ -155,6 +162,7 @@ const Administrators = () => {
 
   return (
     <Layout>
+      <DialogComponent />
       <div className="administrators-page">
         <div className="administrators-content">
           {/* Funções de administrador Section */}

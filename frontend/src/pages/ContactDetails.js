@@ -4,9 +4,11 @@ import Layout from '../components/Layout';
 import contactService from '../services/contactService';
 import botService from '../services/botService';
 import groupManagementService from '../services/groupManagementService';
+import useConfirm from '../hooks/useConfirm';
 import './ContactDetails.css';
 
 const ContactDetails = () => {
+  const { confirm, DialogComponent } = useConfirm();
   const { id } = useParams();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -94,7 +96,12 @@ const ContactDetails = () => {
   };
 
   const handleBlock = async () => {
-    if (!window.confirm('Tem certeza que deseja bloquear este contato?')) {
+    const confirmed = await confirm({
+      message: 'Tem certeza que deseja bloquear este contato?',
+      type: 'warning',
+    });
+    
+    if (!confirmed) {
       return;
     }
 
@@ -175,6 +182,7 @@ const ContactDetails = () => {
 
   return (
     <Layout>
+      <DialogComponent />
       <div className="contact-details-page">
         <div className="contact-details-header">
           <button onClick={() => navigate('/results/contacts')} className="btn-back">

@@ -133,16 +133,14 @@ const Header = ({ onMenuClick }) => {
             <div className="logo-title">Easy</div>
             <div className="logo-subtitle">Página inicial</div>
           </div>
-        </div>
-      </div>
-
-      <div className="header-center">
-        <div className="header-title">
-          <span className="header-back-icon">←</span>
-          <div>
-            <h1>{getPageTitle()}</h1>
-            <p>{getPageTitle()}</p>
+          <div className="header-title">
+          <div style={{ marginLeft: '20px' }}>
+          <span className=""></span>
+            <h1>
+                {getPageTitle()}
+                </h1>
           </div>
+        </div>
         </div>
       </div>
 

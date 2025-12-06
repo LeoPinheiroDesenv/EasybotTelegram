@@ -5,9 +5,11 @@ import { faEdit, faTrash } from '@fortawesome/free-solid-svg-icons';
 import Layout from '../components/Layout';
 import botService from '../services/botService';
 import paymentPlanService from '../services/paymentPlanService';
+import useConfirm from '../hooks/useConfirm';
 import './Groups.css';
 
 const Groups = () => {
+  const { confirm, DialogComponent } = useConfirm();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   let botId = searchParams.get('botId');
@@ -106,7 +108,12 @@ const Groups = () => {
   };
 
   const handleDelete = async (groupId) => {
-    if (!window.confirm('Tem certeza que deseja deletar este grupo?')) {
+    const confirmed = await confirm({
+      message: 'Tem certeza que deseja deletar este grupo?',
+      type: 'warning',
+    });
+    
+    if (!confirmed) {
       return;
     }
 
@@ -176,6 +183,7 @@ const Groups = () => {
   if (loadingData) {
     return (
       <Layout>
+        <DialogComponent />
         <div className="groups-page">
           <div className="loading-container">Carregando...</div>
         </div>
@@ -186,6 +194,7 @@ const Groups = () => {
   if (!botId) {
     return (
       <Layout>
+        <DialogComponent />
         <div className="groups-page">
           <div className="error-container">
             <p>{error}</p>

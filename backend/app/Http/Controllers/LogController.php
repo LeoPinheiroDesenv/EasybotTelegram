@@ -73,6 +73,22 @@ class LogController extends Controller
                         }
                     }
                     
+                    // Garante que request seja um objeto/array se for string JSON
+                    if (isset($formatted['request']) && is_string($formatted['request'])) {
+                        $decoded = json_decode($formatted['request'], true);
+                        if (json_last_error() === JSON_ERROR_NONE) {
+                            $formatted['request'] = $decoded;
+                        }
+                    }
+                    
+                    // Garante que response seja um objeto/array se for string JSON
+                    if (isset($formatted['response']) && is_string($formatted['response'])) {
+                        $decoded = json_decode($formatted['response'], true);
+                        if (json_last_error() === JSON_ERROR_NONE) {
+                            $formatted['response'] = $decoded;
+                        }
+                    }
+                    
                     // Adiciona informações do bot se disponível
                     if ($log->bot) {
                         $formatted['bot_name'] = $log->bot->name;
@@ -118,6 +134,22 @@ class LogController extends Controller
                 }
             }
             
+            // Garante que request seja um objeto/array se for string JSON
+            if (isset($formatted['request']) && is_string($formatted['request'])) {
+                $decoded = json_decode($formatted['request'], true);
+                if (json_last_error() === JSON_ERROR_NONE) {
+                    $formatted['request'] = $decoded;
+                }
+            }
+            
+            // Garante que response seja um objeto/array se for string JSON
+            if (isset($formatted['response']) && is_string($formatted['response'])) {
+                $decoded = json_decode($formatted['response'], true);
+                if (json_last_error() === JSON_ERROR_NONE) {
+                    $formatted['response'] = $decoded;
+                }
+            }
+            
             if ($log->bot) {
                 $formatted['bot_name'] = $log->bot->name;
                 $formatted['bot_username'] = $log->bot->username;
@@ -129,6 +161,28 @@ class LogController extends Controller
         } catch (\Exception $e) {
             return response()->json([
                 'error' => 'Failed to fetch log',
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Remove todos os registros de log
+     */
+    public function deleteAll(): JsonResponse
+    {
+        try {
+            $deletedCount = Log::query()->delete();
+
+            return response()->json([
+                'success' => true,
+                'message' => "Todos os logs foram removidos com sucesso. {$deletedCount} registro(s) deletado(s).",
+                'deleted_count' => $deletedCount
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Erro ao remover logs',
                 'message' => $e->getMessage()
             ], 500);
         }

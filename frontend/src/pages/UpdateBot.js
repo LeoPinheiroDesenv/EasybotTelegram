@@ -283,6 +283,16 @@ const UpdateBot = () => {
               <h2 className="section-title">Informações gerais</h2>
               
               <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                
+              <button
+                onClick={handleSetWebhook}
+                className="btn btn-primary"
+                disabled={loading || settingWebhook}
+                style={{ flex: 1, minWidth: '250px', backgroundColor: '#3b82f6', color: 'white'}}
+              >
+                {settingWebhook ? 'Configurando webhook...' : '🔗 Verificar e setar o webhook'}
+              </button>
+                
                 <button 
                   onClick={handleInitialize}
                   className="btn btn-primary"
@@ -549,19 +559,6 @@ const UpdateBot = () => {
           </div>
 
           {/* Botões de verificação e configuração */}
-          <div className="update-section">
-            <h2 className="section-title">Verificação e Configuração</h2>
-            <div className="action-buttons-vertical">
-              
-              <button
-                onClick={handleSetWebhook}
-                className="btn btn-secondary"
-                disabled={loading || settingWebhook}
-              >
-                {settingWebhook ? 'Configurando webhook...' : '🔗 Verificar e setar o webhook'}
-              </button>
-            </div>
-          </div>
 
           {/* Action buttons */}
           <div className="action-buttons">

@@ -17,6 +17,7 @@ use App\Http\Controllers\RedirectButtonController;
 use App\Http\Controllers\AlertController;
 use App\Http\Controllers\FtpController;
 use App\Http\Controllers\StorageController;
+use App\Http\Controllers\ArtisanController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -34,7 +35,9 @@ Route::post('/auth/password/reset', [AuthController::class, 'resetPassword']);
 
 // Rotas públicas de pagamento (sem autenticação)
 Route::get('/payment/transaction/{token}', [PaymentController::class, 'getTransaction']);
-Route::post('/payment/card/process', [PaymentController::class, 'processCreditCard']);
+Route::get('/payment/stripe-config', [PaymentController::class, 'getStripeConfig']);
+Route::post('/payment/card/create-intent', [PaymentController::class, 'createPaymentIntent']);
+Route::post('/payment/card/confirm', [PaymentController::class, 'confirmPayment']);
 
 // Protected routes
 Route::middleware('auth:api')->group(function () {
@@ -162,8 +165,16 @@ Route::middleware('auth:api')->group(function () {
     Route::post('/storage/link/create', [StorageController::class, 'createStorageLink']);
     Route::post('/storage/test', [StorageController::class, 'testStorageAccess']);
 
+    // Artisan commands routes (super admin only)
+    Route::middleware('super_admin')->group(function () {
+        Route::get('/artisan/commands', [ArtisanController::class, 'availableCommands']);
+        Route::post('/artisan/execute', [ArtisanController::class, 'execute']);
+        Route::post('/artisan/clear-all-caches', [ArtisanController::class, 'clearAllCaches']);
+    });
+
     // Log routes (super admin only)
     Route::middleware('super_admin')->group(function () {
+        Route::delete('logs', [LogController::class, 'deleteAll']);
         Route::apiResource('logs', LogController::class);
     });
 });

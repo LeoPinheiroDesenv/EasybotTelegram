@@ -2,9 +2,11 @@ import React, { useState, useEffect, useContext } from 'react';
 import { AuthContext } from '../contexts/AuthContext';
 import Layout from '../components/Layout';
 import userGroupService from '../services/userGroupService';
+import useConfirm from '../hooks/useConfirm';
 import './UserGroups.css';
 
 const UserGroups = () => {
+  const { confirm, DialogComponent } = useConfirm();
   const [groups, setGroups] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -107,7 +109,12 @@ const UserGroups = () => {
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm('Tem certeza que deseja excluir este grupo? Usuários associados a este grupo perderão suas permissões.')) {
+    const confirmed = await confirm({
+      message: 'Tem certeza que deseja excluir este grupo? Usuários associados a este grupo perderão suas permissões.',
+      type: 'warning',
+    });
+    
+    if (!confirmed) {
       return;
     }
 
@@ -234,6 +241,7 @@ const UserGroups = () => {
 
   return (
     <Layout>
+      <DialogComponent />
       <div className="user-groups-page">
         <div className="user-groups-header">
           <h1>Grupos de Usuários</h1>

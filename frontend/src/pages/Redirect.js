@@ -4,9 +4,11 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faEdit, faTrash } from '@fortawesome/free-solid-svg-icons';
 import Layout from '../components/Layout';
 import redirectButtonService from '../services/redirectButtonService';
+import useConfirm from '../hooks/useConfirm';
 import './Redirect.css';
 
 const Redirect = () => {
+  const { confirm, DialogComponent } = useConfirm();
   const navigate = useNavigate();
   const { botId } = useParams();
   
@@ -75,7 +77,12 @@ const Redirect = () => {
   };
 
   const handleDelete = async (buttonId) => {
-    if (!window.confirm('Tem certeza que deseja deletar este botão?')) {
+    const confirmed = await confirm({
+      message: 'Tem certeza que deseja deletar este botão?',
+      type: 'warning',
+    });
+    
+    if (!confirmed) {
       return;
     }
 
@@ -169,6 +176,7 @@ const Redirect = () => {
 
   return (
     <Layout>
+      <DialogComponent />
       <div className="redirect-page">
         <div className="redirect-content">
           <div className="redirect-header">

@@ -4,9 +4,11 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faEdit, faTrash, faPlus, faCheck, faTimes, faSync } from '@fortawesome/free-solid-svg-icons';
 import Layout from '../components/Layout';
 import botCommandService from '../services/botCommandService';
+import useConfirm from '../hooks/useConfirm';
 import './Commands.css';
 
 const Commands = () => {
+  const { confirm, DialogComponent } = useConfirm();
   const navigate = useNavigate();
   const { botId } = useParams();
   
@@ -84,7 +86,12 @@ const Commands = () => {
   };
 
   const handleDelete = async (commandId) => {
-    if (!window.confirm('Tem certeza que deseja excluir este comando?')) {
+    const confirmed = await confirm({
+      message: 'Tem certeza que deseja excluir este comando?',
+      type: 'warning',
+    });
+    
+    if (!confirmed) {
       return;
     }
 
@@ -156,7 +163,12 @@ const Commands = () => {
   };
 
   const handleRegisterCommands = async () => {
-    if (!window.confirm('Deseja registrar os comandos no Telegram? Isso atualizará a lista de comandos disponíveis no bot.')) {
+    const confirmed = await confirm({
+      message: 'Deseja registrar os comandos no Telegram? Isso atualizará a lista de comandos disponíveis no bot.',
+      type: 'info',
+    });
+    
+    if (!confirmed) {
       return;
     }
 
@@ -186,7 +198,12 @@ const Commands = () => {
   };
 
   const handleDeleteTelegramCommand = async (commandName) => {
-    if (!window.confirm(`Tem certeza que deseja deletar o comando "/${commandName}" do Telegram?`)) {
+    const confirmed = await confirm({
+      message: `Tem certeza que deseja deletar o comando "/${commandName}" do Telegram?`,
+      type: 'warning',
+    });
+    
+    if (!confirmed) {
       return;
     }
 
@@ -230,6 +247,7 @@ const Commands = () => {
 
   return (
     <Layout>
+      <DialogComponent />
       <div className="commands-container">
         <div className="commands-header">
           <h1>Comandos do Bot</h1>
