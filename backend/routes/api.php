@@ -19,6 +19,7 @@ use App\Http\Controllers\FtpController;
 use App\Http\Controllers\StorageController;
 use App\Http\Controllers\ArtisanController;
 use App\Http\Controllers\BotFatherController;
+use App\Http\Controllers\PaymentStatusController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -118,6 +119,12 @@ Route::middleware('auth:api')->group(function () {
     Route::post('/payments/credit-card', [PaymentController::class, 'processCreditCard']);
     Route::post('/payments/webhook/mercadopago', [PaymentController::class, 'mercadoPagoWebhook']);
     Route::post('/payments/webhook/stripe', [PaymentController::class, 'stripeWebhook']);
+
+    // Payment Status routes
+    Route::get('/payment-status/contact/{contactId}', [PaymentStatusController::class, 'getContactStatus']);
+    Route::get('/payment-status/bot/{botId}', [PaymentStatusController::class, 'getBotStatuses']);
+    Route::post('/payment-status/check-expired/{botId?}', [PaymentStatusController::class, 'checkExpiredPayments']);
+    Route::post('/payment-status/check-expiring/{botId?}', [PaymentStatusController::class, 'checkExpiringPayments']);
 
     // Payment Gateway Config routes
     Route::get('/payment-gateway-configs/config', [PaymentGatewayConfigController::class, 'getConfig']);

@@ -1,5 +1,12 @@
 .telegram-groups-page {
-  padding: 20px;
+  min-height: calc(100vh - 80px);
+  padding: 32px;
+  background-color: #ffffff;
+}
+
+.telegram-groups-content {
+  max-width: 1200px;
+  margin: 0 auto;
 }
 
 .page-header {

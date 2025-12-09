@@ -59,12 +59,13 @@ class BotFatherController extends Controller
             $token = $bot->token;
             
             // Busca informações do bot via API do Telegram
+            // Usa o mesmo scope usado ao registrar comandos (all_private_chats)
             $info = [
                 'name' => $this->getMyName($token),
                 'description' => $this->getMyDescription($token),
                 'short_description' => $this->getMyShortDescription($token),
                 'about' => $this->getMyAbout($token),
-                'commands' => $this->getMyCommands($token),
+                'commands' => $this->getMyCommands($token, ['type' => 'all_private_chats']),
                 'menu_button' => $this->getChatMenuButton($token),
                 'default_administrator_rights' => $this->getMyDefaultAdministratorRights($token),
             ];
@@ -308,7 +309,16 @@ class BotFatherController extends Controller
             $forChannels = $request->has('for_channels') ? (bool)$request->for_channels : false;
             $currentRights = $this->getMyDefaultAdministratorRights($bot->token, $forChannels);
             
-            // Lista completa de todas as permissões possíveis
+            Log::info('BotFather: Processando direitos de administrador', [
+                'bot_id' => $botId,
+                'request_rights' => $request->rights,
+                'current_rights' => $currentRights,
+                'for_channels' => $forChannels,
+                'current_rights_is_array' => is_array($currentRights),
+                'current_rights_is_empty' => is_array($currentRights) && empty($currentRights)
+            ]);
+            
+            // Lista completa de todas as permissões possíveis do Telegram
             $allPermissions = [
                 'is_anonymous',
                 'can_manage_chat',
@@ -332,22 +342,22 @@ class BotFatherController extends Controller
                 $allPermissions[] = 'can_read_all_group_messages';
             }
             
-            // Mescla os direitos atuais com os novos direitos
-            // Prioridade: 1) Valores enviados na requisição, 2) Valores atuais, 3) false (padrão)
-            $finalRights = [];
+            // Inicia com os direitos atuais (se existirem e forem array)
+            $finalRights = is_array($currentRights) && !empty($currentRights) ? $currentRights : [];
             
-            // Primeiro, processa todas as permissões conhecidas
+            // Aplica as permissões enviadas na requisição sobre os direitos atuais
+            // Se uma permissão foi enviada na requisição, usa o valor enviado
+            // Se não foi enviada mas existe nos direitos atuais, mantém o valor atual
             foreach ($allPermissions as $permission) {
-                // Se a permissão foi enviada na requisição, usa o valor enviado
                 if (isset($request->rights[$permission])) {
+                    // Permissão foi explicitamente enviada na requisição
                     $finalRights[$permission] = (bool)$request->rights[$permission];
-                } 
-                // Caso contrário, mantém o valor atual se existir
-                elseif ($currentRights && isset($currentRights[$permission])) {
-                    $finalRights[$permission] = (bool)$currentRights[$permission];
-                }
-                // Se não existe nem na requisição nem nos direitos atuais, define como false
-                else {
+                } elseif (isset($finalRights[$permission])) {
+                    // Mantém o valor atual se existir
+                    $finalRights[$permission] = (bool)$finalRights[$permission];
+                } else {
+                    // Se não existe nem na requisição nem nos direitos atuais, define como false
+                    // Isso garante que todas as permissões sejam enviadas ao Telegram
                     $finalRights[$permission] = false;
                 }
             }
@@ -355,10 +365,21 @@ class BotFatherController extends Controller
             // Adiciona quaisquer permissões adicionais que foram enviadas na requisição
             // (caso o Telegram adicione novas permissões no futuro)
             foreach ($request->rights as $key => $value) {
-                if (!isset($finalRights[$key])) {
+                if (!in_array($key, $allPermissions)) {
                     $finalRights[$key] = (bool)$value;
                 }
             }
+            
+            // Garante que todas as permissões sejam booleanas
+            foreach ($finalRights as $key => $value) {
+                $finalRights[$key] = (bool)$value;
+            }
+
+            Log::info('BotFather: Direitos finais preparados para envio', [
+                'bot_id' => $botId,
+                'final_rights' => $finalRights,
+                'rights_count' => count($finalRights)
+            ]);
 
             $data = ['rights' => $finalRights];
             if ($request->has('for_channels')) {

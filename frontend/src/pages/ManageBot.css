@@ -1,12 +1,17 @@
 .manage-bot-wrapper {
   width: 100%;
-  padding: 20px;
-  max-width: 1400px;
-  margin: 0 auto;
+  padding: 0;
+  max-width: 100%;
+  margin: 0;
+  box-sizing: border-box;
+  display: block;
 }
 
 .manage-bot-container {
   width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  display: block;
 }
 
 .manage-bot-header {
@@ -14,8 +19,11 @@
   justify-content: space-between;
   align-items: center;
   margin-bottom: 24px;
-  padding-bottom: 16px;
+  padding: 0 0 16px 0;
   border-bottom: 2px solid #e9ecef;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .manage-bot-header h1 {
@@ -43,6 +51,9 @@
   border-bottom: 2px solid #e9ecef;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .manage-bot-tabs::-webkit-scrollbar {
@@ -94,15 +105,19 @@
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   min-height: 400px;
   width: 100%;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
+  max-width: 100%;
+  overflow: visible;
+  display: block;
+  box-sizing: border-box;
+  padding: 0;
 }
 
 /* Quando as páginas estão dentro do ManageBot, padronizamos o layout */
 .manage-bot-content > * {
-  width: 100%;
+  width: 100% !important;
+  max-width: 100% !important;
   flex: 1;
+  box-sizing: border-box;
 }
 
 /* Remove padding e max-width duplicados das páginas quando dentro do ManageBot */
@@ -123,7 +138,7 @@
   box-sizing: border-box;
 }
 
-/* Padroniza containers internos - TODOS com padding de 24px e ocupando 100% */
+/* Padroniza containers internos - TODOS com padding de 32px e ocupando 100% */
 .manage-bot-content .welcome-message-content,
 .manage-bot-content .payment-plans-content,
 .manage-bot-content .redirect-content,
@@ -132,9 +147,12 @@
 .manage-bot-content .telegram-groups-content {
   max-width: 100% !important;
   margin: 0 !important;
-  padding: 24px !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  padding: 32px !important;
   width: 100% !important;
   box-sizing: border-box;
+  display: block;
 }
 
 /* Para páginas que não têm container interno, aplica padding diretamente */
@@ -156,8 +174,8 @@
 .manage-bot-content .commands-content > *,
 .manage-bot-content .administrators-content > *,
 .manage-bot-content .telegram-groups-content > * {
-  width: 100%;
-  max-width: 100%;
+  width: 100% !important;
+  max-width: 100% !important;
   box-sizing: border-box;
 }
 
@@ -166,9 +184,7 @@
   width: 100% !important;
   max-width: 100% !important;
   margin: 0 !important;
-  gap: 24px;
-  display: grid;
-  grid-template-columns: 1fr 350px;
+  display: block;
 }
 
 .manage-bot-content .update-bot-main {
@@ -177,10 +193,6 @@
   min-width: 0 !important;
 }
 
-.manage-bot-content .update-bot-sidebar {
-  width: 100%;
-  max-width: 100%;
-}
 
 /* Garante que headers e seções ocupem todo o espaço */
 .manage-bot-content .payment-plans-header,
@@ -189,11 +201,8 @@
   width: 100% !important;
   max-width: 100% !important;
   box-sizing: border-box;
-}
-
-.manage-bot-content .payment-plans-header {
-  padding: 24px !important;
-  margin-bottom: 24px;
+  padding: 0 !important;
+  margin-bottom: 24px !important;
 }
 
 /* Garante que cards e seções ocupem todo o espaço */
@@ -205,6 +214,26 @@
   width: 100% !important;
   max-width: 100% !important;
   box-sizing: border-box;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+}
+
+/* Força que todos os elementos dentro do payment-plans-content ocupem 100% */
+.manage-bot-content .payment-plans-content .payment-plans-header,
+.manage-bot-content .payment-plans-content .earnings-card,
+.manage-bot-content .payment-plans-content .payment-plans-section {
+  width: 100% !important;
+  max-width: 100% !important;
+}
+
+/* Garante que o header-text não limite a largura */
+.manage-bot-content .header-text {
+  max-width: 100% !important;
+  flex: 1;
+}
+
+.manage-bot-content .header-text p {
+  max-width: 100% !important;
 }
 
 /* Garante que tabelas ocupem 100% */
@@ -243,6 +272,14 @@
   width: 100% !important;
   margin: 0 !important;
   padding: 0 !important;
+  box-sizing: border-box;
+}
+
+/* Garante que seções, divs e elementos de bloco ocupem 100% */
+.manage-bot-content section,
+.manage-bot-content div:not(.btn):not(button):not(input):not(textarea):not(select) {
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .loading {
@@ -259,10 +296,52 @@
   font-size: 16px;
 }
 
+/* Garante que o wrapper ocupe 100% mesmo dentro do main-content */
+.main-content .manage-bot-wrapper {
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+/* Compensa o padding do main-content para ocupar toda a largura */
+.main-content > .manage-bot-wrapper {
+  margin-left: -32px;
+  margin-right: -32px;
+  padding-left: 32px;
+  padding-right: 32px;
+  width: calc(100% + 64px);
+  max-width: calc(100% + 64px);
+  box-sizing: border-box;
+}
+
+@media (max-width: 1024px) {
+  .main-content > .manage-bot-wrapper {
+    margin-left: -24px;
+    margin-right: -24px;
+    padding-left: 24px;
+    padding-right: 24px;
+    width: calc(100% + 48px);
+    max-width: calc(100% + 48px);
+  }
+}
+
+@media (max-width: 768px) {
+  .main-content > .manage-bot-wrapper {
+    margin-left: -16px;
+    margin-right: -16px;
+    padding-left: 16px;
+    padding-right: 16px;
+    width: calc(100% + 32px);
+    max-width: calc(100% + 32px);
+  }
+}
+
 /* Responsividade para mobile */
 @media (max-width: 768px) {
   .manage-bot-wrapper {
-    padding: 12px;
+    padding: 0;
   }
 
   .manage-bot-header {

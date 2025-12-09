@@ -12,7 +12,9 @@ import {
   faBullhorn,
   faFileAlt,
   faCog,
-  faSignOutAlt
+  faSignOutAlt,
+  faCreditCard,
+  faClock
 } from '@fortawesome/free-solid-svg-icons';
 import { AuthContext } from '../contexts/AuthContext';
 import billingService from '../services/billingService';
@@ -95,11 +97,13 @@ const Sidebar = ({ isOpen, onClose }) => {
   }, []);
 
   const botSubmenuItems = [
+    { path: '/bot/list', label: 'Listar bots' },
     { path: '/bot/create', label: 'Criar novo bot' },
     { path: '/bot/manage', label: 'Gerenciar Bot', requiresBot: true },
   ];
 
   const isBillingActive = location.pathname === '/billing';
+  const isPaymentStatusActive = location.pathname.startsWith('/payment-status');
 
   const getIcon = (iconType) => {
     const icons = {
@@ -121,6 +125,7 @@ const Sidebar = ({ isOpen, onClose }) => {
   // Detecta qualquer rota de bot exceto /bot/create
   const isBotSubmenuActive = location.pathname.startsWith('/bot') && 
     !location.pathname.match(/^\/bot\/create$/);
+  const isBotListActive = location.pathname === '/bot/list';
   const isResultsActive = location.pathname.startsWith('/results');
   const isMarketingActive = location.pathname.startsWith('/marketing');
   // Menu de Configurações está ativo para /settings, /users, /user-groups, /logs, /ftp e /botfather
@@ -197,6 +202,19 @@ const Sidebar = ({ isOpen, onClose }) => {
             >
               <span className="sidebar-icon">{getIcon('chart')}</span>
               <span className="sidebar-label">Faturamento</span>
+            </Link>
+          )}
+
+          {hasMenuAccess('billing') && (
+            <Link
+              to={`/payment-status${localStorage.getItem('selectedBotId') ? `/${localStorage.getItem('selectedBotId')}` : ''}`}
+              className={`sidebar-item ${isPaymentStatusActive ? 'active' : ''}`}
+              onClick={onClose}
+            >
+              <span className="sidebar-icon">
+                <FontAwesomeIcon icon={faCreditCard} />
+              </span>
+              <span className="sidebar-label">Status de Pagamentos</span>
             </Link>
           )}
 

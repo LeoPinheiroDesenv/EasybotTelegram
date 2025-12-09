@@ -1,7 +1,7 @@
 .redirect-page {
-  padding: 24px;
-  min-height: 100vh;
-  background-color: #f9fafb;
+  min-height: calc(100vh - 80px);
+  padding: 32px;
+  background-color: #ffffff;
 }
 
 .redirect-content {
@@ -10,7 +10,7 @@
 }
 
 .redirect-header {
-  margin-bottom: 24px;
+  margin-bottom: 40px;
 }
 
 .redirect-title {

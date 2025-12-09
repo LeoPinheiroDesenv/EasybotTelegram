@@ -143,15 +143,57 @@ class PaymentService
                 throw new Exception('Código PIX não retornado pelo Mercado Pago.');
             }
 
-            // Gera QR Code como imagem usando o código PIX do Mercado Pago
-            $qrCodeImage = null;
-            if ($pixCodeBase64) {
-                // Usa o QR Code base64 retornado pelo Mercado Pago
-                $qrCodeImage = $pixCodeBase64;
-            } else {
-                // Gera QR Code localmente usando o código PIX
-                $qrCodeImage = $this->generateQrCodeImage($pixCode);
+            // Normaliza o código PIX: remove quebras de linha, espaços extras e caracteres invisíveis
+            // O código PIX EMV deve ser uma string contínua sem espaços ou quebras
+            // IMPORTANTE: O código PIX EMV contém apenas caracteres ASCII imprimíveis (0x20-0x7E)
+            // Não devemos remover caracteres válidos do código
+            $pixCodeOriginal = $pixCode;
+            $pixCode = trim($pixCode);
+            // Remove apenas espaços em branco e quebras de linha (whitespace)
+            // Mantém todos os caracteres ASCII imprimíveis (0x20-0x7E)
+            $pixCode = preg_replace('/\s+/', '', $pixCode);
+            // Remove apenas caracteres de controle (0x00-0x1F e 0x7F) mas mantém o resto
+            $pixCode = preg_replace('/[\x00-\x1F\x7F]/', '', $pixCode);
+            // NÃO removemos caracteres não-ASCII aqui, pois o código PIX pode conter
+            // caracteres válidos que não são ASCII padrão (embora raro)
+            
+            // Valida se o código PIX começa com "000201" (padrão EMV para PIX)
+            if (!str_starts_with($pixCode, '000201')) {
+                Log::error('Código PIX em formato incorreto - não começa com 000201', [
+                    'pix_code_start' => substr($pixCode, 0, 50),
+                    'pix_code_length' => strlen($pixCode),
+                    'pix_code_original_start' => substr($pixCodeOriginal, 0, 50)
+                ]);
+                throw new Exception('Código PIX retornado pelo Mercado Pago está em formato inválido.');
             }
+            
+            // Valida comprimento mínimo do código PIX (deve ter pelo menos 100 caracteres)
+            if (strlen($pixCode) < 100) {
+                Log::error('Código PIX muito curto', [
+                    'pix_code_length' => strlen($pixCode),
+                    'pix_code_start' => substr($pixCode, 0, 50)
+                ]);
+                throw new Exception('Código PIX retornado pelo Mercado Pago está incompleto.');
+            }
+            
+            Log::info('Código PIX extraído e normalizado com sucesso', [
+                'pix_code_length' => strlen($pixCode),
+                'pix_code_start' => substr($pixCode, 0, 20),
+                'pix_code_end' => substr($pixCode, -20),
+                'is_valid_format' => str_starts_with($pixCode, '000201')
+            ]);
+
+            // Gera QR Code como imagem usando o código PIX normalizado
+            // IMPORTANTE: Sempre geramos o QR Code localmente usando o código PIX normalizado
+            // para garantir que o QR Code contenha exatamente o mesmo código que será exibido
+            // O QR Code base64 do Mercado Pago pode ter sido gerado com o código original
+            // que pode conter espaços ou quebras de linha, tornando-o inválido
+            $qrCodeImage = $this->generateQrCodeImage($pixCode);
+            
+            Log::info('QR Code gerado localmente usando código PIX normalizado', [
+                'pix_code_length' => strlen($pixCode),
+                'has_mercadopago_base64' => !empty($pixCodeBase64)
+            ]);
 
             // Salva QR Code temporariamente (opcional)
             $qrCodePath = $this->saveQrCodeImage($transactionId, $qrCodeImage);
@@ -225,33 +267,70 @@ class PaymentService
     protected function generateQrCodeImage(string $pixCode): string
     {
         try {
-            // Tenta gerar PNG
+            // Garante que o código PIX está normalizado antes de gerar o QR Code
+            $pixCode = trim($pixCode);
+            $pixCode = preg_replace('/\s+/', '', $pixCode);
+            $pixCode = preg_replace('/[\x00-\x1F\x7F]/', '', $pixCode);
+            
+            // Valida o código antes de gerar o QR Code
+            if (!str_starts_with($pixCode, '000201')) {
+                throw new Exception('Código PIX inválido para geração de QR Code: não começa com 000201');
+            }
+            
+            if (strlen($pixCode) < 100) {
+                throw new Exception('Código PIX muito curto para geração de QR Code');
+            }
+            
+            Log::debug('Gerando QR Code para código PIX', [
+                'pix_code_length' => strlen($pixCode),
+                'pix_code_start' => substr($pixCode, 0, 20)
+            ]);
+            
+            // Tenta gerar PNG (melhor qualidade para QR Codes)
             $hasImagick = extension_loaded('imagick');
             $hasGd = extension_loaded('gd');
 
             if ($hasImagick || $hasGd) {
                 try {
+                    // Usa error correction 'H' (High) para máxima confiabilidade
+                    // Tamanho 300px com margem 2 para melhor leitura
                     $qrCodeData = QrCode::format('png')
                         ->size(300)
                         ->margin(2)
                         ->errorCorrection('H')
                         ->generate($pixCode);
                     
+                    Log::debug('QR Code PNG gerado com sucesso', [
+                        'image_size' => strlen($qrCodeData)
+                    ]);
+                    
                     return base64_encode($qrCodeData);
                 } catch (Exception $e) {
+                    Log::warning('Erro ao gerar QR Code PNG, tentando SVG', [
+                        'error' => $e->getMessage()
+                    ]);
                     // Fallback para SVG
                 }
             }
 
-            // Fallback: SVG
+            // Fallback: SVG (não requer extensões de imagem)
             $qrCodeData = QrCode::format('svg')
                 ->size(300)
                 ->margin(2)
                 ->errorCorrection('H')
                 ->generate($pixCode);
             
+            Log::debug('QR Code SVG gerado com sucesso', [
+                'image_size' => strlen($qrCodeData)
+            ]);
+            
             return base64_encode($qrCodeData);
         } catch (Exception $e) {
+            Log::error('Erro ao gerar imagem do QR Code', [
+                'error' => $e->getMessage(),
+                'pix_code_length' => strlen($pixCode ?? ''),
+                'pix_code_start' => substr($pixCode ?? '', 0, 20)
+            ]);
             throw new Exception('Erro ao gerar imagem do QR Code: ' . $e->getMessage());
         }
     }

@@ -249,28 +249,6 @@ textarea.message-input {
   border-top: 1px solid #e5e7eb;
 }
 
-.floating-icon {
-  position: fixed;
-  bottom: 32px;
-  right: 32px;
-  width: 48px;
-  height: 48px;
-  background-color: #9333ea;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 50;
-  cursor: pointer;
-  box-shadow: 0 4px 12px rgba(147, 51, 234, 0.3);
-  transition: all 0.2s;
-}
-
-.floating-icon:hover {
-  background-color: #7e22ce;
-  transform: scale(1.1);
-}
-
 .cta-toggle {
   display: flex;
   align-items: center;

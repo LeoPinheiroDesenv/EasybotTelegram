@@ -267,7 +267,8 @@ const TelegramGroups = () => {
   return (
     <Layout>
       <div className="telegram-groups-page">
-        <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div className="telegram-groups-content">
+          <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h1>Grupos e Canais</h1>
           <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
             <RefreshButton onRefresh={handleRefresh} loading={loadingData} className="compact" />
@@ -486,6 +487,7 @@ const TelegramGroups = () => {
             </div>
           </div>
         )}
+        </div>
       </div>
     </Layout>
   );

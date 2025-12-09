@@ -1,7 +1,7 @@
 .administrators-page {
-  padding: 24px;
-  min-height: 100vh;
-  background-color: #f9fafb;
+  min-height: calc(100vh - 80px);
+  padding: 32px;
+  background-color: #ffffff;
 }
 
 .administrators-content {

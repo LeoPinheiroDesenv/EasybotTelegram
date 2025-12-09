@@ -14,7 +14,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     zip \
     unzip \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
-    && docker-php-ext-install pdo_mysql mysqli mbstring exif pcntl bcmath gd opcache zip \
+    && docker-php-ext-install pdo_mysql mysqli mbstring exif pcntl bcmath gd opcache zip ftp \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 

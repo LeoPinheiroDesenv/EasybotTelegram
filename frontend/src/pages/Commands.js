@@ -250,7 +250,8 @@ const Commands = () => {
     <Layout>
       <DialogComponent />
       <div className="commands-container">
-        <div className="commands-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div className="commands-content">
+          <div className="commands-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h1>Comandos do Bot</h1>
           <RefreshButton onRefresh={loadCommands} loading={loadingData} className="compact" />
           <div className="commands-actions">
@@ -515,6 +516,7 @@ const Commands = () => {
             </div>
           </div>
         )}
+        </div>
       </div>
     </Layout>
   );

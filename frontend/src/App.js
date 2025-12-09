@@ -33,6 +33,8 @@ import StorageSettings from './pages/StorageSettings';
 import ArtisanCommands from './pages/ArtisanCommands';
 import BotFatherManagement from './pages/BotFatherManagement';
 import ManageBot from './pages/ManageBot';
+import BotList from './pages/BotList';
+import PaymentStatus from './pages/PaymentStatus';
 import './App.css';
 
 function App() {
@@ -49,6 +51,14 @@ function App() {
               element={
                 <ProtectedRoute>
                   <Dashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/bot/list"
+              element={
+                <ProtectedRoute>
+                  <BotList />
                 </ProtectedRoute>
               }
             />
@@ -236,6 +246,14 @@ function App() {
               element={
                 <ProtectedRoute>
                   <Downsell />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/payment-status/:botId?"
+              element={
+                <ProtectedRoute>
+                  <PaymentStatus />
                 </ProtectedRoute>
               }
             />

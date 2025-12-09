@@ -5,7 +5,7 @@
 }
 
 .payment-plans-content {
-  max-width: 1400px;
+  max-width: 1200px;
   margin: 0 auto;
 }
 
@@ -31,10 +31,13 @@
   justify-content: space-between;
   align-items: flex-start;
   margin-bottom: 40px;
-  padding: 32px;
-  background: linear-gradient(135deg, #f9fafb 0%, #ffffff 100%);
-  border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  padding: 0;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.header-text {
+  flex: 1;
 }
 
 .header-text h1 {
@@ -48,12 +51,13 @@
   font-size: 16px;
   color: #6b7280;
   line-height: 1.6;
-  max-width: 500px;
 }
 
 .header-actions {
   display: flex;
   gap: 12px;
+  flex-shrink: 0;
+  align-items: center;
 }
 
 .btn-create {
@@ -436,6 +440,10 @@
 }
 
 @media (max-width: 768px) {
+  .payment-plans-content {
+    padding: 24px;
+  }
+
   .payment-plans-header {
     flex-direction: column;
     gap: 20px;
@@ -448,6 +456,11 @@
 
   .header-actions button {
     width: 100%;
+  }
+
+  .earnings-card {
+    flex-direction: column;
+    align-items: flex-start;
   }
 
   .form-row {
@@ -463,4 +476,3 @@
     padding: 8px;
   }
 }
-

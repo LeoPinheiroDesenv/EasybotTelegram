@@ -1,6 +1,11 @@
 .commands-container {
-  padding: 20px;
-  max-width: 1400px;
+  min-height: calc(100vh - 80px);
+  padding: 32px;
+  background-color: #ffffff;
+}
+
+.commands-content {
+  max-width: 1200px;
   margin: 0 auto;
 }
 

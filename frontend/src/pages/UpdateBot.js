@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faChevronRight, faRobot, faPlus, faInfoCircle, faTimes } from '@fortawesome/free-solid-svg-icons';
+import { faInfoCircle, faTimes } from '@fortawesome/free-solid-svg-icons';
 import Layout from '../components/Layout';
 import botService from '../services/botService';
 import { useManageBot } from '../contexts/ManageBotContext';
@@ -13,7 +13,6 @@ const UpdateBot = () => {
   const isInManageBot = useManageBot();
   // Usa botId se disponível (rota do ManageBot), senão usa id (rota antiga)
   const actualBotId = botId || id;
-  const [bots, setBots] = useState([]);
   const [formData, setFormData] = useState({
     name: '',
     token: '',
@@ -37,19 +36,9 @@ const UpdateBot = () => {
   const [loadingStatus, setLoadingStatus] = useState(false);
 
   useEffect(() => {
-    loadBots();
     loadBot();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [actualBotId]);
-
-  const loadBots = async () => {
-    try {
-      const data = await botService.getAllBots();
-      setBots(data);
-    } catch (err) {
-      console.error('Error loading bots:', err);
-    }
-  };
 
   const loadBot = async () => {
     try {
@@ -201,7 +190,6 @@ const UpdateBot = () => {
       await botService.updateBot(actualBotId, { activated: !formData.activated });
       setFormData({ ...formData, activated: !formData.activated });
       setSuccess(formData.activated ? 'Bot desativado com sucesso!' : 'Bot ativado com sucesso!');
-      await loadBots(); // Reload bots list
       setTimeout(() => setSuccess(''), 3000);
     } catch (err) {
       setError(err.response?.data?.error || 'Erro ao ativar/desativar bot');
@@ -210,15 +198,7 @@ const UpdateBot = () => {
     }
   };
 
-  const handleSelectBot = (botId) => {
-    localStorage.setItem('selectedBotId', botId.toString());
-    navigate(`/bot/update/${botId}`);
-    window.location.reload();
-  };
 
-  const handleCreateBot = () => {
-    navigate('/bot/create');
-  };
 
   const handleValidate = async () => {
     if (!formData.token) {
@@ -275,7 +255,8 @@ const UpdateBot = () => {
   const content = (
     <>
       <div className="update-bot-page">
-        <div className="update-bot-layout">
+        <div className="update-bot-content">
+          <div className="update-bot-layout">
           <div className="update-bot-main">
           {error && <div className="alert alert-error">{error}</div>}
           {success && <div className="alert alert-success">{success}</div>}
@@ -581,41 +562,7 @@ const UpdateBot = () => {
             </button>
           </div>
           </div>
-
-          {/* Right Panel - Meus bots ativos */}
-          <div className="update-bot-sidebar">
-            <div className="sidebar-header">
-              <h2 className="sidebar-title">Meus bots ativos</h2>
-              <a href="/configuracoes" className="sidebar-link">
-                Configurações
-                <FontAwesomeIcon icon={faChevronRight} />
-              </a>
-            </div>
-
-            <div className="bots-list">
-              {bots.map((bot) => (
-                <div key={bot.id} className="bot-list-item">
-                  <div className="bot-icon">
-                    <FontAwesomeIcon icon={faRobot} style={{ color: '#9333ea' }} />
-                  </div>
-                  <div className="bot-info">
-                    <span className="bot-name">{bot.name}</span>
-                  </div>
-                  <button
-                    className={`btn-select ${parseInt(actualBotId) === bot.id ? 'deselect' : ''}`}
-                    onClick={() => handleSelectBot(bot.id)}
-                  >
-                    {parseInt(actualBotId) === bot.id ? 'Deselecionar' : 'Selecionar'}
-                  </button>
-                </div>
-              ))}
-            </div>
-
-            <button onClick={handleCreateBot} className="btn-create-new">
-              <FontAwesomeIcon icon={faPlus} />
-              Criar novo bot
-            </button>
-          </div>
+        </div>
         </div>
       </div>
 

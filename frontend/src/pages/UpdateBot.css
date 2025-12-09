@@ -1,6 +1,12 @@
 .update-bot-page {
   min-height: calc(100vh - 80px);
   padding: 32px;
+  background-color: #ffffff;
+}
+
+.update-bot-content {
+  max-width: 1200px;
+  margin: 0 auto;
 }
 
 .update-bot-layout {

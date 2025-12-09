@@ -298,7 +298,7 @@ const PaymentPlans = () => {
     <Layout>
       <DialogComponent />
       <div className="payment-plans-page">
-        <div className="payment-plans-content">
+        <div className="payment-plans-content"  >
           {/* Header Section */}
           <div className="payment-plans-header">
             <div className="header-text">

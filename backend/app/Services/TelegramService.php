@@ -168,22 +168,46 @@ class TelegramService
             // Registra comandos do bot no Telegram
             $this->registerBotCommands($bot);
 
+            // Configura webhook automaticamente se não estiver configurado
+            $webhookConfigured = false;
+            $webhookUrl = null;
+            $webhookError = null;
+            
+            if (!$hasWebhook) {
+                $webhookResult = $this->configureWebhook($bot);
+                $webhookConfigured = $webhookResult['success'] ?? false;
+                $webhookUrl = $webhookResult['webhook_url'] ?? null;
+                $webhookError = $webhookResult['error'] ?? null;
+                
+                if ($webhookConfigured) {
+                    $this->logBotAction($bot, 'Webhook configurado automaticamente durante inicialização', 'info', [
+                        'webhook_url' => $webhookUrl
+                    ]);
+                } else {
+                    $this->logBotAction($bot, 'Falha ao configurar webhook automaticamente: ' . ($webhookError ?? 'Erro desconhecido'), 'warning');
+                }
+            } else {
+                $webhookUrl = $webhookInfo['url'] ?? null;
+                $webhookConfigured = true;
+            }
+
             $this->logBotAction($bot, 'Bot inicializado com sucesso', 'info');
 
             $message = 'Bot inicializado com sucesso. ';
-            if ($hasWebhook) {
-                $message .= 'Webhook já está configurado. O bot receberá atualizações automaticamente.';
+            if ($webhookConfigured) {
+                $message .= 'Webhook configurado. O bot receberá atualizações automaticamente.';
             } else {
-                $message .= 'Para receber atualizações do Telegram, configure o webhook através da interface ou via API: POST /api/telegram/webhook/' . $bot->id . '/set';
+                $message .= 'Webhook não pôde ser configurado automaticamente. ' . ($webhookError ?? 'Configure manualmente através da interface ou via API: POST /api/telegram/webhook/' . $bot->id . '/set');
             }
 
             return [
                 'success' => true,
                 'message' => $message,
                 'bot_info' => $validation['bot'],
-                'has_webhook' => $hasWebhook,
-                'webhook_url' => $webhookInfo['url'] ?? null,
-                'next_steps' => $hasWebhook ? [] : [
+                'has_webhook' => $webhookConfigured,
+                'webhook_url' => $webhookUrl,
+                'webhook_error' => $webhookError,
+                'next_steps' => $webhookConfigured ? [] : [
                     'webhook' => 'Configure webhook via POST /api/telegram/webhook/' . $bot->id . '/set ou através da interface de gerenciamento'
                 ]
             ];
@@ -216,6 +240,107 @@ class TelegramService
             return [];
         } catch (Exception $e) {
             return [];
+        }
+    }
+
+    /**
+     * Configura webhook para um bot automaticamente
+     *
+     * @param Bot $bot
+     * @return array
+     */
+    protected function configureWebhook(Bot $bot): array
+    {
+        try {
+            // Gera URL do webhook - usa variável de ambiente se disponível, senão usa APP_URL
+            $baseUrl = env('TELEGRAM_WEBHOOK_URL') ?? config('app.url');
+            $webhookUrl = $baseUrl . "/api/telegram/webhook/{$bot->id}";
+            
+            // Converte HTTP para HTTPS se necessário (Telegram requer HTTPS)
+            if (str_starts_with($webhookUrl, 'http://')) {
+                $webhookUrl = str_replace('http://', 'https://', $webhookUrl);
+            }
+            
+            // Verifica se URL começa com https (obrigatório pelo Telegram)
+            if (!str_starts_with($webhookUrl, 'https://')) {
+                return [
+                    'success' => false,
+                    'error' => 'Webhook requer HTTPS. Configure TELEGRAM_WEBHOOK_URL no .env com URL HTTPS.'
+                ];
+            }
+            
+            // Valida porta (Telegram aceita apenas 443, 80, 88, 8443)
+            $parsedUrl = parse_url($webhookUrl);
+            $port = $parsedUrl['port'] ?? (str_starts_with($webhookUrl, 'https://') ? 443 : 80);
+            if (!in_array($port, [443, 80, 88, 8443])) {
+                return [
+                    'success' => false,
+                    'error' => 'Porta inválida. Telegram aceita apenas portas: 443, 80, 88, 8443. Porta atual: ' . $port
+                ];
+            }
+            
+            // Remove webhook existente primeiro (se houver)
+            try {
+                $this->http()
+                    ->post("https://api.telegram.org/bot{$bot->token}/deleteWebhook", [
+                        'drop_pending_updates' => false
+                    ]);
+            } catch (Exception $e) {
+                // Ignora erros ao remover webhook antigo
+            }
+            
+            // Prepara dados para setWebhook
+            $allowedUpdates = [
+                'message',
+                'edited_message',
+                'channel_post',
+                'edited_channel_post',
+                'inline_query',
+                'chosen_inline_result',
+                'callback_query',
+                'shipping_query',
+                'pre_checkout_query',
+                'poll',
+                'poll_answer',
+                'my_chat_member',
+                'chat_member',
+                'chat_join_request'
+            ];
+            
+            $webhookData = [
+                'url' => $webhookUrl,
+                'allowed_updates' => json_encode($allowedUpdates)
+            ];
+
+            // Configura novo webhook
+            $response = $this->http()
+                ->post("https://api.telegram.org/bot{$bot->token}/setWebhook", $webhookData);
+
+            if (!$response->successful() || !$response->json()['ok']) {
+                return [
+                    'success' => false,
+                    'error' => $response->json()['description'] ?? 'Erro ao configurar webhook'
+                ];
+            }
+
+            // Verifica webhook configurado
+            $webhookInfo = $this->getWebhookInfo($bot->token);
+
+            return [
+                'success' => true,
+                'webhook_url' => $webhookUrl,
+                'webhook_info' => $webhookInfo
+            ];
+        } catch (Exception $e) {
+            LogFacade::error('Erro ao configurar webhook automaticamente', [
+                'bot_id' => $bot->id,
+                'error' => $e->getMessage()
+            ]);
+            
+            return [
+                'success' => false,
+                'error' => 'Erro ao configurar webhook: ' . $e->getMessage()
+            ];
         }
     }
 
@@ -1506,31 +1631,73 @@ class TelegramService
             // Envia mensagem inicial
             $message = $bot->initial_message ?? 'Bem-vindo!';
             
-            $keyboard = null;
+            // Monta o teclado com botões de redirecionamento e botão de ativação
+            $keyboardButtons = [];
+            
+            // Adiciona botão de ativação se configurado
             if ($bot->activate_cta && $bot->button_message) {
+                $keyboardButtons[] = [
+                    [
+                        'text' => $bot->button_message,
+                        'callback_data' => 'activate'
+                    ]
+                ];
+            }
+            
+            // Busca botões de redirecionamento do bot
+            $redirectButtons = \App\Models\RedirectButton::where('bot_id', $bot->id)
+                ->orderBy('order')
+                ->orderBy('id')
+                ->get();
+            
+            // Adiciona botões de redirecionamento ao teclado
+            if ($redirectButtons->isNotEmpty()) {
+                $redirectRow = [];
+                foreach ($redirectButtons as $redirectButton) {
+                    $redirectRow[] = [
+                        'text' => $redirectButton->title,
+                        'url' => $redirectButton->link
+                    ];
+                }
+                // Adiciona os botões de redirecionamento em uma linha
+                // Se houver mais de 2 botões, divide em múltiplas linhas
+                if (count($redirectRow) <= 2) {
+                    $keyboardButtons[] = $redirectRow;
+                } else {
+                    // Divide em linhas de 2 botões cada
+                    foreach (array_chunk($redirectRow, 2) as $chunk) {
+                        $keyboardButtons[] = $chunk;
+                    }
+                }
+            }
+            
+            $keyboard = null;
+            if (!empty($keyboardButtons)) {
                 $keyboard = [
-                    'inline_keyboard' => [[
-                        [
-                            'text' => $bot->button_message,
-                            'callback_data' => 'activate'
-                        ]
-                    ]]
+                    'inline_keyboard' => $keyboardButtons
                 ];
             }
 
-            $this->logBotAction($bot, "Enviando mensagem inicial", 'info');
+            $this->logBotAction($bot, "Enviando mensagem inicial", 'info', [
+                'has_activate_button' => ($bot->activate_cta && $bot->button_message),
+                'redirect_buttons_count' => $redirectButtons->count()
+            ]);
             $this->sendMessage($bot, $chatId, $message, $keyboard);
 
             // IMPORTANTE: Só solicita dados pessoais em chats privados
             // Em grupos, não deve solicitar email, telefone ou idioma
             if ($isPrivateChat && $contact) {
+                // Verifica se todos os dados necessários foram coletados
+                $needsEmail = $bot->request_email && !$contact->email;
+                $needsPhone = $bot->request_phone && !$contact->phone;
+                $needsLanguage = $bot->request_language && !$contact->language;
+                
                 // Se o bot está configurado para solicitar dados, solicita após mensagem inicial
                 // Verifica na ordem: email -> telefone -> idioma
-                // IMPORTANTE: Sempre solicita email primeiro se configurado e não tiver
-                if ($bot->request_email && !$contact->email) {
+                if ($needsEmail) {
                     $this->logBotAction($bot, "Solicitando email", 'info');
                     $this->sendMessage($bot, $chatId, '📧 Por favor, envie seu email:');
-                } elseif ($bot->request_phone && !$contact->phone) {
+                } elseif ($needsPhone) {
                     // Usa botão nativo do Telegram para solicitar telefone
                     $this->logBotAction($bot, "Solicitando telefone", 'info');
                     $phoneKeyboard = [
@@ -1544,9 +1711,12 @@ class TelegramService
                         'one_time_keyboard' => true
                     ];
                     $this->sendMessage($bot, $chatId, '📱 Por favor, compartilhe seu número de telefone ou envie o número:', $phoneKeyboard);
-                } elseif ($bot->request_language && !$contact->language) {
+                } elseif ($needsLanguage) {
                     $this->logBotAction($bot, "Solicitando idioma", 'info');
                     $this->sendMessage($bot, $chatId, '🌐 Por favor, escolha um idioma (pt, en, es, fr):');
+                } else {
+                    // Todos os dados foram coletados, verifica se tem plano ativo
+                    $this->checkAndShowPlansIfNeeded($bot, $chatId, $contact);
                 }
             }
 
@@ -1868,8 +2038,20 @@ class TelegramService
                 $message .= "📱 <b>Escaneie o QR Code abaixo para pagar:</b>\n\n";
                 
                 // Exibe código PIX apenas se disponível
+                // IMPORTANTE: O código PIX EMV deve ser uma string contínua sem quebras ou espaços
                 if (!empty($pixResult['pix_code'])) {
-                    $message .= "📋 <b>Código PIX:</b>\n<code>{$pixResult['pix_code']}</code>\n\n";
+                    $pixCode = trim($pixResult['pix_code']);
+                    // Remove quebras de linha, espaços e caracteres de controle
+                    $pixCode = preg_replace('/\s+/', '', $pixCode);
+                    $pixCode = preg_replace('/[\x00-\x1F\x7F]/', '', $pixCode);
+                    
+                    // Exibe o código PIX em uma única linha usando <code> para preservar o formato
+                    // O Telegram preserva o conteúdo dentro de <code> sem adicionar quebras
+                    // IMPORTANTE: O código PIX EMV deve ser copiado sem espaços ou quebras de linha
+                    $message .= "📋 <b>Código PIX (copie e cole no app do seu banco):</b>\n";
+                    $message .= "<code>{$pixCode}</code>\n\n";
+                    $message .= "⚠️ <b>IMPORTANTE:</b> Copie o código completo, sem espaços ou quebras.\n\n";
+                    $message .= "💡 <i>Ou escaneie o QR Code abaixo</i>\n\n";
                 }
                 
                 $message .= "⏰ Este QR Code expira em 30 minutos.";
@@ -1879,22 +2061,56 @@ class TelegramService
 
                 // Envia QR Code como imagem
                 try {
-                    // Verifica se o QR Code já está em base64 ou precisa ser decodificado
-                    $qrCodeImageData = $pixResult['qr_code_image'];
-                    if (is_string($qrCodeImageData) && !empty($qrCodeImageData)) {
-                        // Tenta decodificar se for base64 válido
-                        $decoded = base64_decode($qrCodeImageData, true);
-                        if ($decoded !== false && base64_encode($decoded) === $qrCodeImageData) {
-                            $qrCodeImageData = $decoded;
-                        }
+                    // O QR Code vem como base64 string do PaymentService
+                    $qrCodeImageData = $pixResult['qr_code_image'] ?? null;
+                    
+                    if (empty($qrCodeImageData)) {
+                        throw new Exception('QR Code image data está vazio');
                     }
                     
-                    $tempFile = tempnam(sys_get_temp_dir(), 'pix_qr_') . '.png';
-                    file_put_contents($tempFile, $qrCodeImageData);
+                    // Decodifica o base64 para obter os dados binários da imagem
+                    $decoded = base64_decode($qrCodeImageData, true);
+                    if ($decoded === false) {
+                        // Se não for base64 válido, assume que já está decodificado
+                        $decoded = $qrCodeImageData;
+                    }
+                    
+                    // Valida se os dados decodificados são uma imagem válida
+                    if (empty($decoded) || strlen($decoded) < 100) {
+                        throw new Exception('QR Code image data inválido ou muito pequeno');
+                    }
+                    
+                    // Verifica se é PNG (começa com PNG signature)
+                    $isPng = substr($decoded, 0, 8) === "\x89PNG\r\n\x1a\n";
+                    // Verifica se é SVG (começa com <svg ou <?xml)
+                    $isSvg = strpos($decoded, '<svg') !== false || strpos($decoded, '<?xml') !== false;
+                    
+                    if (!$isPng && !$isSvg) {
+                        // Se não for PNG nem SVG, tenta usar como PNG mesmo assim
+                        // (pode ser que a biblioteca tenha retornado dados binários sem header)
+                        Log::warning('QR Code image não tem signature PNG ou SVG válida', [
+                            'data_start' => bin2hex(substr($decoded, 0, 20))
+                        ]);
+                    }
+                    
+                    $fileExtension = $isPng ? 'png' : ($isSvg ? 'svg' : 'png');
+                    $tempFile = tempnam(sys_get_temp_dir(), 'pix_qr_') . '.' . $fileExtension;
+                    
+                    // Salva os dados binários no arquivo temporário
+                    $bytesWritten = file_put_contents($tempFile, $decoded);
+                    if ($bytesWritten === false || $bytesWritten === 0) {
+                        throw new Exception('Erro ao salvar QR Code em arquivo temporário');
+                    }
+                    
+                    Log::debug('QR Code salvo em arquivo temporário', [
+                        'file' => $tempFile,
+                        'size' => $bytesWritten,
+                        'format' => $fileExtension
+                    ]);
 
                     // Envia foto usando multipart/form-data
                     $response = $this->http()->asMultipart()
-                        ->attach('photo', file_get_contents($tempFile), 'qrcode.png')
+                        ->attach('photo', file_get_contents($tempFile), 'qrcode.' . $fileExtension)
                         ->post("https://api.telegram.org/bot{$bot->token}/sendPhoto", [
                             'chat_id' => $chatId,
                             'caption' => "📱 QR Code PIX - {$plan->title} - R$ {$price}"
@@ -1906,12 +2122,23 @@ class TelegramService
                     }
 
                     if (!$response->successful()) {
-                        throw new Exception('Erro ao enviar foto: ' . $response->body());
+                        $errorBody = $response->body();
+                        Log::error('Erro ao enviar QR Code para Telegram', [
+                            'status' => $response->status(),
+                            'body' => $errorBody
+                        ]);
+                        throw new Exception('Erro ao enviar foto: ' . $errorBody);
                     }
+                    
+                    Log::info('QR Code enviado com sucesso para Telegram', [
+                        'chat_id' => $chatId,
+                        'plan_id' => $planId
+                    ]);
                 } catch (Exception $e) {
                     $this->logBotAction($bot, "Erro ao enviar QR Code como imagem", 'warning', [
                         'chat_id' => $chatId,
-                        'error' => $e->getMessage()
+                        'error' => $e->getMessage(),
+                        'trace' => $e->getTraceAsString()
                     ]);
                     // Continua mesmo se falhar ao enviar imagem
                 }
@@ -2078,8 +2305,18 @@ class TelegramService
                     // Remove teclado se todos os dados foram coletados
                     $this->removeKeyboard($bot, $chatId);
                     
-                    // Mensagem de confirmação final
-                    $this->sendMessage($bot, $chatId, '✅ Obrigado! Seus dados foram registrados com sucesso.');
+                    // Verifica se todos os dados necessários foram coletados
+                    $allDataCollected = (!$bot->request_email || $contact->email) &&
+                                       (!$bot->request_phone || $contact->phone) &&
+                                       (!$bot->request_language || $contact->language);
+                    
+                    if ($allDataCollected) {
+                        // Mensagem de confirmação final
+                        $this->sendMessage($bot, $chatId, '✅ Obrigado! Seus dados foram registrados com sucesso.');
+                        
+                        // Verifica se tem plano ativo e lista planos se necessário
+                        $this->checkAndShowPlansIfNeeded($bot, $chatId, $contact);
+                    }
                     return;
                 } else {
                     $this->sendMessage($bot, $chatId, '❌ Email inválido. Por favor, envie um email válido:');
@@ -2115,8 +2352,18 @@ class TelegramService
                         return;
                     }
                     
-                    // Mensagem de confirmação final
-                    $this->sendMessage($bot, $chatId, '✅ Obrigado! Seus dados foram registrados com sucesso.');
+                    // Verifica se todos os dados necessários foram coletados
+                    $allDataCollected = (!$bot->request_email || $contact->email) &&
+                                       (!$bot->request_phone || $contact->phone) &&
+                                       (!$bot->request_language || $contact->language);
+                    
+                    if ($allDataCollected) {
+                        // Mensagem de confirmação final
+                        $this->sendMessage($bot, $chatId, '✅ Obrigado! Seus dados foram registrados com sucesso.');
+                        
+                        // Verifica se tem plano ativo e lista planos se necessário
+                        $this->checkAndShowPlansIfNeeded($bot, $chatId, $contact);
+                    }
                     return;
                 } else {
                     $this->sendMessage($bot, $chatId, '❌ Telefone inválido. Por favor, envie um número de telefone válido (mínimo 10 dígitos) ou use o botão para compartilhar:');
@@ -2139,8 +2386,18 @@ class TelegramService
                     // Remove teclado se todos os dados foram coletados
                     $this->removeKeyboard($bot, $chatId);
                     
-                    // Mensagem de confirmação final
-                    $this->sendMessage($bot, $chatId, '✅ Obrigado! Seus dados foram registrados com sucesso.');
+                    // Verifica se todos os dados necessários foram coletados
+                    $allDataCollected = (!$bot->request_email || $contact->email) &&
+                                       (!$bot->request_phone || $contact->phone) &&
+                                       (!$bot->request_language || $contact->language);
+                    
+                    if ($allDataCollected) {
+                        // Mensagem de confirmação final
+                        $this->sendMessage($bot, $chatId, '✅ Obrigado! Seus dados foram registrados com sucesso.');
+                        
+                        // Verifica se tem plano ativo e lista planos se necessário
+                        $this->checkAndShowPlansIfNeeded($bot, $chatId, $contact);
+                    }
                     return;
                 } else {
                     $this->sendMessage($bot, $chatId, '❌ Idioma inválido. Por favor, escolha um idioma válido (pt, en, es, fr):');
@@ -2377,6 +2634,19 @@ class TelegramService
                 ];
             }
 
+            // Valida comandos antes de enviar
+            foreach ($commands as $index => $cmd) {
+                // Remove barras iniciais se houver
+                $cmd['command'] = ltrim($cmd['command'], '/');
+                // Garante que a descrição não esteja vazia
+                if (empty($cmd['description'])) {
+                    $cmd['description'] = 'Comando do bot';
+                }
+                // Limita tamanho da descrição (máximo 256 caracteres)
+                $cmd['description'] = mb_substr($cmd['description'], 0, 256);
+                $commands[$index] = $cmd;
+            }
+
             // Registra comandos no Telegram
             // IMPORTANTE: Usa scope para garantir que os comandos apareçam em todos os chats privados
             // O Laravel HTTP client já faz o JSON encoding automaticamente quando usamos asJson()
@@ -2392,7 +2662,8 @@ class TelegramService
             if ($response->successful() && $response->json()['ok']) {
                 $this->logBotAction($bot, 'Comandos registrados no Telegram com sucesso', 'info', [
                     'commands_count' => count($commands),
-                    'commands' => $commands
+                    'commands' => $commands,
+                    'scope' => 'all_private_chats'
                 ]);
                 
                 // Configura menu button para exibir os comandos
@@ -2404,7 +2675,10 @@ class TelegramService
             } else {
                 $error = $response->json()['description'] ?? 'Erro desconhecido';
                 $this->logBotAction($bot, 'Erro ao registrar comandos no Telegram: ' . $error, 'error', [
-                    'response' => $response->json()
+                    'response' => $response->json(),
+                    'commands_sent' => $commands,
+                    'scope' => 'all_private_chats',
+                    'status_code' => $response->status()
                 ]);
             }
 
@@ -2471,6 +2745,15 @@ class TelegramService
                         $this->sendMessage($bot, $chatId, '📧 Por favor, envie seu email:');
                     } elseif ($bot->request_language && !$contact->language) {
                         $this->sendMessage($bot, $chatId, '🌐 Por favor, escolha um idioma (pt, en, es, fr):');
+                    } else {
+                        // Todos os dados foram coletados, verifica planos
+                        $allDataCollected = (!$bot->request_email || $contact->email) &&
+                                           (!$bot->request_phone || $contact->phone) &&
+                                           (!$bot->request_language || $contact->language);
+                        
+                        if ($allDataCollected) {
+                            $this->checkAndShowPlansIfNeeded($bot, $chatId, $contact);
+                        }
                     }
                 } else {
                     $this->sendMessage($bot, $chatId, '❌ Telefone inválido. Por favor, tente novamente.');
@@ -2517,16 +2800,52 @@ class TelegramService
      * Obtém lista de comandos registrados no Telegram
      *
      * @param Bot $bot
+     * @param array|null $scope Scope opcional para buscar comandos específicos
      * @return array
      */
-    public function getMyCommands(Bot $bot): array
+    public function getMyCommands(Bot $bot, ?array $scope = null): array
     {
         try {
-            $response = $this->http()->get("https://api.telegram.org/bot{$bot->token}/getMyCommands");
+            // Se não especificado, usa o mesmo scope usado ao registrar (all_private_chats)
+            if ($scope === null) {
+                $scope = [
+                    'type' => 'all_private_chats'
+                ];
+            }
+
+            $data = [
+                'scope' => $scope
+            ];
+
+            $response = $this->http()
+                ->asJson()
+                ->post("https://api.telegram.org/bot{$bot->token}/getMyCommands", $data);
 
             if ($response->successful() && $response->json()['ok']) {
-                return $response->json()['result'] ?? [];
+                $result = $response->json()['result'] ?? [];
+                // Se result é um array de comandos, retorna diretamente
+                // Se result tem uma estrutura diferente, extrai os comandos
+                if (isset($result[0]) && is_array($result[0])) {
+                    $this->logBotAction($bot, 'Comandos obtidos do Telegram com sucesso', 'info', [
+                        'commands_count' => count($result),
+                        'scope' => $scope
+                    ]);
+                    return $result;
+                }
+                $commands = is_array($result) ? $result : [];
+                $this->logBotAction($bot, 'Comandos obtidos do Telegram (estrutura diferente)', 'info', [
+                    'commands_count' => count($commands),
+                    'result_structure' => gettype($result),
+                    'scope' => $scope
+                ]);
+                return $commands;
             }
+
+            $this->logBotAction($bot, 'Erro ao obter comandos do Telegram', 'warning', [
+                'response' => $response->json() ?? null,
+                'status' => $response->status(),
+                'scope' => $scope
+            ]);
 
             return [];
         } catch (Exception $e) {
@@ -2692,12 +3011,13 @@ class TelegramService
     protected function logBotAction(Bot $bot, string $message, string $level = 'info', array $context = []): void
     {
         try {
+            $user = auth()->user();
             Log::create([
                 'bot_id' => $bot->id,
                 'level' => $level,
                 'message' => $message,
                 'context' => $context,
-                'user_email' => auth()->user()->email ?? null,
+                'user_email' => $user ? $user->email : null,
                 'ip_address' => request()->ip()
             ]);
         } catch (Exception $e) {
@@ -2882,6 +3202,93 @@ class TelegramService
                 'error' => 'Erro ao sincronizar membros: ' . $e->getMessage(),
                 'details' => []
             ];
+        }
+    }
+
+    /**
+     * Verifica se o contato tem um plano ativo e lista planos se não tiver
+     *
+     * @param Bot $bot
+     * @param int $chatId
+     * @param Contact $contact
+     * @return void
+     */
+    protected function checkAndShowPlansIfNeeded(Bot $bot, int $chatId, Contact $contact): void
+    {
+        try {
+            $this->logBotAction($bot, "Verificando se contato tem plano ativo", 'info', [
+                'contact_id' => $contact->id,
+                'chat_id' => $chatId
+            ]);
+
+            // Busca a última transação aprovada do contato
+            $lastApprovedTransaction = \App\Models\Transaction::where('contact_id', $contact->id)
+                ->whereIn('status', ['approved', 'paid', 'completed'])
+                ->orderBy('created_at', 'desc')
+                ->with(['paymentPlan', 'paymentCycle'])
+                ->first();
+
+            $hasActivePlan = false;
+            
+            if ($lastApprovedTransaction) {
+                $paymentCycle = $lastApprovedTransaction->paymentCycle;
+                if ($paymentCycle) {
+                    // Calcula data de expiração baseada na data de criação + dias do ciclo
+                    $expiresAt = \Carbon\Carbon::parse($lastApprovedTransaction->created_at)
+                        ->addDays($paymentCycle->days ?? 30);
+                    
+                    // Verifica se ainda não expirou
+                    $hasActivePlan = \Carbon\Carbon::now()->lessThanOrEqualTo($expiresAt);
+                    
+                    if ($hasActivePlan) {
+                        $paymentPlan = $lastApprovedTransaction->paymentPlan;
+                        $daysRemaining = \Carbon\Carbon::now()->diffInDays($expiresAt, false);
+                        
+                        $this->logBotAction($bot, "Contato tem plano ativo", 'info', [
+                            'contact_id' => $contact->id,
+                            'plan_id' => $paymentPlan->id ?? null,
+                            'days_remaining' => $daysRemaining
+                        ]);
+                        
+                        $message = "✅ <b>Você já possui um plano ativo!</b>\n\n";
+                        $message .= "📦 <b>Plano:</b> " . ($paymentPlan->title ?? 'N/A') . "\n";
+                        $message .= "⏰ <b>Expira em:</b> " . $expiresAt->format('d/m/Y') . "\n";
+                        $message .= "📅 <b>Dias restantes:</b> {$daysRemaining} dia(s)\n\n";
+                        $message .= "Obrigado por ser nosso cliente!";
+                        
+                        $this->sendMessage($bot, $chatId, $message);
+                        return;
+                    }
+                }
+            }
+
+            // Se não tem plano ativo, lista os planos disponíveis
+            $this->logBotAction($bot, "Contato não tem plano ativo, listando planos disponíveis", 'info', [
+                'contact_id' => $contact->id
+            ]);
+            
+            $this->handlePlansCommand($bot, $chatId, [
+                'id' => $contact->telegram_id,
+                'first_name' => $contact->first_name,
+                'username' => $contact->username
+            ]);
+        } catch (\Exception $e) {
+            $this->logBotAction($bot, 'Erro ao verificar planos do contato: ' . $e->getMessage(), 'error', [
+                'contact_id' => $contact->id,
+                'chat_id' => $chatId,
+                'trace' => $e->getTraceAsString()
+            ]);
+            
+            // Em caso de erro, tenta listar os planos mesmo assim
+            try {
+                $this->handlePlansCommand($bot, $chatId, [
+                    'id' => $contact->telegram_id,
+                    'first_name' => $contact->first_name,
+                    'username' => $contact->username
+                ]);
+            } catch (\Exception $e2) {
+                // Ignora erro ao listar planos
+            }
         }
     }
 
