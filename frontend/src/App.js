@@ -32,6 +32,7 @@ import CardPayment from './pages/CardPayment';
 import StorageSettings from './pages/StorageSettings';
 import ArtisanCommands from './pages/ArtisanCommands';
 import BotFatherManagement from './pages/BotFatherManagement';
+import ManageBot from './pages/ManageBot';
 import './App.css';
 
 function App() {
@@ -67,6 +68,89 @@ function App() {
                 </ProtectedRoute>
               }
             />
+            {/* Rotas do ManageBot com abas */}
+            <Route
+              path="/bot/manage/:botId"
+              element={
+                <ProtectedRoute>
+                  <ManageBot />
+                </ProtectedRoute>
+              }
+            >
+              <Route
+                index
+                element={
+                  <ProtectedRoute>
+                    <UpdateBot />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="settings"
+                element={
+                  <ProtectedRoute>
+                    <UpdateBot />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="welcome"
+                element={
+                  <ProtectedRoute>
+                    <WelcomeMessage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="payment-plans"
+                element={
+                  <ProtectedRoute>
+                    <PaymentPlans />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="redirect"
+                element={
+                  <ProtectedRoute>
+                    <Redirect />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="commands"
+                element={
+                  <ProtectedRoute>
+                    <Commands />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="administrators"
+                element={
+                  <ProtectedRoute>
+                    <Administrators />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="telegram-groups"
+                element={
+                  <ProtectedRoute>
+                    <TelegramGroups />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="botfather"
+                element={
+                  <ProtectedRoute>
+                    <BotFatherManagement />
+                  </ProtectedRoute>
+                }
+              />
+            </Route>
+            {/* Rotas antigas mantidas para compatibilidade */}
             <Route
               path="/bot/welcome/:botId"
               element={

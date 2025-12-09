@@ -1,7 +1,12 @@
-.manage-bot-container {
+.manage-bot-wrapper {
+  width: 100%;
   padding: 20px;
   max-width: 1400px;
   margin: 0 auto;
+}
+
+.manage-bot-container {
+  width: 100%;
 }
 
 .manage-bot-header {
@@ -86,9 +91,158 @@
 .manage-bot-content {
   background: white;
   border-radius: 8px;
-  padding: 24px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   min-height: 400px;
+  width: 100%;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Quando as páginas estão dentro do ManageBot, padronizamos o layout */
+.manage-bot-content > * {
+  width: 100%;
+  flex: 1;
+}
+
+/* Remove padding e max-width duplicados das páginas quando dentro do ManageBot */
+.manage-bot-content .welcome-message-page,
+.manage-bot-content .payment-plans-page,
+.manage-bot-content .redirect-page,
+.manage-bot-content .commands-container,
+.manage-bot-content .update-bot-page,
+.manage-bot-content .botfather-page,
+.manage-bot-content .administrators-page,
+.manage-bot-content .telegram-groups-page {
+  padding: 0 !important;
+  max-width: 100% !important;
+  width: 100% !important;
+  margin: 0 !important;
+  min-height: auto !important;
+  background-color: transparent !important;
+  box-sizing: border-box;
+}
+
+/* Padroniza containers internos - TODOS com padding de 24px e ocupando 100% */
+.manage-bot-content .welcome-message-content,
+.manage-bot-content .payment-plans-content,
+.manage-bot-content .redirect-content,
+.manage-bot-content .commands-content,
+.manage-bot-content .administrators-content,
+.manage-bot-content .telegram-groups-content {
+  max-width: 100% !important;
+  margin: 0 !important;
+  padding: 24px !important;
+  width: 100% !important;
+  box-sizing: border-box;
+}
+
+/* Para páginas que não têm container interno, aplica padding diretamente */
+.manage-bot-content > .commands-container,
+.manage-bot-content > .update-bot-page,
+.manage-bot-content > .botfather-page,
+.manage-bot-content > .administrators-page,
+.manage-bot-content > .telegram-groups-page {
+  padding: 24px !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box;
+}
+
+/* Garante que elementos internos ocupem todo o espaço */
+.manage-bot-content .welcome-message-content > *,
+.manage-bot-content .payment-plans-content > *,
+.manage-bot-content .redirect-content > *,
+.manage-bot-content .commands-content > *,
+.manage-bot-content .administrators-content > *,
+.manage-bot-content .telegram-groups-content > * {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+/* Padroniza o layout do UpdateBot dentro do ManageBot */
+.manage-bot-content .update-bot-layout {
+  width: 100% !important;
+  max-width: 100% !important;
+  margin: 0 !important;
+  gap: 24px;
+  display: grid;
+  grid-template-columns: 1fr 350px;
+}
+
+.manage-bot-content .update-bot-main {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+}
+
+.manage-bot-content .update-bot-sidebar {
+  width: 100%;
+  max-width: 100%;
+}
+
+/* Garante que headers e seções ocupem todo o espaço */
+.manage-bot-content .payment-plans-header,
+.manage-bot-content .redirect-header,
+.manage-bot-content .commands-header {
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box;
+}
+
+.manage-bot-content .payment-plans-header {
+  padding: 24px !important;
+  margin-bottom: 24px;
+}
+
+/* Garante que cards e seções ocupem todo o espaço */
+.manage-bot-content .earnings-card,
+.manage-bot-content .payment-plans-section,
+.manage-bot-content .redirect-table-container,
+.manage-bot-content .redirect-actions,
+.manage-bot-content .telegram-commands-section {
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box;
+}
+
+/* Garante que tabelas ocupem 100% */
+.manage-bot-content table,
+.manage-bot-content .table-container,
+.manage-bot-content .payment-plans-table,
+.manage-bot-content .redirect-table {
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box;
+}
+
+/* Remove padding duplicado do Administrators */
+.manage-bot-content .administrators-content,
+.manage-bot-content .telegram-groups-content {
+  max-width: 100% !important;
+  margin: 0 !important;
+  padding: 24px !important;
+  width: 100% !important;
+  box-sizing: border-box;
+}
+
+/* Remove padding duplicado do BotFather */
+.manage-bot-content .botfather-container {
+  padding: 0 !important;
+  max-width: 100% !important;
+  margin: 0 !important;
+  width: 100% !important;
+}
+
+/* Garante que todos os containers internos ocupem 100% */
+.manage-bot-content .container,
+.manage-bot-content .content,
+.manage-bot-content .page-content {
+  max-width: 100% !important;
+  width: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
 }
 
 .loading {
@@ -105,8 +259,9 @@
   font-size: 16px;
 }
 
+/* Responsividade para mobile */
 @media (max-width: 768px) {
-  .manage-bot-container {
+  .manage-bot-wrapper {
     padding: 12px;
   }
 
@@ -129,8 +284,31 @@
     font-size: 13px;
   }
 
-  .manage-bot-content {
-    padding: 16px;
+  .manage-bot-content .welcome-message-content,
+  .manage-bot-content .payment-plans-content,
+  .manage-bot-content .redirect-content,
+  .manage-bot-content .commands-content,
+  .manage-bot-content .administrators-content,
+  .manage-bot-content .telegram-groups-content {
+    padding: 16px !important;
+  }
+
+  .manage-bot-content > .commands-container,
+  .manage-bot-content > .update-bot-page,
+  .manage-bot-content > .botfather-page,
+  .manage-bot-content > .administrators-page,
+  .manage-bot-content > .telegram-groups-page {
+    padding: 16px !important;
+  }
+
+  .manage-bot-content .update-bot-layout {
+    grid-template-columns: 1fr !important;
+    gap: 16px;
+  }
+
+  .manage-bot-content .payment-plans-header {
+    padding: 16px !important;
+    flex-direction: column;
+    gap: 16px;
   }
 }
-

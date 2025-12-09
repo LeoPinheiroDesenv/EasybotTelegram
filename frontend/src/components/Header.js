@@ -89,6 +89,16 @@ const Header = ({ onMenuClick }) => {
     if (path === '/bot/create') return 'Criar novo bot';
     if (path === '/bot/update') return 'Atualizar bot';
     if (path.startsWith('/bot/update/')) return 'Atualizar bot';
+    if (path.includes('/bot/manage/') || 
+        path.startsWith('/bot/welcome/') ||
+        path.startsWith('/bot/payment-plans/') ||
+        path.startsWith('/bot/redirect/') ||
+        path.startsWith('/bot/commands/') ||
+        path.startsWith('/bot/administrators/') ||
+        path.startsWith('/bot/telegram-groups/') ||
+        (path.includes('/bot/') && path.includes('/botfather'))) {
+      return 'Gerenciar Bot';
+    }
     if (path === '/bot/welcome') return 'Mensagem de boas-vindas';
     if (path === '/bot/payment-plans') return 'Planos de pagamento';
     if (path === '/bot/redirect') return 'Botões de redirecionamento';

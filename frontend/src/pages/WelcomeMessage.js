@@ -5,12 +5,14 @@ import { faUpload, faTrash } from '@fortawesome/free-solid-svg-icons';
 import Layout from '../components/Layout';
 import botService from '../services/botService';
 import useConfirm from '../hooks/useConfirm';
+import { useManageBot } from '../contexts/ManageBotContext';
 import './WelcomeMessage.css';
 
 const WelcomeMessage = () => {
   const { confirm, DialogComponent } = useConfirm();
   const navigate = useNavigate();
   const { botId } = useParams();
+  const isInManageBot = useManageBot();
   
   const [formData, setFormData] = useState({
     initial_message: '',
@@ -181,36 +183,21 @@ const WelcomeMessage = () => {
     }
   };
 
-  if (loadingData) {
-    return (
-      <Layout>
-        <DialogComponent />
-        <div className="welcome-message-page">
+  const content = (
+    <>
+      <DialogComponent />
+      <div className="welcome-message-page">
+        {loadingData ? (
           <div className="loading-container">Carregando...</div>
-        </div>
-      </Layout>
-    );
-  }
-
-  if (!botId) {
-    return (
-      <Layout>
-        <DialogComponent />
-        <div className="welcome-message-page">
+        ) : !botId ? (
           <div className="error-container">
             <p>{error}</p>
             <button onClick={() => navigate('/')} className="btn btn-primary">
               Voltar ao Dashboard
             </button>
           </div>
-        </div>
-      </Layout>
-    );
-  }
-
-  return (
-    <Layout>
-      <div className="welcome-message-page">
+        ) : (
+          <>
         <div className="welcome-message-content">
           <div className="welcome-header">
             <p className="welcome-description">
@@ -410,9 +397,17 @@ const WelcomeMessage = () => {
             </svg>
           </div>
         </div>
+          </>
+        )}
       </div>
-    </Layout>
+    </>
   );
+
+  if (isInManageBot) {
+    return content;
+  }
+
+  return <Layout>{content}</Layout>;
 };
 
 export default WelcomeMessage;

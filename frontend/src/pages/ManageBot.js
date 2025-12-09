@@ -3,6 +3,7 @@ import { useParams, useNavigate, Outlet, useLocation } from 'react-router-dom';
 import Layout from '../components/Layout';
 import botService from '../services/botService';
 import useAlert from '../hooks/useAlert';
+import { ManageBotProvider } from '../contexts/ManageBotContext';
 import './ManageBot.css';
 
 const ManageBot = () => {
@@ -20,13 +21,20 @@ const ManageBot = () => {
     } else {
       const storedBotId = localStorage.getItem('selectedBotId');
       if (storedBotId) {
-        navigate(`/bot/manage/${storedBotId}`, { replace: true });
+        navigate(`/bot/manage/${storedBotId}/settings`, { replace: true });
       } else {
         setError('Nenhum bot selecionado');
         setLoading(false);
       }
     }
   }, [botId, navigate]);
+
+  useEffect(() => {
+    // Redireciona para a primeira aba se estiver na rota base
+    if (botId && location.pathname === `/bot/manage/${botId}`) {
+      navigate(`/bot/manage/${botId}/settings`, { replace: true });
+    }
+  }, [botId, location.pathname, navigate]);
 
   const loadBot = async () => {
     try {
@@ -47,46 +55,44 @@ const ManageBot = () => {
   // Define as abas disponíveis
   const tabs = [
     { 
+      id: 'settings', 
+      label: 'Configurações', 
+      route: `/bot/manage/${botId}/settings`
+    },
+    { 
       id: 'welcome', 
-      label: 'Mensagens de Boas Vindas', 
-      path: `/bot/manage/${botId}/welcome`,
-      route: `/bot/welcome/${botId}`
+      label: 'Mensagens Iniciais', 
+      route: `/bot/manage/${botId}/welcome`
     },
     { 
       id: 'payment-plans', 
       label: 'Planos de Pagamento', 
-      path: `/bot/manage/${botId}/payment-plans`,
-      route: `/bot/payment-plans/${botId}`
+      route: `/bot/manage/${botId}/payment-plans`
     },
     { 
       id: 'redirect', 
       label: 'Botões de redirecionamento', 
-      path: `/bot/manage/${botId}/redirect`,
-      route: `/bot/redirect/${botId}`
+      route: `/bot/manage/${botId}/redirect`
     },
     { 
       id: 'commands', 
       label: 'Comandos', 
-      path: `/bot/manage/${botId}/commands`,
-      route: `/bot/commands/${botId}`
+      route: `/bot/manage/${botId}/commands`
     },
     { 
       id: 'administrators', 
       label: 'Administradores', 
-      path: `/bot/manage/${botId}/administrators`,
-      route: `/bot/administrators/${botId}`
+      route: `/bot/manage/${botId}/administrators`
     },
     { 
       id: 'telegram-groups', 
       label: 'Grupos e Canais', 
-      path: `/bot/manage/${botId}/telegram-groups`,
-      route: `/bot/telegram-groups/${botId}`
+      route: `/bot/manage/${botId}/telegram-groups`
     },
     { 
       id: 'botfather', 
-      label: 'Gerenciamento via BotFather', 
-      path: `/bot/manage/${botId}/botfather`,
-      route: `/bot/${botId}/botfather`
+      label: 'BotFather', 
+      route: `/bot/manage/${botId}/botfather`
     },
   ];
 
@@ -96,20 +102,15 @@ const ManageBot = () => {
     
     // Verifica se está em uma rota de gerenciamento
     if (currentPath.includes('/bot/manage/')) {
-      const tabId = currentPath.split('/').pop();
-      return tabId || 'welcome';
+      const parts = currentPath.split('/');
+      const tabId = parts[parts.length - 1];
+      return tabId || 'settings';
     }
     
     // Mapeia rotas antigas para abas
-    if (currentPath.includes('/bot/welcome/')) return 'welcome';
-    if (currentPath.includes('/bot/payment-plans/')) return 'payment-plans';
-    if (currentPath.includes('/bot/redirect/')) return 'redirect';
-    if (currentPath.includes('/bot/commands/')) return 'commands';
-    if (currentPath.includes('/bot/administrators/')) return 'administrators';
-    if (currentPath.includes('/bot/telegram-groups/')) return 'telegram-groups';
-    if (currentPath.includes('/botfather')) return 'botfather';
+    if (currentPath.includes('/bot/update/')) return 'settings';
     
-    return 'welcome';
+    return 'settings';
   };
 
   const activeTab = getActiveTab();
@@ -121,8 +122,10 @@ const ManageBot = () => {
   if (loading) {
     return (
       <Layout>
-        <div className="manage-bot-container">
-          <div className="loading">Carregando bot...</div>
+        <div className="manage-bot-wrapper">
+          <div className="manage-bot-container">
+            <div className="loading">Carregando bot...</div>
+          </div>
         </div>
       </Layout>
     );
@@ -131,9 +134,11 @@ const ManageBot = () => {
   if (error || !bot) {
     return (
       <Layout>
-        <div className="manage-bot-container">
-          <div className="error-container">
-            <p>{error || 'Bot não encontrado'}</p>
+        <div className="manage-bot-wrapper">
+          <div className="manage-bot-container">
+            <div className="error-container">
+              <p>{error || 'Bot não encontrado'}</p>
+            </div>
           </div>
         </div>
       </Layout>
@@ -142,31 +147,35 @@ const ManageBot = () => {
 
   return (
     <Layout>
-      <DialogComponent />
-      <div className="manage-bot-container">
-        <div className="manage-bot-header">
-          <h1>Gerenciar Bot</h1>
-          {bot && (
-            <div className="bot-info">
-              <span className="bot-name">{bot.name}</span>
-            </div>
-          )}
-        </div>
+      <AlertDialog />
+      <div className="manage-bot-wrapper">
+        <div className="manage-bot-container">
+          <div className="manage-bot-header">
+            <h1>Gerenciar Bot</h1>
+            {bot && (
+              <div className="bot-info">
+                <span className="bot-name">{bot.name}</span>
+              </div>
+            )}
+          </div>
 
-        <div className="manage-bot-tabs">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              className={`manage-bot-tab ${activeTab === tab.id ? 'active' : ''}`}
-              onClick={() => handleTabClick(tab)}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
+          <div className="manage-bot-tabs">
+            {tabs.map((tab) => (
+              <button
+                key={tab.id}
+                className={`manage-bot-tab ${activeTab === tab.id ? 'active' : ''}`}
+                onClick={() => handleTabClick(tab)}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
 
-        <div className="manage-bot-content">
-          <Outlet />
+          <div className="manage-bot-content">
+            <ManageBotProvider>
+              <Outlet />
+            </ManageBotProvider>
+          </div>
         </div>
       </div>
     </Layout>

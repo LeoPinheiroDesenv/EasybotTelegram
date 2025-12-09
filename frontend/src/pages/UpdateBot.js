@@ -4,11 +4,15 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faChevronRight, faRobot, faPlus, faInfoCircle, faTimes } from '@fortawesome/free-solid-svg-icons';
 import Layout from '../components/Layout';
 import botService from '../services/botService';
+import { useManageBot } from '../contexts/ManageBotContext';
 import './UpdateBot.css';
 
 const UpdateBot = () => {
-  const { id } = useParams();
+  const { id, botId } = useParams();
   const navigate = useNavigate();
+  const isInManageBot = useManageBot();
+  // Usa botId se disponível (rota do ManageBot), senão usa id (rota antiga)
+  const actualBotId = botId || id;
   const [bots, setBots] = useState([]);
   const [formData, setFormData] = useState({
     name: '',
@@ -36,7 +40,7 @@ const UpdateBot = () => {
     loadBots();
     loadBot();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id]);
+  }, [actualBotId]);
 
   const loadBots = async () => {
     try {
@@ -50,7 +54,7 @@ const UpdateBot = () => {
   const loadBot = async () => {
     try {
       setLoadingData(true);
-      const bot = await botService.getBotById(id);
+      const bot = await botService.getBotById(actualBotId);
       setFormData({
         name: bot.name || '',
         token: bot.token || '',
@@ -98,7 +102,7 @@ const UpdateBot = () => {
   };
 
   const handleGetBotStatus = async () => {
-    if (!id) {
+    if (!actualBotId) {
       setError('ID do bot não encontrado');
       return;
     }
@@ -108,7 +112,7 @@ const UpdateBot = () => {
     setShowStatusModal(true);
 
     try {
-      const status = await botService.getBotStatus(id);
+      const status = await botService.getBotStatus(actualBotId);
       setBotStatus(status);
     } catch (err) {
       setError(err.response?.data?.error || 'Erro ao obter status do bot');
@@ -126,7 +130,7 @@ const UpdateBot = () => {
   };
 
   const handleInitialize = async () => {
-    if (!id) {
+    if (!actualBotId) {
       setError('ID do bot não encontrado');
       return;
     }
@@ -136,7 +140,7 @@ const UpdateBot = () => {
     setInitializing(true);
 
     try {
-      const result = await botService.initializeBot(id);
+      const result = await botService.initializeBot(actualBotId);
       setSuccess(result.message || 'Bot inicializado com sucesso!');
       
       // Recarrega os dados do bot para atualizar o status
@@ -151,7 +155,7 @@ const UpdateBot = () => {
   };
 
   const handleSetWebhook = async () => {
-    if (!id) {
+    if (!actualBotId) {
       setError('ID do bot não encontrado');
       return;
     }
@@ -161,7 +165,7 @@ const UpdateBot = () => {
     setSettingWebhook(true);
 
     try {
-      const result = await botService.setWebhook(id);
+      const result = await botService.setWebhook(actualBotId);
       setSuccess(result.message || 'Webhook configurado com sucesso!');
       
       setTimeout(() => setSuccess(''), 5000);
@@ -178,7 +182,7 @@ const UpdateBot = () => {
     setLoading(true);
 
     try {
-      await botService.updateBot(id, formData);
+      await botService.updateBot(actualBotId, formData);
       setSuccess('Alterações salvas com sucesso!');
       setTimeout(() => setSuccess(''), 3000);
     } catch (err) {
@@ -194,7 +198,7 @@ const UpdateBot = () => {
     setLoading(true);
 
     try {
-      await botService.updateBot(id, { activated: !formData.activated });
+      await botService.updateBot(actualBotId, { activated: !formData.activated });
       setFormData({ ...formData, activated: !formData.activated });
       setSuccess(formData.activated ? 'Bot desativado com sucesso!' : 'Bot ativado com sucesso!');
       await loadBots(); // Reload bots list
@@ -260,17 +264,16 @@ const UpdateBot = () => {
   };
 
   if (loadingData) {
-    return (
-      <Layout>
-        <div className="update-bot-page">
-          <div className="loading-container">Carregando...</div>
-        </div>
-      </Layout>
+    const loadingContent = (
+      <div className="update-bot-page">
+        <div className="loading-container">Carregando...</div>
+      </div>
     );
+    return isInManageBot ? loadingContent : <Layout>{loadingContent}</Layout>;
   }
 
-  return (
-    <Layout>
+  const content = (
+    <>
       <div className="update-bot-page">
         <div className="update-bot-layout">
           <div className="update-bot-main">
@@ -599,10 +602,10 @@ const UpdateBot = () => {
                     <span className="bot-name">{bot.name}</span>
                   </div>
                   <button
-                    className={`btn-select ${parseInt(id) === bot.id ? 'deselect' : ''}`}
+                    className={`btn-select ${parseInt(actualBotId) === bot.id ? 'deselect' : ''}`}
                     onClick={() => handleSelectBot(bot.id)}
                   >
-                    {parseInt(id) === bot.id ? 'Deselecionar' : 'Selecionar'}
+                    {parseInt(actualBotId) === bot.id ? 'Deselecionar' : 'Selecionar'}
                   </button>
                 </div>
               ))}
@@ -786,8 +789,14 @@ const UpdateBot = () => {
           </div>
         </div>
       )}
-    </Layout>
+    </>
   );
+
+  if (isInManageBot) {
+    return content;
+  }
+
+  return <Layout>{content}</Layout>;
 };
 
 export default UpdateBot;
