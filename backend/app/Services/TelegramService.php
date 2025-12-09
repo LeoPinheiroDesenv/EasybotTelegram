@@ -1004,7 +1004,7 @@ class TelegramService
             // Processa contato compartilhado (telefone compartilhado via botão)
             // Só processa em chats privados, não em grupos
             if (isset($message['contact'])) {
-                $this->processSharedContact($bot, $chatId, $from, $message['contact'], $contact);
+                $this->processSharedContact($bot, $chatId, $from, $message['contact'], $contact, $chatType);
                 return;
             }
         } else {
@@ -1075,7 +1075,7 @@ class TelegramService
                 'chat_type' => $chatType,
                 'command_before_clean' => $command
             ]);
-            $this->processCommand($bot, $chatId, $from, $command);
+            $this->processCommand($bot, $chatId, $from, $command, $chatType);
         } else {
             // Log quando não é comando para debug
             if ($text) {
@@ -1369,7 +1369,7 @@ class TelegramService
      * @param string $command
      * @return void
      */
-    protected function processCommand(Bot $bot, int $chatId, array $from, string $command): void
+    protected function processCommand(Bot $bot, int $chatId, array $from, string $command, string $chatType = 'private'): void
     {
         $command = trim($command);
         
@@ -1404,7 +1404,7 @@ class TelegramService
                 'chat_id' => $chatId,
                 'command' => $commandName
             ]);
-            $this->handleStartCommand($bot, $chatId, $from);
+            $this->handleStartCommand($bot, $chatId, $from, $chatType);
             return;
         }
         
@@ -1471,19 +1471,19 @@ class TelegramService
      * @param array $from
      * @return void
      */
-    protected function handleStartCommand(Bot $bot, int $chatId, array $from): void
+    protected function handleStartCommand(Bot $bot, int $chatId, array $from, string $chatType = 'private'): void
     {
         try {
             $this->logBotAction($bot, "Iniciando processamento do comando /start", 'info', [
                 'chat_id' => $chatId,
-                'user_id' => $from['id']
+                'user_id' => $from['id'],
+                'chat_type' => $chatType
             ]);
             
             // IMPORTANTE: Verifica se é um chat privado antes de solicitar dados
             // Comandos em grupos não devem solicitar dados pessoais
-            $isPrivateChat = $chatId > 0; // IDs de chat privado são positivos, grupos são negativos
+            $isPrivateChat = ($chatType === 'private');
             
-
             // Busca ou cria contato (apenas para chats privados)
             $contact = null;
             if ($isPrivateChat) {
@@ -1679,7 +1679,8 @@ class TelegramService
             // Isso faz com que o botão "Menu" no chat mostre todos os comandos registrados
             // O Laravel HTTP client já faz o JSON encoding automaticamente quando usamos asJson()
             
-            // Primeiro, tenta configurar globalmente (para todos os chats)
+            // Configura o menu button globalmente (para todos os chats privados)
+            // O tipo 'commands' faz com que o botão Menu mostre os comandos registrados via setMyCommands
             $response = $this->http()
                 ->asJson()
                 ->post("https://api.telegram.org/bot{$bot->token}/setChatMenuButton", [
@@ -1689,23 +1690,15 @@ class TelegramService
                 ]);
 
             if ($response->successful() && $response->json()['ok']) {
-                $this->logBotAction($bot, 'Menu de comandos configurado com sucesso (global)', 'info');
+                $this->logBotAction($bot, 'Menu de comandos configurado com sucesso', 'info');
             } else {
                 $error = $response->json()['description'] ?? 'Erro desconhecido';
-                $this->logBotAction($bot, 'Erro ao configurar menu de comandos (global): ' . $error, 'warning', [
+                $this->logBotAction($bot, 'Erro ao configurar menu de comandos: ' . $error, 'warning', [
                     'response' => $response->json()
                 ]);
-                
-                // Tenta configurar usando setMyCommands com scope (se disponível na versão da API)
-                // Isso garante que os comandos apareçam no menu
-                try {
-                    $this->logBotAction($bot, 'Tentando configurar menu usando scope', 'info');
-                } catch (Exception $e2) {
-                    $this->logBotAction($bot, 'Erro ao configurar menu usando scope: ' . $e2->getMessage(), 'warning');
-                }
             }
         } catch (Exception $e) {
-            // Não é crítico se falhar, o Telegram ainda mostrará os comandos
+            // Não é crítico se falhar, o Telegram ainda mostrará os comandos se estiverem registrados via setMyCommands
             $this->logBotAction($bot, 'Aviso ao configurar menu de comandos: ' . $e->getMessage(), 'warning');
         }
     }
@@ -2432,15 +2425,15 @@ class TelegramService
      * @param Contact|null $contact
      * @return void
      */
-    protected function processSharedContact(Bot $bot, int $chatId, array $from, array $contactData, ?Contact $contact = null): void
+    protected function processSharedContact(Bot $bot, int $chatId, array $from, array $contactData, ?Contact $contact = null, string $chatType = 'private'): void
     {
         try {
             // IMPORTANTE: Só processa contato compartilhado em chats privados
-            // IDs de chat privado são positivos, grupos são negativos
-            $isPrivateChat = $chatId > 0;
+            $isPrivateChat = ($chatType === 'private');
             if (!$isPrivateChat) {
                 $this->logBotAction($bot, "Tentativa de processar contato compartilhado em grupo ignorada", 'warning', [
                     'chat_id' => $chatId,
+                    'chat_type' => $chatType,
                     'user_id' => $from['id']
                 ]);
                 return;

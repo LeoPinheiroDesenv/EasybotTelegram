@@ -6,6 +6,7 @@ import Layout from '../components/Layout';
 import botService from '../services/botService';
 import paymentPlanService from '../services/paymentPlanService';
 import useConfirm from '../hooks/useConfirm';
+import RefreshButton from '../components/RefreshButton';
 import './Groups.css';
 
 const Groups = () => {
@@ -68,6 +69,14 @@ const Groups = () => {
     } catch (err) {
       console.error('Erro ao carregar planos de pagamento:', err);
     }
+  };
+
+  const handleRefresh = async () => {
+    if (!botId) return;
+    await Promise.all([
+      loadGroups(),
+      loadPaymentPlans()
+    ]);
   };
 
   const handleChange = (e) => {
@@ -219,12 +228,15 @@ const Groups = () => {
                 <p className="promo-description">
                   Adicione canais para expandir sua comunidade e gerenciar grupos de forma mais eficiente.
                 </p>
-                <button
-                  onClick={handleAdd}
-                  className="btn btn-create-group"
-                >
-                  Criar novo grupo
-                </button>
+                <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                  <RefreshButton onRefresh={handleRefresh} loading={loadingData} className="compact" />
+                  <button
+                    onClick={handleAdd}
+                    className="btn btn-create-group"
+                  >
+                    Criar novo grupo
+                  </button>
+                </div>
               </div>
               <div className="groups-illustration">
                 <div className="illustration-container">

@@ -33,7 +33,8 @@ const Sidebar = ({ isOpen, onClose }) => {
     location.pathname === '/user-groups' || 
     location.pathname === '/logs' ||
     location.pathname === '/ftp' ||
-    location.pathname === '/settings/artisan'
+    location.pathname === '/settings/artisan' ||
+    location.pathname.includes('/botfather')
   );
   const [monthlyBilling, setMonthlyBilling] = useState({ total: 0, transaction_count: 0 });
   const [loadingBilling, setLoadingBilling] = useState(true);
@@ -65,7 +66,8 @@ const Sidebar = ({ isOpen, onClose }) => {
         location.pathname === '/users' || 
         location.pathname === '/user-groups' || 
         location.pathname === '/logs' ||
-        location.pathname === '/ftp') {
+        location.pathname === '/ftp' ||
+        location.pathname.includes('/botfather')) {
       setSettingsMenuOpen(true);
     }
   }, [location.pathname]);
@@ -94,13 +96,7 @@ const Sidebar = ({ isOpen, onClose }) => {
 
   const botSubmenuItems = [
     { path: '/bot/create', label: 'Criar novo bot' },
-    { path: '/bot/update', label: 'Atualizar bot', requiresBot: true },
-    { path: '/bot/welcome', label: 'Mensagem de boas-vindas', requiresBot: true },
-    { path: '/bot/payment-plans', label: 'Planos de pagamento', requiresBot: true },
-    { path: '/bot/redirect', label: 'Botões de redirecionamento', requiresBot: true },
-    { path: '/bot/commands', label: 'Comandos', requiresBot: true },
-    { path: '/bot/administrators', label: 'Administradores', requiresBot: true },
-    { path: '/bot/telegram-groups', label: 'Grupos e Canais', requiresBot: true },
+    { path: '/bot/manage', label: 'Gerenciar Bot', requiresBot: true },
   ];
 
   const isBillingActive = location.pathname === '/billing';
@@ -127,12 +123,13 @@ const Sidebar = ({ isOpen, onClose }) => {
     !location.pathname.match(/^\/bot\/create$/);
   const isResultsActive = location.pathname.startsWith('/results');
   const isMarketingActive = location.pathname.startsWith('/marketing');
-  // Menu de Configurações está ativo para /settings, /users, /user-groups, /logs e /ftp
+  // Menu de Configurações está ativo para /settings, /users, /user-groups, /logs, /ftp e /botfather
   const isSettingsActive = location.pathname.startsWith('/settings') || 
     location.pathname === '/users' || 
     location.pathname === '/user-groups' || 
     location.pathname === '/logs' ||
-    location.pathname === '/ftp';
+    location.pathname === '/ftp' ||
+    location.pathname.includes('/botfather');
 
   const handleLogout = () => {
     logout();
@@ -155,13 +152,14 @@ const Sidebar = ({ isOpen, onClose }) => {
             <div className="logo-title">Easy</div>
             <div className="logo-subtitle">
               {location.pathname === '/bot/create' ? 'Criar novo bot' : 
-               location.pathname.startsWith('/bot/update/') ? 'Atualizar bot' : 
-               location.pathname.startsWith('/bot/welcome/') ? 'Mensagem de boas-vindas' :
-               location.pathname.startsWith('/bot/payment-plans/') ? 'Planos de pagamento' :
-               location.pathname.startsWith('/bot/redirect/') ? 'Botões de redirecionamento' :
-               location.pathname.startsWith('/bot/commands/') ? 'Comandos' :
-               location.pathname.startsWith('/bot/administrators/') ? 'Administradores' :
-               location.pathname.startsWith('/bot/telegram-groups/') ? 'Grupos e Canais' :
+               location.pathname.includes('/bot/manage/') || 
+               location.pathname.startsWith('/bot/welcome/') ||
+               location.pathname.startsWith('/bot/payment-plans/') ||
+               location.pathname.startsWith('/bot/redirect/') ||
+               location.pathname.startsWith('/bot/commands/') ||
+               location.pathname.startsWith('/bot/administrators/') ||
+               location.pathname.startsWith('/bot/telegram-groups/') ||
+               (location.pathname.includes('/bot/') && location.pathname.includes('/botfather')) ? 'Gerenciar Bot' :
                location.pathname.startsWith('/marketing/alerts') ? 'Alertas' :
                location.pathname.startsWith('/marketing/downsell') ? 'Downsell' :
                location.pathname.startsWith('/marketing') ? 'Marketing' :
@@ -223,20 +221,8 @@ const Sidebar = ({ isOpen, onClose }) => {
                   if (item.requiresBot) {
                     const selectedBotId = localStorage.getItem('selectedBotId');
                     if (selectedBotId) {
-                      if (item.path === '/bot/update') {
-                        path = `/bot/update/${selectedBotId}`;
-                      } else if (item.path === '/bot/welcome') {
-                        path = `/bot/welcome/${selectedBotId}`;
-                      } else if (item.path === '/bot/payment-plans') {
-                        path = `/bot/payment-plans/${selectedBotId}`;
-                    } else if (item.path === '/bot/redirect') {
-                      path = `/bot/redirect/${selectedBotId}`;
-                      } else if (item.path === '/bot/commands') {
-                      path = `/bot/commands/${selectedBotId}`;
-                      } else if (item.path === '/bot/administrators') {
-                        path = `/bot/administrators/${selectedBotId}`;
-                      } else if (item.path === '/bot/telegram-groups') {
-                        path = `/bot/telegram-groups/${selectedBotId}`;
+                      if (item.path === '/bot/manage') {
+                        path = `/bot/manage/${selectedBotId}/welcome`;
                       }
                     } else {
                       // If no bot selected, navigate to dashboard first
@@ -247,17 +233,16 @@ const Sidebar = ({ isOpen, onClose }) => {
                   // More precise active detection
                   let isActive = false;
                   if (item.requiresBot) {
-                    // For items with requiresBot, check if pathname matches the pattern
-                    if (item.path === '/bot/welcome') {
-                      isActive = location.pathname.startsWith('/bot/welcome/');
-                    } else if (item.path === '/bot/redirect') {
-                      isActive = location.pathname.startsWith('/bot/redirect/');
-                    } else if (item.path === '/bot/commands') {
-                      isActive = location.pathname.startsWith('/bot/commands/');
-                    } else if (item.path === '/bot/administrators') {
-                      isActive = location.pathname.startsWith('/bot/administrators/');
-                    } else if (item.path === '/bot/telegram-groups') {
-                      isActive = location.pathname.startsWith('/bot/telegram-groups/');
+                    // For manage bot, check if we're on any manage bot route
+                    if (item.path === '/bot/manage') {
+                      isActive = location.pathname.includes('/bot/manage/') || 
+                                 location.pathname.includes('/bot/welcome/') ||
+                                 location.pathname.includes('/bot/payment-plans/') ||
+                                 location.pathname.includes('/bot/redirect/') ||
+                                 location.pathname.includes('/bot/commands/') ||
+                                 location.pathname.includes('/bot/administrators/') ||
+                                 location.pathname.includes('/bot/telegram-groups/') ||
+                                 (location.pathname.includes('/bot/') && location.pathname.includes('/botfather'));
                     } else {
                       isActive = location.pathname.startsWith(item.path) && 
                                  location.pathname !== '/bot/create';
@@ -405,6 +390,21 @@ const Sidebar = ({ isOpen, onClose }) => {
                       >
                         Gerenciador FTP
                       </Link> */}
+                      {(() => {
+                        const storedBotId = localStorage.getItem('selectedBotId');
+                        if (storedBotId) {
+                          return (
+                            <Link
+                              to={`/bot/${storedBotId}/botfather`}
+                              className={`sidebar-submenu-item ${location.pathname.includes('/botfather') ? 'active' : ''}`}
+                              onClick={onClose}
+                            >
+                              Gerenciar via BotFather
+                            </Link>
+                          );
+                        }
+                        return null;
+                      })()}
                     </>
                   )}
                   {user?.user_type === 'super_admin' && (

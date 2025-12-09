@@ -4,6 +4,7 @@ import Layout from '../components/Layout';
 import paymentPlanService from '../services/paymentPlanService';
 import paymentCycleService from '../services/paymentCycleService';
 import useConfirm from '../hooks/useConfirm';
+import RefreshButton from '../components/RefreshButton';
 import './PaymentPlans.css';
 
 const PaymentPlans = () => {
@@ -65,6 +66,14 @@ const PaymentPlans = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleRefresh = async () => {
+    if (!botId) return;
+    await Promise.all([
+      loadPaymentPlans(botId),
+      loadPaymentCycles()
+    ]);
   };
 
   const handleChange = (e) => {
@@ -296,7 +305,8 @@ const PaymentPlans = () => {
               <h1>Gerencie suas cobranças de qualquer lugar</h1>
               <p>Elabore planos, administre e estruture seus pagamentos. Escolha prazos e montantes</p>
             </div>
-            <div className="header-actions">
+            <div className="header-actions" style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+              <RefreshButton onRefresh={handleRefresh} loading={loading} className="compact" />
               <button
                 onClick={handleOpenCreateModal}
                 className="btn btn-create"

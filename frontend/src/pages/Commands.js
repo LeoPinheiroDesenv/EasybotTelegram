@@ -5,6 +5,7 @@ import { faEdit, faTrash, faPlus, faCheck, faTimes, faSync } from '@fortawesome/
 import Layout from '../components/Layout';
 import botCommandService from '../services/botCommandService';
 import useConfirm from '../hooks/useConfirm';
+import RefreshButton from '../components/RefreshButton';
 import './Commands.css';
 
 const Commands = () => {
@@ -249,8 +250,9 @@ const Commands = () => {
     <Layout>
       <DialogComponent />
       <div className="commands-container">
-        <div className="commands-header">
+        <div className="commands-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h1>Comandos do Bot</h1>
+          <RefreshButton onRefresh={loadCommands} loading={loadingData} className="compact" />
           <div className="commands-actions">
             <button
               className="btn btn-register"

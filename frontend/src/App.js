@@ -31,6 +31,7 @@ import FtpManager from './pages/FtpManager';
 import CardPayment from './pages/CardPayment';
 import StorageSettings from './pages/StorageSettings';
 import ArtisanCommands from './pages/ArtisanCommands';
+import BotFatherManagement from './pages/BotFatherManagement';
 import './App.css';
 
 function App() {
@@ -244,6 +245,14 @@ function App() {
               element={
                 <ProtectedRoute>
                   <ArtisanCommands />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/bot/:botId/botfather"
+              element={
+                <ProtectedRoute>
+                  <BotFatherManagement />
                 </ProtectedRoute>
               }
             />

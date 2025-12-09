@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 16" width="64" height="16">
+  <!-- Fundo transparente -->
+  <rect width="64" height="16" fill="transparent"/>
+  
+  <!-- Primeiro círculo (verde escuro) -->
+  <circle cx="8" cy="8" r="6" fill="#2d5016"/>
+  
+  <!-- Segundo círculo (verde claro) -->
+  <circle cx="32" cy="8" r="6" fill="#4ade80"/>
+  
+  <!-- Terceiro círculo (contorno branco) -->
+  <circle cx="56" cy="8" r="6" fill="none" stroke="#ffffff" stroke-width="2"/>
+</svg>
+

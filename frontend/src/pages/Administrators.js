@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import Layout from '../components/Layout';
 import botAdministratorService from '../services/botAdministratorService';
 import useConfirm from '../hooks/useConfirm';
+import RefreshButton from '../components/RefreshButton';
 import './Administrators.css';
 
 const Administrators = () => {
@@ -173,12 +174,15 @@ const Administrators = () => {
                 <p className="section-description">
                   Coloque o ID de usuários em "adicionar administrador". Após isso, dê o seguinte comando no seu BOT no Telegram: <strong>/comandos</strong>
                 </p>
-                <button
-                  onClick={handleAdd}
-                  className="btn btn-add-admin"
-                >
-                  Adicionar administrador
-                </button>
+                <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                  <RefreshButton onRefresh={loadAdministrators} loading={loadingData} className="compact" />
+                  <button
+                    onClick={handleAdd}
+                    className="btn btn-add-admin"
+                  >
+                    Adicionar administrador
+                  </button>
+                </div>
               </div>
               <div className="admin-illustration">
                 <div className="illustration-container">

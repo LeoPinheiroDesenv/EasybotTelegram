@@ -3,9 +3,12 @@ import { AuthContext } from '../contexts/AuthContext';
 import Layout from '../components/Layout';
 import userService from '../services/userService';
 import UserModal from '../components/UserModal';
+import useConfirm from '../hooks/useConfirm';
+import RefreshButton from '../components/RefreshButton';
 import './Users.css';
 
 const Users = () => {
+  const { confirm, DialogComponent } = useConfirm();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -42,7 +45,12 @@ const Users = () => {
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm('Tem certeza que deseja excluir este usuário?')) {
+    const confirmed = await confirm({
+      message: 'Tem certeza que deseja excluir este usuário?',
+      type: 'warning',
+    });
+    
+    if (!confirmed) {
       return;
     }
 
@@ -82,9 +90,10 @@ const Users = () => {
   };
 
   if (!isAdmin) {
-    return (
-      <Layout>
-        <div className="container">
+  return (
+    <Layout>
+      <DialogComponent />
+      <div className="container">
           <div className="card">
             <h1>Acesso Negado</h1>
             <p>Você não tem permissão para acessar esta página.</p>
@@ -102,9 +111,12 @@ const Users = () => {
         {success && <div className="alert alert-success">{success}</div>}
 
         <div className="users-toolbar">
-          <button onClick={handleCreate} className="btn btn-primary">
-            + Novo Usuário
-          </button>
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+            <RefreshButton onRefresh={loadUsers} loading={loading} />
+            <button onClick={handleCreate} className="btn btn-primary">
+              + Novo Usuário
+            </button>
+          </div>
         </div>
 
         {loading ? (

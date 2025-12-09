@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Layout from '../components/Layout';
 import billingService from '../services/billingService';
 import botService from '../services/botService';
+import RefreshButton from '../components/RefreshButton';
 import { Line } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
@@ -86,6 +87,13 @@ const Billing = () => {
       setError(err.response?.data?.error || 'Erro ao carregar dados filtrados');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleRefresh = async () => {
+    await loadInitialData();
+    if (filters.start_date || filters.end_date || filters.month || filters.bot_id || filters.payment_method || filters.gateway) {
+      await loadBillingData();
     }
   };
 
@@ -183,8 +191,9 @@ const Billing = () => {
   return (
     <Layout>
       <div className="billing-page">
-        <div className="billing-header">
+        <div className="billing-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h1>Faturamento</h1>
+          <RefreshButton onRefresh={handleRefresh} loading={loading} className="compact" />
           <p>Visualize e gerencie seus pagamentos e faturamento</p>
         </div>
 

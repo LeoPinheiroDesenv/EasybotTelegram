@@ -5,6 +5,7 @@ import contactService from '../services/contactService';
 import botService from '../services/botService';
 import groupManagementService from '../services/groupManagementService';
 import useConfirm from '../hooks/useConfirm';
+import RefreshButton from '../components/RefreshButton';
 import './Contacts.css';
 
 const Contacts = () => {
@@ -88,6 +89,15 @@ const Contacts = () => {
     } catch (err) {
       console.error('Error loading latest contacts:', err);
     }
+  };
+
+  const handleRefresh = async () => {
+    if (!botId) return;
+    await Promise.all([
+      loadContacts(botId, pagination.page),
+      loadStats(botId),
+      loadLatestContacts(botId)
+    ]);
   };
 
   const handleBotChange = (e) => {
@@ -308,8 +318,9 @@ const Contacts = () => {
         <div className="contacts-main">
           <div className="contacts-content">
             {/* Search and Filter Section */}
-            <div className="contacts-filters">
-              <div className="search-box">
+            <div className="contacts-filters" style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', alignItems: 'center', marginBottom: '16px' }}>
+              <RefreshButton onRefresh={handleRefresh} loading={loading} className="compact" />
+              <div className="search-box" style={{ flex: 1, minWidth: '200px' }}>
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <circle cx="11" cy="11" r="8"></circle>
                   <path d="m21 21-4.35-4.35"></path>

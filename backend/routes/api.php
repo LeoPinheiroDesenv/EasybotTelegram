@@ -18,6 +18,7 @@ use App\Http\Controllers\AlertController;
 use App\Http\Controllers\FtpController;
 use App\Http\Controllers\StorageController;
 use App\Http\Controllers\ArtisanController;
+use App\Http\Controllers\BotFatherController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -164,6 +165,16 @@ Route::middleware('auth:api')->group(function () {
     Route::get('/storage/link/status', [StorageController::class, 'checkStorageLink']);
     Route::post('/storage/link/create', [StorageController::class, 'createStorageLink']);
     Route::post('/storage/test', [StorageController::class, 'testStorageAccess']);
+
+    // BotFather routes
+    Route::get('/bots/{botId}/botfather/info', [BotFatherController::class, 'getBotInfo']);
+    Route::post('/bots/{botId}/botfather/set-name', [BotFatherController::class, 'setMyName']);
+    Route::post('/bots/{botId}/botfather/set-description', [BotFatherController::class, 'setMyDescription']);
+    Route::post('/bots/{botId}/botfather/set-short-description', [BotFatherController::class, 'setMyShortDescription']);
+    Route::post('/bots/{botId}/botfather/set-about', [BotFatherController::class, 'setMyAbout']);
+    Route::post('/bots/{botId}/botfather/set-menu-button', [BotFatherController::class, 'setChatMenuButton']);
+    Route::post('/bots/{botId}/botfather/set-default-admin-rights', [BotFatherController::class, 'setMyDefaultAdministratorRights']);
+    Route::post('/bots/{botId}/botfather/delete-commands', [BotFatherController::class, 'deleteMyCommands']);
 
     // Artisan commands routes (super admin only)
     Route::middleware('super_admin')->group(function () {

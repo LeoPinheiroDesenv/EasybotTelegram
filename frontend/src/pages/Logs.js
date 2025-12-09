@@ -5,6 +5,7 @@ import logService from '../services/logService';
 import botService from '../services/botService';
 import useConfirm from '../hooks/useConfirm';
 import useAlert from '../hooks/useAlert';
+import RefreshButton from '../components/RefreshButton';
 import './Logs.css';
 
 const Logs = () => {
@@ -219,20 +220,23 @@ const Logs = () => {
         <div className="logs-container">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
             <h1 className="logs-title" style={{ margin: 0 }}>Logs da Aplicação</h1>
-            {total > 0 && (
-              <button
-                onClick={handleDeleteAll}
-                disabled={deleting || loading}
-                className="btn btn-danger"
-                style={{ 
-                  padding: '10px 20px',
-                  fontSize: '14px',
-                  fontWeight: '500'
-                }}
-              >
-                {deleting ? 'Removendo...' : '🗑️ Remover Todos os Logs'}
-              </button>
-            )}
+            <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+              <RefreshButton onRefresh={loadLogs} loading={loading} />
+              {total > 0 && (
+                <button
+                  onClick={handleDeleteAll}
+                  disabled={deleting || loading}
+                  className="btn btn-danger"
+                  style={{ 
+                    padding: '10px 20px',
+                    fontSize: '14px',
+                    fontWeight: '500'
+                  }}
+                >
+                  {deleting ? 'Removendo...' : '🗑️ Remover Todos os Logs'}
+                </button>
+              )}
+            </div>
           </div>
           
           {error && <div className="alert alert-error">{error}</div>}

@@ -1,0 +1,32 @@
+{
+  "files": {
+    "maxSize": 5000000,
+    "exclude": [
+      "**/node_modules/**",
+      "**/bower_components/**",
+      "**/build/**",
+      "**/storage/**",
+      "**/bootstrap/cache/**"
+    ]
+  },
+  "completion": {
+    "fullyQualifyGlobalConstantsAndFunctions": false,
+    "fullyQualifyGlobalConstants": false,
+    "fullyQualifyGlobalFunctions": false,
+    "insertUseDeclaration": true,
+    "triggerParameterHints": true
+  },
+  "environment": {
+    "includePaths": [
+      "./backend/vendor",
+      "./backend/app",
+      "./backend"
+    ],
+    "phpVersion": "8.2.0"
+  },
+  "diagnostics": {
+    "enable": true,
+    "run": "onSave"
+  }
+}
+

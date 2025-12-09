@@ -4,6 +4,7 @@ import Layout from '../components/Layout';
 import alertService from '../services/alertService';
 import paymentPlanService from '../services/paymentPlanService';
 import useConfirm from '../hooks/useConfirm';
+import RefreshButton from '../components/RefreshButton';
 import './Alerts.css';
 
 const Alerts = () => {
@@ -73,6 +74,14 @@ const Alerts = () => {
     } catch (err) {
       console.error('Erro ao carregar planos:', err);
     }
+  };
+
+  const handleRefresh = async () => {
+    if (!botId) return;
+    await Promise.all([
+      loadAlerts(),
+      loadPaymentPlans()
+    ]);
   };
 
   const handleChange = (e) => {
@@ -295,7 +304,8 @@ const Alerts = () => {
                 {alerts.length}
               </div>
             </div>
-            <div className="alerts-actions">
+            <div className="alerts-actions" style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+              <RefreshButton onRefresh={handleRefresh} loading={loadingData} className="compact" />
               {showSearch ? (
                 <div className="search-input-container">
                   <input

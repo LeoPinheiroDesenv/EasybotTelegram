@@ -3,6 +3,7 @@ import { AuthContext } from '../contexts/AuthContext';
 import Layout from '../components/Layout';
 import userGroupService from '../services/userGroupService';
 import useConfirm from '../hooks/useConfirm';
+import RefreshButton from '../components/RefreshButton';
 import './UserGroups.css';
 
 const UserGroups = () => {
@@ -243,11 +244,14 @@ const UserGroups = () => {
     <Layout>
       <DialogComponent />
       <div className="user-groups-page">
-        <div className="user-groups-header">
+        <div className="user-groups-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h1>Grupos de Usuários</h1>
-          <button className="btn btn-primary" onClick={handleCreate}>
-            + Novo Grupo
-          </button>
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+            <RefreshButton onRefresh={() => Promise.all([loadGroups(), loadAvailableMenus(), loadAvailableBots()])} loading={loading} className="compact" />
+            <button className="btn btn-primary" onClick={handleCreate}>
+              + Novo Grupo
+            </button>
+          </div>
         </div>
 
         {error && <div className="alert alert-error">{error}</div>}

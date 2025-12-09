@@ -6,6 +6,7 @@ import Layout from '../components/Layout';
 import telegramGroupService from '../services/telegramGroupService';
 import paymentPlanService from '../services/paymentPlanService';
 import useConfirm from '../hooks/useConfirm';
+import RefreshButton from '../components/RefreshButton';
 import './TelegramGroups.css';
 
 const TelegramGroups = () => {
@@ -62,6 +63,14 @@ const TelegramGroups = () => {
     } catch (err) {
       console.error('Erro ao carregar planos:', err);
     }
+  };
+
+  const handleRefresh = async () => {
+    if (!botId) return;
+    await Promise.all([
+      loadGroups(),
+      loadPaymentPlans()
+    ]);
   };
 
   const handleOpenModal = (group = null) => {
@@ -258,11 +267,14 @@ const TelegramGroups = () => {
   return (
     <Layout>
       <div className="telegram-groups-page">
-        <div className="page-header">
+        <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h1>Grupos e Canais</h1>
-          <button className="btn btn-primary" onClick={() => handleOpenModal()}>
-            <FontAwesomeIcon icon={faPlus} /> Adicionar Grupo/Canal
-          </button>
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+            <RefreshButton onRefresh={handleRefresh} loading={loadingData} className="compact" />
+            <button className="btn btn-primary" onClick={() => handleOpenModal()}>
+              <FontAwesomeIcon icon={faPlus} /> Adicionar Grupo/Canal
+            </button>
+          </div>
         </div>
 
         {error && (
