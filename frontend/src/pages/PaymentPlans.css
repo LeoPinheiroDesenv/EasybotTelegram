@@ -1,12 +1,15 @@
 .payment-plans-page {
   min-height: calc(100vh - 80px);
-  padding: 32px;
-  background-color: #ffffff;
+  padding: clamp(16px, 5vw, 32px);
+  background-color: #f9fafb;
 }
 
 .payment-plans-content {
   max-width: 1200px;
   margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
 }
 
 .loading-container,
@@ -28,11 +31,14 @@
 /* Header Section */
 .payment-plans-header {
   display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 40px;
-  padding: 0;
+  flex-direction: column;
+  gap: 16px;
   width: 100%;
+  background-color: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  padding: clamp(20px, 4vw, 32px);
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
   box-sizing: border-box;
 }
 
@@ -41,23 +47,27 @@
 }
 
 .header-text h1 {
-  font-size: 28px;
-  font-weight: 700;
-  color: #9333ea;
-  margin-bottom: 12px;
+  font-size: clamp(24px, 4vw, 32px);
+  font-weight: 600;
+  color: #111827;
+  margin-bottom: 8px;
 }
 
 .header-text p {
   font-size: 16px;
-  color: #6b7280;
+  color: #4b5563;
   line-height: 1.6;
 }
 
 .header-actions {
   display: flex;
+  flex-direction: column;
   gap: 12px;
-  flex-shrink: 0;
-  align-items: center;
+  width: 100%;
+}
+
+.header-actions > * {
+  width: 100%;
 }
 
 .btn-create {
@@ -70,6 +80,11 @@
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
 }
 
 .btn-create:hover {
@@ -88,6 +103,11 @@
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
 }
 
 .btn-edit-pix:hover {
@@ -117,19 +137,19 @@
 /* Earnings Card */
 .earnings-card {
   display: flex;
-  align-items: center;
-  gap: 20px;
-  padding: 24px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 16px;
+  padding: clamp(20px, 4vw, 28px);
   background-color: #ffffff;
   border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  margin-bottom: 32px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  border-radius: 16px;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
 }
 
 .earnings-icon {
-  width: 64px;
-  height: 64px;
+  width: 56px;
+  height: 56px;
   background-color: #9333ea;
   color: #ffffff;
   border-radius: 50%;
@@ -161,16 +181,18 @@
 .payment-plans-section {
   background-color: #ffffff;
   border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  padding: 24px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  border-radius: 16px;
+  padding: clamp(20px, 4vw, 32px);
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
 }
 
 .section-header {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 24px;
+  flex-direction: column;
+  gap: 12px;
   padding-bottom: 16px;
   border-bottom: 1px solid #e5e7eb;
 }
@@ -182,13 +204,15 @@
 }
 
 .language-selector {
-  padding: 8px 16px;
+  padding: 10px 16px;
   border: 1px solid #d1d5db;
-  border-radius: 6px;
+  border-radius: 8px;
   font-size: 14px;
   background-color: #ffffff;
   color: #111827;
   cursor: pointer;
+  width: 100%;
+  max-width: 100%;
 }
 
 .language-selector:focus {
@@ -209,9 +233,25 @@
 }
 
 /* Table */
+.payment-plans-table-wrapper {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.payment-plans-table-wrapper::-webkit-scrollbar {
+  height: 6px;
+}
+
+.payment-plans-table-wrapper::-webkit-scrollbar-thumb {
+  background-color: rgba(156, 163, 175, 0.7);
+  border-radius: 999px;
+}
+
 .payment-plans-table {
   width: 100%;
   border-collapse: collapse;
+  min-width: 720px;
 }
 
 .payment-plans-table thead {
@@ -384,7 +424,7 @@
 
 .form-row {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr;
   gap: 16px;
 }
 
@@ -439,40 +479,122 @@
   background-color: #e5e7eb;
 }
 
-@media (max-width: 768px) {
+@media (max-width: 640px) {
+  .payment-plans-table {
+    min-width: 0;
+  }
+
+  .payment-plans-table,
+  .payment-plans-table thead,
+  .payment-plans-table tbody,
+  .payment-plans-table th,
+  .payment-plans-table td,
+  .payment-plans-table tr {
+    display: block;
+    width: 100%;
+  }
+
+  .payment-plans-table thead {
+    border: 0;
+    clip: rect(0 0 0 0);
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    padding: 0;
+    position: absolute;
+    width: 1px;
+  }
+
+  .payment-plans-table tr {
+    margin-bottom: 16px;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 16px;
+    background-color: #ffffff;
+    box-shadow: 0 2px 6px rgba(15, 23, 42, 0.08);
+  }
+
+  .payment-plans-table td {
+    border-bottom: none;
+    padding: 8px 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .payment-plans-table td::before {
+    content: attr(data-label);
+    font-size: 12px;
+    font-weight: 600;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 4px;
+  }
+
+  .payment-plans-table td:last-child {
+    padding-top: 12px;
+  }
+
+  .action-buttons {
+    width: 100%;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .btn-icon {
+    width: 44px;
+    height: 44px;
+  }
+}
+
+@media (min-width: 640px) {
+  .form-row {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 768px) {
   .payment-plans-content {
-    padding: 24px;
+    gap: 32px;
   }
 
   .payment-plans-header {
-    flex-direction: column;
-    gap: 20px;
+    flex-direction: row;
+    align-items: center;
+  }
+
+  .header-text {
+    max-width: 60%;
   }
 
   .header-actions {
-    width: 100%;
-    flex-direction: column;
+    flex-direction: row;
+    width: auto;
+    justify-content: flex-end;
+    align-items: center;
   }
 
-  .header-actions button {
-    width: 100%;
+  .header-actions > * {
+    width: auto;
+  }
+
+  .btn-create,
+  .btn-edit-pix {
+    min-width: 160px;
   }
 
   .earnings-card {
-    flex-direction: column;
-    align-items: flex-start;
+    flex-direction: row;
+    align-items: center;
   }
 
-  .form-row {
-    grid-template-columns: 1fr;
+  .section-header {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
   }
 
-  .payment-plans-table {
-    font-size: 12px;
-  }
-
-  .payment-plans-table th,
-  .payment-plans-table td {
-    padding: 8px;
+  .language-selector {
+    max-width: 220px;
   }
 }
