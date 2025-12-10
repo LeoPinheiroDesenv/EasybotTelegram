@@ -178,6 +178,168 @@
   position: relative;
 }
 
+.billing-plans-section {
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 32px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.plans-subscriptions-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+  gap: 24px;
+}
+
+.plans-card,
+.subscriptions-card {
+  background: #f9fafb;
+  border-radius: 8px;
+  padding: 20px;
+}
+
+.plans-card h3,
+.subscriptions-card h3 {
+  font-size: 18px;
+  font-weight: 600;
+  color: #111827;
+  margin: 0 0 16px 0;
+}
+
+.plans-list,
+.subscriptions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 500px;
+  overflow-y: auto;
+}
+
+.plan-item {
+  background: #ffffff;
+  border-radius: 8px;
+  padding: 16px;
+  border: 1px solid #e5e7eb;
+}
+
+.plan-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.plan-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.plan-price {
+  font-size: 14px;
+  font-weight: 500;
+  color: #059669;
+}
+
+.plan-stats {
+  display: flex;
+  gap: 16px;
+  font-size: 14px;
+  color: #6b7280;
+}
+
+.plan-stats .stat-item strong {
+  color: #111827;
+  font-weight: 600;
+}
+
+.subscription-item {
+  background: #ffffff;
+  border-radius: 8px;
+  padding: 16px;
+  border: 1px solid #e5e7eb;
+}
+
+.subscription-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.subscription-user {
+  font-size: 15px;
+  font-weight: 600;
+  color: #111827;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.subscription-username {
+  font-size: 12px;
+  font-weight: 400;
+  color: #9ca3af;
+}
+
+.subscription-plan {
+  font-size: 14px;
+  font-weight: 500;
+  color: #3b82f6;
+  background: #dbeafe;
+  padding: 4px 12px;
+  border-radius: 12px;
+}
+
+.subscription-details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 8px;
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.subscription-details .detail-item strong {
+  color: #111827;
+  font-weight: 600;
+}
+
+.subscription-dates {
+  display: flex;
+  gap: 16px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #e5e7eb;
+  font-size: 12px;
+  color: #9ca3af;
+}
+
+.subscriptions-more {
+  text-align: center;
+  padding: 12px;
+  color: #6b7280;
+  font-size: 13px;
+}
+
+.plan-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.plan-name {
+  font-weight: 500;
+  color: #111827;
+  font-size: 14px;
+}
+
+.plan-price-small {
+  font-size: 12px;
+  color: #6b7280;
+}
+
 .billing-transactions-section {
   background: #ffffff;
   border-radius: 12px;

@@ -14,9 +14,12 @@ const PaymentGatewayConfigs = () => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [showModal, setShowModal] = useState(false);
+  const [showStatusModal, setShowStatusModal] = useState(false);
   const [editingConfig, setEditingConfig] = useState(null);
   const [selectedGateway, setSelectedGateway] = useState('mercadopago');
   const [selectedEnvironment, setSelectedEnvironment] = useState('test');
+  const [apiStatus, setApiStatus] = useState(null);
+  const [loadingStatus, setLoadingStatus] = useState(false);
   const [formData, setFormData] = useState({
     gateway: 'mercadopago',
     environment: 'test',
@@ -192,6 +195,32 @@ const PaymentGatewayConfigs = () => {
     return token.substring(0, 4) + '••••••••' + token.substring(token.length - 4);
   };
 
+  const handleCheckApiStatus = async (gateway, environment) => {
+    setLoadingStatus(true);
+    setShowStatusModal(true);
+    setSelectedGateway(gateway);
+    setSelectedEnvironment(environment);
+    setApiStatus(null);
+
+    try {
+      const status = await paymentGatewayConfigService.checkApiStatus(botId, gateway, environment);
+      setApiStatus(status);
+    } catch (err) {
+      setApiStatus({
+        status: 'error',
+        message: 'Erro ao verificar status',
+        details: err.response?.data?.message || err.message || 'Erro desconhecido'
+      });
+    } finally {
+      setLoadingStatus(false);
+    }
+  };
+
+  const handleCloseStatusModal = () => {
+    setShowStatusModal(false);
+    setApiStatus(null);
+  };
+
   if (loading && !botId) {
     return (
       <Layout>
@@ -233,7 +262,25 @@ const PaymentGatewayConfigs = () => {
           {/* Mercado Pago Section */}
           <div className="gateway-section">
             <div className="gateway-header">
-              <h2>Mercado Pago (PIX)</h2>
+              <div className="gateway-title-wrapper">
+                <h2>Mercado Pago (PIX)</h2>
+                <div className="status-api-buttons">
+                  <button
+                    className="btn-status-api"
+                    onClick={() => handleCheckApiStatus('mercadopago', 'test')}
+                    title="Verificar status da API - Ambiente de Teste"
+                  >
+                    Status API (Teste)
+                  </button>
+                  <button
+                    className="btn-status-api"
+                    onClick={() => handleCheckApiStatus('mercadopago', 'production')}
+                    title="Verificar status da API - Ambiente de Produção"
+                  >
+                    Status API (Produção)
+                  </button>
+                </div>
+              </div>
               <div className="gateway-badges">
                 <button
                   className={`badge ${getConfigForGateway('mercadopago', 'test')?.is_active ? 'active' : ''}`}
@@ -336,7 +383,25 @@ const PaymentGatewayConfigs = () => {
           {/* Stripe Section */}
           <div className="gateway-section">
             <div className="gateway-header">
-              <h2>Stripe (Cartão de Crédito)</h2>
+              <div className="gateway-title-wrapper">
+                <h2>Stripe (Cartão de Crédito)</h2>
+                <div className="status-api-buttons">
+                  <button
+                    className="btn-status-api"
+                    onClick={() => handleCheckApiStatus('stripe', 'test')}
+                    title="Verificar status da API - Ambiente de Teste"
+                  >
+                    Status API (Teste)
+                  </button>
+                  <button
+                    className="btn-status-api"
+                    onClick={() => handleCheckApiStatus('stripe', 'production')}
+                    title="Verificar status da API - Ambiente de Produção"
+                  >
+                    Status API (Produção)
+                  </button>
+                </div>
+              </div>
               <div className="gateway-badges">
                 <button
                   className={`badge ${getConfigForGateway('stripe', 'test')?.is_active ? 'active' : ''}`}
@@ -475,6 +540,17 @@ const PaymentGatewayConfigs = () => {
                       />
                       <small>URL para receber notificações do Mercado Pago</small>
                     </div>
+                    <div className="form-group">
+                      <label>Webhook Secret</label>
+                      <input
+                        type="password"
+                        name="webhook_secret"
+                        value={formData.webhook_secret}
+                        onChange={handleChange}
+                        placeholder="Chave secreta para validar webhooks"
+                      />
+                      <small>Chave secreta para validar a autenticidade dos webhooks (opcional, mas recomendado)</small>
+                    </div>
                   </>
                 ) : (
                   <>
@@ -551,6 +627,69 @@ const PaymentGatewayConfigs = () => {
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        )}
+
+        {/* Status API Modal */}
+        {showStatusModal && (
+          <div className="modal-overlay" onClick={handleCloseStatusModal}>
+            <div className="modal-content status-modal" onClick={(e) => e.stopPropagation()}>
+              <div className="modal-header">
+                <h2>
+                  Status da API - {selectedGateway === 'mercadopago' ? 'Mercado Pago' : 'Stripe'} ({selectedEnvironment === 'test' ? 'Teste' : 'Produção'})
+                </h2>
+                <button className="modal-close" onClick={handleCloseStatusModal}>×</button>
+              </div>
+              <div className="status-modal-content">
+                {loadingStatus ? (
+                  <div className="status-loading">
+                    <p>Verificando status da API...</p>
+                  </div>
+                ) : apiStatus ? (
+                  <div className={`status-result status-${apiStatus.status}`}>
+                    <div className="status-icon">
+                      {apiStatus.status === 'success' && '✓'}
+                      {apiStatus.status === 'error' && '✗'}
+                      {apiStatus.status === 'warning' && '⚠'}
+                    </div>
+                    <h3 className="status-message">{apiStatus.message}</h3>
+                    {apiStatus.details && (
+                      <div className="status-details">
+                        {typeof apiStatus.details === 'string' ? (
+                          <p>{apiStatus.details}</p>
+                        ) : (
+                          <div className="status-details-object">
+                            {Object.entries(apiStatus.details).map(([key, value]) => (
+                              <div key={key} className="status-detail-item">
+                                <strong>{key}:</strong> {String(value)}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    {apiStatus.timestamp && (
+                      <div className="status-timestamp">
+                        <small>Verificado em: {new Date(apiStatus.timestamp).toLocaleString('pt-BR')}</small>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="status-error">
+                    <p>Nenhum status disponível</p>
+                  </div>
+                )}
+              </div>
+              <div className="modal-footer">
+                <button
+                  type="button"
+                  onClick={handleCloseStatusModal}
+                  className="btn btn-primary"
+                >
+                  Fechar
+                </button>
+              </div>
             </div>
           </div>
         )}

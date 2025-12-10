@@ -17,6 +17,7 @@ use Stripe\Exception\ApiErrorException;
 use Exception;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use App\Services\PixCrcService;
 
 class PaymentService
 {
@@ -104,7 +105,11 @@ class PaymentService
             $paymentData['external_reference'] = $transactionId;
 
             // Adiciona URL de notificação
-            $webhookUrl = $gatewayConfig->webhook_url ?? env('APP_URL') . '/api/payments/webhook/mercadopago';
+            // Se webhook_url não estiver configurado no banco, usa a URL base da aplicação
+            $webhookUrl = $gatewayConfig->webhook_url;
+            if (!$webhookUrl) {
+                $webhookUrl = config('app.url') . '/api/payments/webhook/mercadopago';
+            }
             if ($webhookUrl) {
                 $paymentData['notification_url'] = $webhookUrl;
             }
@@ -131,69 +136,191 @@ class PaymentService
             }
 
             if (!$pixData) {
+                Log::error('Dados PIX não encontrados na resposta do Mercado Pago', [
+                    'payment_id' => $payment->id ?? null,
+                    'payment_status' => $payment->status ?? null,
+                    'has_point_of_interaction' => isset($payment->point_of_interaction),
+                    'point_of_interaction_keys' => isset($payment->point_of_interaction) ? array_keys((array)$payment->point_of_interaction) : []
+                ]);
                 throw new Exception('Erro ao obter dados do PIX do Mercado Pago. Pagamento criado mas sem dados PIX.');
             }
 
             // Extrai código PIX e QR Code
-            $pixCode = $pixData->qr_code ?? null;
+            // O Mercado Pago pode retornar o código em diferentes formatos:
+            // - qr_code: código PIX em texto (formato EMV)
+            // - qr_code_base64: código PIX codificado em base64 (precisa decodificar)
+            $pixCode = null;
+            if (isset($pixData->qr_code)) {
+                $pixCode = $pixData->qr_code;
+            } elseif (isset($pixData->qr_code_base64)) {
+                // Decodifica base64 para obter o código PIX em texto
+                $decoded = base64_decode($pixData->qr_code_base64, true);
+                if ($decoded !== false) {
+                    $pixCode = $decoded;
+                } else {
+                    Log::warning('Falha ao decodificar qr_code_base64 do Mercado Pago', [
+                        'payment_id' => $payment->id ?? null
+                    ]);
+                }
+            }
+            
             $pixCodeBase64 = $pixData->qr_code_base64 ?? null;
             $ticketUrl = $pixData->ticket_url ?? null;
 
+            // Log da estrutura recebida para debug
+            Log::debug('Dados PIX recebidos do Mercado Pago', [
+                'has_qr_code' => isset($pixData->qr_code),
+                'has_qr_code_base64' => isset($pixData->qr_code_base64),
+                'has_ticket_url' => isset($pixData->ticket_url),
+                'transaction_data_keys' => array_keys((array)$pixData),
+                'qr_code_length' => isset($pixData->qr_code) ? strlen($pixData->qr_code) : null
+            ]);
+
             if (!$pixCode) {
+                Log::error('Código PIX não encontrado na resposta do Mercado Pago', [
+                    'payment_id' => $payment->id ?? null,
+                    'transaction_data' => (array)$pixData
+                ]);
                 throw new Exception('Código PIX não retornado pelo Mercado Pago.');
             }
 
-            // Normaliza o código PIX: remove quebras de linha, espaços extras e caracteres invisíveis
-            // O código PIX EMV deve ser uma string contínua sem espaços ou quebras
-            // IMPORTANTE: O código PIX EMV contém apenas caracteres ASCII imprimíveis (0x20-0x7E)
-            // Não devemos remover caracteres válidos do código
+            // IMPORTANTE: O código PIX do Mercado Pago já vem com CRC calculado
+            // Devemos validar o CRC ANTES de normalizar, pois o CRC foi calculado sobre o código original
+            $pixCrcService = new PixCrcService();
             $pixCodeOriginal = $pixCode;
-            $pixCode = trim($pixCode);
-            // Remove apenas espaços em branco e quebras de linha (whitespace)
-            // Mantém todos os caracteres ASCII imprimíveis (0x20-0x7E)
-            $pixCode = preg_replace('/\s+/', '', $pixCode);
-            // Remove apenas caracteres de controle (0x00-0x1F e 0x7F) mas mantém o resto
-            $pixCode = preg_replace('/[\x00-\x1F\x7F]/', '', $pixCode);
-            // NÃO removemos caracteres não-ASCII aqui, pois o código PIX pode conter
-            // caracteres válidos que não são ASCII padrão (embora raro)
             
-            // Valida se o código PIX começa com "000201" (padrão EMV para PIX)
-            if (!str_starts_with($pixCode, '000201')) {
+            // Primeiro, tenta validar o código PIX original (sem normalizar)
+            // Remove apenas espaços em branco para validação, mas mantém o código original
+            $pixCodeForValidation = trim($pixCode);
+            $pixCodeForValidation = preg_replace('/\s+/', '', $pixCodeForValidation);
+            
+            // Valida formato básico
+            if (!str_starts_with($pixCodeForValidation, '000201')) {
                 Log::error('Código PIX em formato incorreto - não começa com 000201', [
-                    'pix_code_start' => substr($pixCode, 0, 50),
-                    'pix_code_length' => strlen($pixCode),
+                    'pix_code_start' => substr($pixCodeForValidation, 0, 50),
+                    'pix_code_length' => strlen($pixCodeForValidation),
                     'pix_code_original_start' => substr($pixCodeOriginal, 0, 50)
                 ]);
                 throw new Exception('Código PIX retornado pelo Mercado Pago está em formato inválido.');
             }
             
-            // Valida comprimento mínimo do código PIX (deve ter pelo menos 100 caracteres)
-            if (strlen($pixCode) < 100) {
+            // Valida comprimento mínimo
+            if (strlen($pixCodeForValidation) < 100) {
                 Log::error('Código PIX muito curto', [
-                    'pix_code_length' => strlen($pixCode),
-                    'pix_code_start' => substr($pixCode, 0, 50)
+                    'pix_code_length' => strlen($pixCodeForValidation),
+                    'pix_code_start' => substr($pixCodeForValidation, 0, 50)
                 ]);
                 throw new Exception('Código PIX retornado pelo Mercado Pago está incompleto.');
             }
             
-            Log::info('Código PIX extraído e normalizado com sucesso', [
+            // Valida o CRC do código original (normalizado apenas removendo espaços)
+            $crcValidation = $pixCrcService->validatePixCode($pixCodeForValidation);
+            
+            if ($crcValidation['valid']) {
+                // CRC válido - usa o código normalizado (sem espaços, mas mantendo estrutura original)
+                $pixCode = $pixCodeForValidation;
+                Log::info('Código PIX do Mercado Pago com CRC válido', [
+                    'crc' => $crcValidation['current_crc'],
+                    'pix_code_length' => strlen($pixCode)
+                ]);
+            } else {
+                // CRC inválido - tenta normalizar mais e recalcular
+                Log::warning('Código PIX com CRC inválido, tentando normalizar e recalcular...', [
+                    'errors' => $crcValidation['errors'],
+                    'current_crc' => $crcValidation['current_crc'],
+                    'calculated_crc' => $crcValidation['calculated_crc'],
+                    'pix_code_length' => strlen($pixCodeForValidation),
+                    'pix_code_end' => substr($pixCodeForValidation, -10)
+                ]);
+                
+                // Normaliza mais agressivamente: remove caracteres de controle
+                $pixCodeNormalized = $pixCodeForValidation;
+                $pixCodeNormalized = preg_replace('/[\x00-\x1F\x7F]/', '', $pixCodeNormalized);
+                
+                // Recalcula o CRC
+                $pixCode = $pixCrcService->addCrc($pixCodeNormalized);
+                
+                // Valida novamente após correção
+                $crcValidation = $pixCrcService->validatePixCode($pixCode);
+                if (!$crcValidation['valid']) {
+                    Log::error('Falha ao corrigir CRC do código PIX após normalização', [
+                        'errors' => $crcValidation['errors'],
+                        'pix_code_length' => strlen($pixCode),
+                        'calculated_crc' => $crcValidation['calculated_crc'],
+                        'current_crc' => $crcValidation['current_crc']
+                    ]);
+                    throw new Exception('Erro ao validar/corrigir CRC do código PIX: ' . implode(', ', $crcValidation['errors']));
+                }
+                
+                Log::info('CRC do código PIX corrigido após normalização', [
+                    'old_crc' => $crcValidation['current_crc'] ?? 'N/A',
+                    'new_crc' => $crcValidation['calculated_crc'],
+                    'pix_code_length' => strlen($pixCode)
+                ]);
+            }
+            
+            // Garante que o código está limpo (sem espaços ou caracteres de controle) antes de gerar QR Code
+            $pixCode = trim($pixCode);
+            $pixCode = preg_replace('/\s+/', '', $pixCode);
+            $pixCode = preg_replace('/[\x00-\x1F\x7F]/', '', $pixCode);
+            
+            // Validação final antes de gerar QR Code
+            $finalValidation = $pixCrcService->validatePixCode($pixCode);
+            if (!$finalValidation['valid']) {
+                Log::error('Código PIX inválido após normalização final', [
+                    'errors' => $finalValidation['errors'],
+                    'pix_code_length' => strlen($pixCode)
+                ]);
+                throw new Exception('Código PIX inválido após processamento: ' . implode(', ', $finalValidation['errors']));
+            }
+            
+            Log::info('Código PIX extraído, normalizado e validado com sucesso', [
                 'pix_code_length' => strlen($pixCode),
                 'pix_code_start' => substr($pixCode, 0, 20),
                 'pix_code_end' => substr($pixCode, -20),
-                'is_valid_format' => str_starts_with($pixCode, '000201')
+                'crc' => substr($pixCode, -4),
+                'is_valid_format' => str_starts_with($pixCode, '000201'),
+                'crc_valid' => $finalValidation['crc_valid']
             ]);
 
-            // Gera QR Code como imagem usando o código PIX normalizado
-            // IMPORTANTE: Sempre geramos o QR Code localmente usando o código PIX normalizado
-            // para garantir que o QR Code contenha exatamente o mesmo código que será exibido
-            // O QR Code base64 do Mercado Pago pode ter sido gerado com o código original
-            // que pode conter espaços ou quebras de linha, tornando-o inválido
-            $qrCodeImage = $this->generateQrCodeImage($pixCode);
+            // Gera QR Code como imagem
+            // Prioriza usar o QR Code base64 do Mercado Pago se disponível e válido
+            // Caso contrário, gera localmente usando o código PIX validado
+            $qrCodeImage = null;
             
-            Log::info('QR Code gerado localmente usando código PIX normalizado', [
-                'pix_code_length' => strlen($pixCode),
-                'has_mercadopago_base64' => !empty($pixCodeBase64)
-            ]);
+            if (!empty($pixCodeBase64)) {
+                // Tenta usar o QR Code base64 do Mercado Pago
+                // Mas valida se o código PIX dentro dele corresponde ao nosso código validado
+                try {
+                    $decodedBase64 = base64_decode($pixCodeBase64, true);
+                    if ($decodedBase64 !== false && strlen($decodedBase64) > 100) {
+                        // Verifica se é uma imagem válida (PNG ou SVG)
+                        $isPng = substr($decodedBase64, 0, 8) === "\x89PNG\r\n\x1a\n";
+                        $isSvg = strpos($decodedBase64, '<svg') !== false || strpos($decodedBase64, '<?xml') !== false;
+                        
+                        if ($isPng || $isSvg) {
+                            $qrCodeImage = $pixCodeBase64;
+                            Log::info('Usando QR Code base64 do Mercado Pago', [
+                                'format' => $isPng ? 'PNG' : 'SVG',
+                                'size' => strlen($decodedBase64)
+                            ]);
+                        }
+                    }
+                } catch (Exception $e) {
+                    Log::warning('Erro ao processar QR Code base64 do Mercado Pago, gerando localmente', [
+                        'error' => $e->getMessage()
+                    ]);
+                }
+            }
+            
+            // Se não conseguiu usar o QR Code do Mercado Pago, gera localmente
+            if (!$qrCodeImage) {
+                $qrCodeImage = $this->generateQrCodeImage($pixCode);
+                Log::info('QR Code gerado localmente usando código PIX validado', [
+                    'pix_code_length' => strlen($pixCode),
+                    'crc' => substr($pixCode, -4)
+                ]);
+            }
 
             // Salva QR Code temporariamente (opcional)
             $qrCodePath = $this->saveQrCodeImage($transactionId, $qrCodeImage);
@@ -267,10 +394,8 @@ class PaymentService
     protected function generateQrCodeImage(string $pixCode): string
     {
         try {
-            // Garante que o código PIX está normalizado antes de gerar o QR Code
-            $pixCode = trim($pixCode);
-            $pixCode = preg_replace('/\s+/', '', $pixCode);
-            $pixCode = preg_replace('/[\x00-\x1F\x7F]/', '', $pixCode);
+            // O código PIX já deve estar normalizado e validado antes de chegar aqui
+            // Apenas validações finais de segurança
             
             // Valida o código antes de gerar o QR Code
             if (!str_starts_with($pixCode, '000201')) {
@@ -281,9 +406,26 @@ class PaymentService
                 throw new Exception('Código PIX muito curto para geração de QR Code');
             }
             
-            Log::debug('Gerando QR Code para código PIX', [
+            // Validação final do CRC (deve estar válido, mas verificamos por segurança)
+            $pixCrcService = new PixCrcService();
+            $crcValidation = $pixCrcService->validatePixCode($pixCode);
+            
+            if (!$crcValidation['valid']) {
+                Log::error('Código PIX com CRC inválido ao gerar QR Code', [
+                    'errors' => $crcValidation['errors'],
+                    'current_crc' => $crcValidation['current_crc'],
+                    'calculated_crc' => $crcValidation['calculated_crc'],
+                    'pix_code_length' => strlen($pixCode),
+                    'pix_code_end' => substr($pixCode, -10)
+                ]);
+                throw new Exception('Código PIX com CRC inválido não pode ser usado para gerar QR Code: ' . implode(', ', $crcValidation['errors']));
+            }
+            
+            Log::debug('Gerando QR Code para código PIX validado', [
                 'pix_code_length' => strlen($pixCode),
-                'pix_code_start' => substr($pixCode, 0, 20)
+                'pix_code_start' => substr($pixCode, 0, 20),
+                'crc' => substr($pixCode, -4),
+                'crc_valid' => true
             ]);
             
             // Tenta gerar PNG (melhor qualidade para QR Codes)

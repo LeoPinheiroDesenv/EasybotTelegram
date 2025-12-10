@@ -1,9 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
+import { AuthContext } from '../contexts/AuthContext';
 import userService from '../services/userService';
 import userGroupService from '../services/userGroupService';
 import './UserModal.css';
 
 const UserModal = ({ user, onClose, onSave }) => {
+  const { user: currentUser } = useContext(AuthContext);
+  const isSuperAdmin = currentUser?.user_type === 'super_admin';
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -56,10 +59,17 @@ const UserModal = ({ user, onClose, onSave }) => {
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
-    setFormData({
+    const newFormData = {
       ...formData,
       [name]: type === 'checkbox' ? checked : value
-    });
+    };
+    
+    // Sincronizar role com user_type
+    if (name === 'user_type') {
+      newFormData.role = value === 'admin' ? 'admin' : 'user';
+    }
+    
+    setFormData(newFormData);
     setError('');
   };
 
@@ -154,10 +164,16 @@ const UserModal = ({ user, onClose, onSave }) => {
               value={formData.user_type}
               onChange={handleChange}
               required
+              disabled={user && !isSuperAdmin} // Desabilita edição se não for super admin
             >
               <option value="user">Usuário (Somente Leitura)</option>
-              <option value="admin">Administrador (Leitura e Edição)</option>
+              {isSuperAdmin && (
+                <option value="admin">Administrador (Leitura e Edição)</option>
+              )}
             </select>
+            {!isSuperAdmin && !user && (
+              <small>Você só pode criar usuários. Apenas super administradores podem criar administradores.</small>
+            )}
           </div>
 
           <div className="form-group">

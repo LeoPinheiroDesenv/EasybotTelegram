@@ -394,11 +394,178 @@ class PaymentController extends Controller
     public function mercadoPagoWebhook(Request $request)
     {
         try {
+            // Valida assinatura do webhook se configurado (recomendado para produção)
+            // Documentação: https://www.mercadopago.com.br/developers/pt/docs/checkout-pro/payment-notifications
+            // Busca webhook_secret do banco de dados baseado no payment_id recebido
+            $webhookSecret = null;
+            
+            // Tenta encontrar a configuração do gateway baseado no payment_id
+            $dataId = $request->input('data.id');
+            if ($dataId) {
+                // Busca a transação para obter o bot_id
+                $transaction = Transaction::where('gateway', 'mercadopago')
+                    ->where(function($query) use ($dataId) {
+                        $query->where('gateway_transaction_id', (string) $dataId)
+                              ->orWhereRaw('JSON_EXTRACT(metadata, "$.mercadopago_payment_id") = ?', [(string) $dataId]);
+                    })
+                    ->first();
+                
+                if ($transaction) {
+                    // Busca a configuração do gateway para obter o webhook_secret
+                    $gatewayConfig = \App\Models\PaymentGatewayConfig::where('bot_id', $transaction->bot_id)
+                        ->where('gateway', 'mercadopago')
+                        ->where('active', true)
+                        ->first();
+                    
+                    if ($gatewayConfig && $gatewayConfig->webhook_secret) {
+                        $webhookSecret = $gatewayConfig->webhook_secret;
+                    }
+                }
+            }
+            
+            // Se não encontrou pelo payment_id, tenta buscar todas as configurações ativas
+            if (!$webhookSecret) {
+                $gatewayConfigs = \App\Models\PaymentGatewayConfig::where('gateway', 'mercadopago')
+                    ->where('active', true)
+                    ->whereNotNull('webhook_secret')
+                    ->get();
+                
+                // Tenta validar com cada configuração até encontrar uma que funcione
+                foreach ($gatewayConfigs as $config) {
+                    if ($config->webhook_secret) {
+                        $webhookSecret = $config->webhook_secret;
+                        break; // Usa a primeira encontrada
+                    }
+                }
+            }
+            
+            if ($webhookSecret) {
+                $signature = $request->header('x-signature');
+                if ($signature) {
+                    // Formato: ts=<timestamp>,v1=<hash>
+                    if (preg_match('/ts=(\d+),v1=(.+)/', $signature, $matches)) {
+                        $timestamp = $matches[1];
+                        $hash = $matches[2];
+                        
+                        // Detecta se o timestamp está em milissegundos ou segundos
+                        // Timestamps em milissegundos têm 13+ dígitos (ex: 1742505638683)
+                        // Timestamps em segundos têm 10 dígitos (ex: 1765333549)
+                        // Se o timestamp tiver 13+ dígitos, está em milissegundos
+                        $timestampSeconds = (int)$timestamp;
+                        $timestampLength = strlen($timestamp);
+                        
+                        if ($timestampLength >= 13) {
+                            // Está em milissegundos, converte para segundos
+                            $timestampSeconds = (int)($timestamp / 1000);
+                        } elseif ($timestamp > 2147483648) {
+                            // Timestamp muito grande para ser em segundos (maior que 2^31)
+                            // Provavelmente está em milissegundos mesmo com menos de 13 dígitos
+                            $timestampSeconds = (int)($timestamp / 1000);
+                        }
+                        
+                        // Valida timestamp (tolerância de 15 minutos para diferenças de relógio)
+                        // Permite timestamps até 15 minutos no passado ou no futuro
+                        // Isso ajuda a lidar com pequenas diferenças de sincronização de relógio
+                        $currentTime = time();
+                        $timeDifference = abs($currentTime - $timestampSeconds);
+                        $maxTolerance = 900; // 15 minutos em segundos
+                        
+                        if ($timeDifference > $maxTolerance) {
+                            \Illuminate\Support\Facades\Log::warning('Webhook Mercado Pago com timestamp fora da tolerância', [
+                                'timestamp' => $timestamp,
+                                'timestamp_seconds' => $timestampSeconds,
+                                'current_time' => $currentTime,
+                                'difference_seconds' => $timeDifference,
+                                'difference_minutes' => round($timeDifference / 60, 2),
+                                'timestamp_length' => $timestampLength,
+                                'is_future' => $timestampSeconds > $currentTime,
+                                'max_tolerance_seconds' => $maxTolerance
+                            ]);
+                            
+                            // Se a diferença for muito grande (mais de 1 hora), rejeita por segurança
+                            if ($timeDifference > 3600) {
+                                return response()->json(['error' => 'Invalid timestamp'], 400);
+                            }
+                            // Caso contrário, apenas loga mas continua processando
+                            // Isso permite que webhooks com pequenas diferenças de relógio sejam processados
+                        }
+                        
+                        // Valida hash HMAC SHA256
+                        // Formato do manifest: id:{data.id};request-id:{x-request-id};ts:{ts};
+                        // Documentação: https://www.mercadopago.com.br/developers/pt/docs/your-integrations/notifications/webhooks
+                        
+                        // Extrai data.id da query string ou do body
+                        // Tenta múltiplas formas de obter o data.id
+                        $dataId = $request->query('data.id') 
+                                ?? $request->get('data.id')
+                                ?? $request->input('data.id')
+                                ?? $request->input('data_id');
+                        
+                        // Tenta obter do body se ainda não encontrou
+                        if (!$dataId) {
+                            $dataBody = $request->input('data');
+                            if (is_array($dataBody) && isset($dataBody['id'])) {
+                                $dataId = $dataBody['id'];
+                            }
+                        }
+                        
+                        // Extrai x-request-id do header
+                        $requestId = $request->header('x-request-id');
+                        
+                        // Valida se temos os dados necessários
+                        if (!$dataId || !$requestId) {
+                            \Illuminate\Support\Facades\Log::warning('Webhook Mercado Pago faltando dados para validação', [
+                                'has_data_id' => !empty($dataId),
+                                'has_request_id' => !empty($requestId),
+                                'query_params' => $request->query->all(),
+                                'body' => $request->all()
+                            ]);
+                            // Continua mesmo sem validação se não tiver os dados
+                            // (alguns webhooks podem não ter esses campos)
+                        } else {
+                            // Constrói o manifest string no formato correto
+                            $manifest = "id:{$dataId};request-id:{$requestId};ts:{$timestamp};";
+                            
+                            // Calcula o HMAC SHA256 do manifest
+                            $calculatedHash = hash_hmac('sha256', $manifest, $webhookSecret);
+                            
+                            // Compara hash usando comparação segura (timing-safe)
+                            if (!hash_equals($hash, $calculatedHash)) {
+                                \Illuminate\Support\Facades\Log::warning('Webhook Mercado Pago com assinatura inválida', [
+                                    'received_hash' => substr($hash, 0, 20) . '...',
+                                    'calculated_hash' => substr($calculatedHash, 0, 20) . '...',
+                                    'manifest' => $manifest,
+                                    'data_id' => $dataId,
+                                    'request_id' => $requestId,
+                                    'timestamp' => $timestamp
+                                ]);
+                                return response()->json(['error' => 'Invalid signature'], 400);
+                            }
+                            
+                            \Illuminate\Support\Facades\Log::debug('Webhook Mercado Pago com assinatura válida', [
+                                'data_id' => $dataId,
+                                'request_id' => $requestId
+                            ]);
+                        }
+                    } else {
+                        \Illuminate\Support\Facades\Log::warning('Webhook Mercado Pago com formato de assinatura inválido', [
+                            'signature' => $signature
+                        ]);
+                        return response()->json(['error' => 'Invalid signature format'], 400);
+                    }
+                } else {
+                    // Se webhook secret está configurado mas não há assinatura, rejeita
+                    \Illuminate\Support\Facades\Log::warning('Webhook Mercado Pago sem assinatura (webhook secret configurado)');
+                    return response()->json(['error' => 'Missing signature'], 400);
+                }
+            }
+
             \Illuminate\Support\Facades\Log::info('Webhook Mercado Pago recebido', [
                 'data' => $request->all(),
                 'type' => $request->input('type'),
                 'action' => $request->input('action'),
-                'data_id' => $request->input('data.id')
+                'data_id' => $request->input('data.id'),
+                'has_signature' => $request->hasHeader('x-signature')
             ]);
 
             // O Mercado Pago envia notificações no formato:

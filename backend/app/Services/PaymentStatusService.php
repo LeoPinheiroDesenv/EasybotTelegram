@@ -56,7 +56,8 @@ class PaymentStatusService
 
         $now = Carbon::now();
         $isExpired = $now->greaterThan($expiresAt);
-        $daysUntilExpiration = $now->diffInDays($expiresAt, false);
+        // Arredonda o número de dias para o inteiro mais próximo
+        $daysUntilExpiration = (int) round($now->diffInDays($expiresAt, false));
         $isExpiringSoon = $daysUntilExpiration <= 7 && $daysUntilExpiration >= 0;
 
         return [
@@ -246,7 +247,8 @@ class PaymentStatusService
             $expiresAt = Carbon::parse($transaction->created_at)
                 ->addDays($paymentCycle->days ?? 30);
 
-            $daysUntilExpiration = Carbon::now()->diffInDays($expiresAt, false);
+            // Arredonda o número de dias para o inteiro mais próximo
+            $daysUntilExpiration = (int) round(Carbon::now()->diffInDays($expiresAt, false));
 
             // Se está entre 1 e $daysBeforeExpiration dias para expirar
             if ($daysUntilExpiration > 0 && $daysUntilExpiration <= $daysBeforeExpiration) {

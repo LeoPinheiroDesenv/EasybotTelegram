@@ -3,9 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Services\BillingService;
+use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Auth;
 
 class BillingController extends Controller
 {
@@ -22,7 +24,12 @@ class BillingController extends Controller
     public function getMonthlyBilling(): JsonResponse
     {
         try {
-            $billing = $this->billingService->getMonthlyBilling(auth()->id());
+            /** @var User|null $user */
+            $user = Auth::user();
+            if (!$user) {
+                return response()->json(['error' => 'Usuário não autenticado'], 401);
+            }
+            $billing = $this->billingService->getMonthlyBilling($user);
             return response()->json($billing);
         } catch (\Exception $e) {
             return response()->json([
@@ -50,14 +57,23 @@ class BillingController extends Controller
         }
 
         try {
-            // Verifica se o bot pertence ao usuário
+            /** @var User|null $user */
+            $user = Auth::user();
+            if (!$user) {
+                return response()->json(['error' => 'Usuário não autenticado'], 401);
+            }
+            
+            // Verifica se o bot pertence ao usuário (se não for super admin)
             if ($request->bot_id) {
-                $bot = \App\Models\Bot::where('id', $request->bot_id)
-                    ->where('user_id', auth()->id())
-                    ->first();
+                $bot = \App\Models\Bot::find($request->bot_id);
                 
                 if (!$bot) {
-                    return response()->json(['error' => 'Bot não encontrado ou não pertence ao usuário'], 404);
+                    return response()->json(['error' => 'Bot não encontrado'], 404);
+                }
+                
+                // Se não for super admin, verifica se o bot pertence ao usuário
+                if (!$user->isSuperAdmin() && $bot->user_id !== $user->id) {
+                    return response()->json(['error' => 'Bot não pertence ao usuário'], 403);
                 }
             }
 
@@ -70,7 +86,7 @@ class BillingController extends Controller
                 'gateway'
             ]);
 
-            $billing = $this->billingService->getBillingWithFilters(auth()->id(), $filters);
+            $billing = $this->billingService->getBillingWithFilters($user, $filters);
             return response()->json($billing);
         } catch (\Exception $e) {
             return response()->json([
@@ -93,8 +109,13 @@ class BillingController extends Controller
         }
 
         try {
+            /** @var User|null $user */
+            $user = Auth::user();
+            if (!$user) {
+                return response()->json(['error' => 'Usuário não autenticado'], 401);
+            }
             $months = $request->input('months', 12);
-            $chartData = $this->billingService->getMonthlyChartData(auth()->id(), $months);
+            $chartData = $this->billingService->getMonthlyChartData($user, $months);
             return response()->json(['data' => $chartData]);
         } catch (\Exception $e) {
             return response()->json([
@@ -109,7 +130,12 @@ class BillingController extends Controller
     public function getTotalBilling(): JsonResponse
     {
         try {
-            $total = $this->billingService->getTotalBilling(auth()->id());
+            /** @var User|null $user */
+            $user = Auth::user();
+            if (!$user) {
+                return response()->json(['error' => 'Usuário não autenticado'], 401);
+            }
+            $total = $this->billingService->getTotalBilling($user);
             return response()->json([
                 'total' => $total,
                 'currency' => 'BRL'
@@ -117,6 +143,26 @@ class BillingController extends Controller
         } catch (\Exception $e) {
             return response()->json([
                 'error' => 'Erro ao obter faturamento total: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Obtém estatísticas do dashboard
+     */
+    public function getDashboardStatistics(): JsonResponse
+    {
+        try {
+            /** @var User|null $user */
+            $user = Auth::user();
+            if (!$user) {
+                return response()->json(['error' => 'Usuário não autenticado'], 401);
+            }
+            $statistics = $this->billingService->getDashboardStatistics($user);
+            return response()->json($statistics);
+        } catch (\Exception $e) {
+            return response()->json([
+                'error' => 'Erro ao obter estatísticas do dashboard: ' . $e->getMessage()
             ], 500);
         }
     }

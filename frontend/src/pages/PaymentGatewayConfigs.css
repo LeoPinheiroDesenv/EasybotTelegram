@@ -47,6 +47,38 @@
   margin: 0;
 }
 
+.gateway-title-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  flex-wrap: wrap;
+}
+
+.status-api-buttons {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.btn-status-api {
+  padding: 6px 16px;
+  background: #17a2b8;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.btn-status-api:hover {
+  background: #138496;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
 .gateway-badges {
   display: flex;
   gap: 10px;
@@ -329,5 +361,106 @@
 .error-container p {
   color: #dc3545;
   margin-bottom: 20px;
+}
+
+/* Status Modal Styles */
+.status-modal {
+  max-width: 500px;
+}
+
+.status-modal-content {
+  padding: 20px 0;
+  min-height: 150px;
+}
+
+.status-loading {
+  text-align: center;
+  padding: 40px 20px;
+  color: #666;
+}
+
+.status-result {
+  padding: 20px;
+  border-radius: 8px;
+  text-align: center;
+}
+
+.status-result.status-success {
+  background: #d4edda;
+  border: 1px solid #c3e6cb;
+  color: #155724;
+}
+
+.status-result.status-error {
+  background: #f8d7da;
+  border: 1px solid #f5c6cb;
+  color: #721c24;
+}
+
+.status-result.status-warning {
+  background: #fff3cd;
+  border: 1px solid #ffeaa7;
+  color: #856404;
+}
+
+.status-icon {
+  font-size: 48px;
+  margin-bottom: 15px;
+  font-weight: bold;
+}
+
+.status-message {
+  font-size: 18px;
+  margin: 0 0 15px 0;
+  font-weight: 600;
+}
+
+.status-details {
+  margin-top: 20px;
+  text-align: left;
+  background: rgba(255, 255, 255, 0.5);
+  padding: 15px;
+  border-radius: 4px;
+}
+
+.status-details p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.status-details-object {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.status-detail-item {
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.status-detail-item strong {
+  display: inline-block;
+  min-width: 150px;
+  text-transform: capitalize;
+}
+
+.status-timestamp {
+  margin-top: 15px;
+  padding-top: 15px;
+  border-top: 1px solid rgba(0, 0, 0, 0.1);
+  text-align: center;
+}
+
+.status-timestamp small {
+  color: #666;
+  font-size: 12px;
+}
+
+.status-error {
+  text-align: center;
+  padding: 40px 20px;
+  color: #dc3545;
 }
 

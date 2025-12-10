@@ -31,6 +31,14 @@ const billingService = {
   async getTotalBilling() {
     const response = await api.get('/billing/total');
     return response.data;
+  },
+
+  /**
+   * Obtém estatísticas do dashboard
+   */
+  async getDashboardStatistics() {
+    const response = await api.get('/billing/dashboard-stats');
+    return response.data;
   }
 };
 

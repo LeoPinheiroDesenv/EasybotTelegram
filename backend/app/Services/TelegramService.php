@@ -2088,7 +2088,7 @@ class TelegramService
                     if (!$isPng && !$isSvg) {
                         // Se não for PNG nem SVG, tenta usar como PNG mesmo assim
                         // (pode ser que a biblioteca tenha retornado dados binários sem header)
-                        Log::warning('QR Code image não tem signature PNG ou SVG válida', [
+                        LogFacade::warning('QR Code image não tem signature PNG ou SVG válida', [
                             'data_start' => bin2hex(substr($decoded, 0, 20))
                         ]);
                     }
@@ -2102,7 +2102,7 @@ class TelegramService
                         throw new Exception('Erro ao salvar QR Code em arquivo temporário');
                     }
                     
-                    Log::debug('QR Code salvo em arquivo temporário', [
+                    LogFacade::debug('QR Code salvo em arquivo temporário', [
                         'file' => $tempFile,
                         'size' => $bytesWritten,
                         'format' => $fileExtension
@@ -2123,14 +2123,14 @@ class TelegramService
 
                     if (!$response->successful()) {
                         $errorBody = $response->body();
-                        Log::error('Erro ao enviar QR Code para Telegram', [
+                        LogFacade::error('Erro ao enviar QR Code para Telegram', [
                             'status' => $response->status(),
                             'body' => $errorBody
                         ]);
                         throw new Exception('Erro ao enviar foto: ' . $errorBody);
                     }
                     
-                    Log::info('QR Code enviado com sucesso para Telegram', [
+                    LogFacade::info('QR Code enviado com sucesso para Telegram', [
                         'chat_id' => $chatId,
                         'plan_id' => $planId
                     ]);

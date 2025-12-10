@@ -24,9 +24,16 @@ class User extends Authenticatable implements JWTSubject
         'role',
         'user_type',
         'user_group_id',
+        'created_by',
         'active',
         'two_factor_secret',
         'two_factor_enabled',
+        'phone',
+        'address_street',
+        'address_number',
+        'address_zipcode',
+        'municipality_id',
+        'state_id',
     ];
 
     /**
@@ -92,6 +99,38 @@ class User extends Authenticatable implements JWTSubject
     public function userGroup(): BelongsTo
     {
         return $this->belongsTo(UserGroup::class, 'user_group_id');
+    }
+
+    /**
+     * Get the user that created this user
+     */
+    public function creator(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
+
+    /**
+     * Get users created by this user
+     */
+    public function createdUsers()
+    {
+        return $this->hasMany(User::class, 'created_by');
+    }
+
+    /**
+     * Get the state for this user
+     */
+    public function state(): BelongsTo
+    {
+        return $this->belongsTo(State::class);
+    }
+
+    /**
+     * Get the municipality for this user
+     */
+    public function municipality(): BelongsTo
+    {
+        return $this->belongsTo(Municipality::class);
     }
 
     /**

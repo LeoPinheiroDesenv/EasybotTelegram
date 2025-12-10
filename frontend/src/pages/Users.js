@@ -15,7 +15,7 @@ const Users = () => {
   const [success, setSuccess] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
-  const { user: currentUser, isAdmin } = useContext(AuthContext);
+  const { user: currentUser, isAdmin, isSuperAdmin } = useContext(AuthContext);
 
   useEffect(() => {
     loadUsers();

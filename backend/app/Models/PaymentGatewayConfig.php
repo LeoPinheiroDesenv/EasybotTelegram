@@ -19,6 +19,7 @@ class PaymentGatewayConfig extends Model
         'api_key',
         'api_secret',
         'webhook_url',
+        'webhook_secret',
         'active',
     ];
 

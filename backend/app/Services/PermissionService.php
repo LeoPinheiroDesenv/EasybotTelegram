@@ -54,7 +54,18 @@ class PermissionService
      */
     public function hasBotPermission(User $user, int $botId, string $permission = 'read'): bool
     {
-        return $this->hasPermission($user, 'bot', $botId, $permission);
+        // Super admin tem acesso total
+        if ($user->isSuperAdmin()) {
+            return true;
+        }
+
+        // Verifica se o bot pertence ao usuário
+        $bot = \App\Models\Bot::find($botId);
+        if ($bot && $bot->user_id === $user->id) {
+            return true;
+        }
+
+        return false;
     }
 
     /**
@@ -121,22 +132,8 @@ class PermissionService
             return $query;
         }
 
-        // Se não tem grupo, não vê nenhum bot
-        if (!$user->user_group_id) {
-            return $query->whereRaw('1 = 0'); // Retorna query vazia
-        }
-
-        // Busca IDs dos bots que o grupo tem permissão
-        $botIds = UserGroupPermission::where('user_group_id', $user->user_group_id)
-            ->where('resource_type', 'bot')
-            ->where('permission', 'read')
-            ->pluck('resource_id')
-            ->map(function ($id) {
-                return (int) $id; // Converte de string para int para comparação
-            })
-            ->toArray();
-
-        return $query->whereIn('id', $botIds);
+        // Usuários normais e administradores só veem bots criados por eles mesmos
+        return $query->where('user_id', $user->id);
     }
 
     /**

@@ -17,12 +17,15 @@ class UserGroupController extends Controller
      */
     public function index(): JsonResponse
     {
-        // Apenas super admin pode ver todos os grupos
-        if (!auth()->user()->isSuperAdmin()) {
-            return response()->json(['error' => 'Acesso negado'], 403);
+        $currentUser = auth()->user();
+
+        // Apenas admins podem ver grupos
+        if (!$currentUser->isAdmin()) {
+            return response()->json(['error' => 'Acesso negado. Apenas administradores podem acessar esta funcionalidade.'], 403);
         }
 
-        $groups = UserGroup::with(['users', 'permissions'])->get();
+        // Super admin vê todos os grupos, admins comuns também veem todos (para poderem atribuir usuários)
+        $groups = UserGroup::with(['users', 'permissions', 'creator'])->get();
 
         return response()->json([
             'groups' => $groups
@@ -34,9 +37,11 @@ class UserGroupController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
-        // Apenas super admin pode criar grupos
-        if (!auth()->user()->isSuperAdmin()) {
-            return response()->json(['error' => 'Acesso negado'], 403);
+        $currentUser = auth()->user();
+
+        // Apenas admins podem criar grupos
+        if (!$currentUser->isAdmin()) {
+            return response()->json(['error' => 'Acesso negado. Apenas administradores podem criar grupos de usuários.'], 403);
         }
 
         $validator = Validator::make($request->all(), [
@@ -61,6 +66,7 @@ class UserGroupController extends Controller
                 'name' => $request->name,
                 'description' => $request->description,
                 'active' => $request->input('active', true),
+                'created_by' => $currentUser->id, // Vincula ao admin que criou
             ]);
 
             // Adiciona permissões de menus
@@ -77,6 +83,19 @@ class UserGroupController extends Controller
 
             // Adiciona permissões de bots
             if ($request->has('bot_permissions')) {
+                // Se não for super admin, valida se os bots pertencem ao usuário
+                if (!$currentUser->isSuperAdmin()) {
+                    $userBotIds = Bot::where('user_id', $currentUser->id)->pluck('id')->toArray();
+                    foreach ($request->bot_permissions as $botPermission) {
+                        if (!in_array($botPermission['bot_id'], $userBotIds)) {
+                            DB::rollBack();
+                            return response()->json([
+                                'error' => 'Você só pode atribuir permissões aos seus próprios bots.'
+                            ], 403);
+                        }
+                    }
+                }
+                
                 foreach ($request->bot_permissions as $botPermission) {
                     foreach ($botPermission['permissions'] as $permission) {
                         UserGroupPermission::create([
@@ -107,12 +126,14 @@ class UserGroupController extends Controller
      */
     public function show($id): JsonResponse
     {
-        // Apenas super admin pode ver grupos
-        if (!auth()->user()->isSuperAdmin()) {
-            return response()->json(['error' => 'Acesso negado'], 403);
+        $currentUser = auth()->user();
+
+        // Apenas admins podem ver grupos
+        if (!$currentUser->isAdmin()) {
+            return response()->json(['error' => 'Acesso negado. Apenas administradores podem acessar esta funcionalidade.'], 403);
         }
 
-        $group = UserGroup::with(['users', 'permissions'])->find($id);
+        $group = UserGroup::with(['users', 'permissions', 'creator'])->find($id);
 
         if (!$group) {
             return response()->json(['error' => 'Grupo não encontrado'], 404);
@@ -128,15 +149,22 @@ class UserGroupController extends Controller
      */
     public function update(Request $request, $id): JsonResponse
     {
-        // Apenas super admin pode atualizar grupos
-        if (!auth()->user()->isSuperAdmin()) {
-            return response()->json(['error' => 'Acesso negado'], 403);
+        $currentUser = auth()->user();
+
+        // Apenas admins podem atualizar grupos
+        if (!$currentUser->isAdmin()) {
+            return response()->json(['error' => 'Acesso negado. Apenas administradores podem atualizar grupos de usuários.'], 403);
         }
 
         $group = UserGroup::find($id);
 
         if (!$group) {
             return response()->json(['error' => 'Grupo não encontrado'], 404);
+        }
+
+        // Super admin pode atualizar qualquer grupo, admins comuns só podem atualizar grupos que criaram
+        if (!$currentUser->isSuperAdmin() && $group->created_by !== $currentUser->id) {
+            return response()->json(['error' => 'Acesso negado. Você só pode atualizar grupos criados por você.'], 403);
         }
 
         $validator = Validator::make($request->all(), [
@@ -182,6 +210,19 @@ class UserGroupController extends Controller
 
                 // Adiciona novas permissões de bots
                 if ($request->has('bot_permissions')) {
+                    // Se não for super admin, valida se os bots pertencem ao usuário
+                    if (!$currentUser->isSuperAdmin()) {
+                        $userBotIds = Bot::where('user_id', $currentUser->id)->pluck('id')->toArray();
+                        foreach ($request->bot_permissions as $botPermission) {
+                            if (!in_array($botPermission['bot_id'], $userBotIds)) {
+                                DB::rollBack();
+                                return response()->json([
+                                    'error' => 'Você só pode atribuir permissões aos seus próprios bots.'
+                                ], 403);
+                            }
+                        }
+                    }
+                    
                     foreach ($request->bot_permissions as $botPermission) {
                         foreach ($botPermission['permissions'] as $permission) {
                             UserGroupPermission::create([
@@ -213,15 +254,22 @@ class UserGroupController extends Controller
      */
     public function destroy($id): JsonResponse
     {
-        // Apenas super admin pode remover grupos
-        if (!auth()->user()->isSuperAdmin()) {
-            return response()->json(['error' => 'Acesso negado'], 403);
+        $currentUser = auth()->user();
+
+        // Apenas admins podem remover grupos
+        if (!$currentUser->isAdmin()) {
+            return response()->json(['error' => 'Acesso negado. Apenas administradores podem remover grupos de usuários.'], 403);
         }
 
         $group = UserGroup::find($id);
 
         if (!$group) {
             return response()->json(['error' => 'Grupo não encontrado'], 404);
+        }
+
+        // Super admin pode remover qualquer grupo, admins comuns só podem remover grupos que criaram
+        if (!$currentUser->isSuperAdmin() && $group->created_by !== $currentUser->id) {
+            return response()->json(['error' => 'Acesso negado. Você só pode remover grupos criados por você.'], 403);
         }
 
         // Verifica se há usuários no grupo
@@ -260,7 +308,15 @@ class UserGroupController extends Controller
      */
     public function getAvailableBots(): JsonResponse
     {
-        $bots = Bot::select('id', 'name', 'user_id')->get();
+        $currentUser = auth()->user();
+
+        // Super admin vê todos os bots, admins comuns veem apenas seus próprios bots
+        $query = Bot::select('id', 'name', 'user_id');
+        if (!$currentUser->isSuperAdmin()) {
+            $query->where('user_id', $currentUser->id);
+        }
+
+        $bots = $query->get();
 
         return response()->json(['bots' => $bots]);
     }

@@ -28,6 +28,13 @@ const paymentGatewayConfigService = {
   async deleteConfig(id) {
     const response = await api.delete(`/payment-gateway-configs/${id}`);
     return response.data;
+  },
+
+  async checkApiStatus(botId, gateway, environment) {
+    const response = await api.get('/payment-gateway-configs/status', {
+      params: { botId, gateway, environment }
+    });
+    return response.data;
   }
 };
 

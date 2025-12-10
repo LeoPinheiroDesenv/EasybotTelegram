@@ -51,7 +51,16 @@ return Application::configure(basePath: dirname(__DIR__))
         });
         
         // Trata exceções de autenticação para rotas API
+        // Exceção: webhooks não devem exigir autenticação
         $exceptions->render(function (\Illuminate\Auth\AuthenticationException $e, \Illuminate\Http\Request $request) {
+            // Permite webhooks sem autenticação
+            if ($request->is('api/payments/webhook/*') || 
+                $request->is('api/telegram/webhook/*') ||
+                $request->is('api/alerts/process-auto')) {
+                // Webhooks são públicos, não devem retornar 401
+                return null; // Deixa o Laravel processar normalmente
+            }
+            
             if ($request->is('api/*') || $request->expectsJson()) {
                 return response()->json([
                     'message' => 'Unauthenticated.',

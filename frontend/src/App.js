@@ -10,8 +10,11 @@ import CreateBot from './pages/CreateBot';
 import UpdateBot from './pages/UpdateBot';
 import WelcomeMessage from './pages/WelcomeMessage';
 import PaymentPlans from './pages/PaymentPlans';
-import Redirect from './pages/Redirect';
-import Administrators from './pages/Administrators';
+import RedirectButtons from './pages/RedirectButtons';
+import BotCommands from './pages/BotCommands';
+import BotAdministrators from './pages/BotAdministrators';
+import BotTelegramGroups from './pages/BotTelegramGroups';
+import BotFather from './pages/BotFather';
 import Marketing from './pages/Marketing';
 import Alerts from './pages/Alerts';
 import Downsell from './pages/Downsell';
@@ -25,13 +28,10 @@ import GroupManagement from './pages/GroupManagement';
 import Billing from './pages/Billing';
 import UserGroups from './pages/UserGroups';
 import SecuritySettings from './pages/SecuritySettings';
-import TelegramGroups from './pages/TelegramGroups';
-import Commands from './pages/Commands';
 import FtpManager from './pages/FtpManager';
 import CardPayment from './pages/CardPayment';
 import StorageSettings from './pages/StorageSettings';
 import ArtisanCommands from './pages/ArtisanCommands';
-import BotFatherManagement from './pages/BotFatherManagement';
 import ManageBot from './pages/ManageBot';
 import BotList from './pages/BotList';
 import PaymentStatus from './pages/PaymentStatus';
@@ -123,7 +123,7 @@ function App() {
                 path="redirect"
                 element={
                   <ProtectedRoute>
-                    <Redirect />
+                    <RedirectButtons />
                   </ProtectedRoute>
                 }
               />
@@ -131,7 +131,7 @@ function App() {
                 path="commands"
                 element={
                   <ProtectedRoute>
-                    <Commands />
+                    <BotCommands />
                   </ProtectedRoute>
                 }
               />
@@ -139,7 +139,7 @@ function App() {
                 path="administrators"
                 element={
                   <ProtectedRoute>
-                    <Administrators />
+                    <BotAdministrators />
                   </ProtectedRoute>
                 }
               />
@@ -147,7 +147,7 @@ function App() {
                 path="telegram-groups"
                 element={
                   <ProtectedRoute>
-                    <TelegramGroups />
+                    <BotTelegramGroups />
                   </ProtectedRoute>
                 }
               />
@@ -155,7 +155,7 @@ function App() {
                 path="botfather"
                 element={
                   <ProtectedRoute>
-                    <BotFatherManagement />
+                    <BotFather />
                   </ProtectedRoute>
                 }
               />
@@ -166,46 +166,6 @@ function App() {
               element={
                 <ProtectedRoute>
                   <WelcomeMessage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/bot/payment-plans/:botId"
-              element={
-                <ProtectedRoute>
-                  <PaymentPlans />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/bot/redirect/:botId"
-              element={
-                <ProtectedRoute>
-                  <Redirect />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/bot/administrators/:botId"
-              element={
-                <ProtectedRoute>
-                  <Administrators />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/bot/telegram-groups/:botId"
-              element={
-                <ProtectedRoute>
-                  <TelegramGroups />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/bot/commands/:botId"
-              element={
-                <ProtectedRoute>
-                  <Commands />
                 </ProtectedRoute>
               }
             />
@@ -347,14 +307,6 @@ function App() {
               element={
                 <ProtectedRoute>
                   <ArtisanCommands />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/bot/:botId/botfather"
-              element={
-                <ProtectedRoute>
-                  <BotFatherManagement />
                 </ProtectedRoute>
               }
             />

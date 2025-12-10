@@ -224,16 +224,16 @@ const UserGroups = () => {
     return labels[permission] || permission;
   };
 
-  // Verifica se é super admin
-  const isSuperAdmin = currentUser?.user_type === 'super_admin';
+  // Verifica se é admin (super admin ou admin comum)
+  const isAdmin = currentUser?.role === 'admin' || currentUser?.user_type === 'admin' || currentUser?.user_type === 'super_admin';
 
-  if (!isSuperAdmin) {
+  if (!isAdmin) {
     return (
       <Layout>
         <div className="user-groups-page">
           <div className="access-denied">
             <h1>Acesso Negado</h1>
-            <p>Apenas super administradores podem gerenciar grupos de usuários.</p>
+            <p>Apenas administradores podem gerenciar grupos de usuários.</p>
           </div>
         </div>
       </Layout>

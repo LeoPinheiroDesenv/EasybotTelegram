@@ -25,7 +25,7 @@ const Sidebar = ({ isOpen, onClose }) => {
   const { alert, DialogComponent: AlertDialog } = useAlert();
   const location = useLocation();
   const navigate = useNavigate();
-  const { isAdmin, logout, user } = useContext(AuthContext);
+  const { isAdmin, logout, user, isSuperAdmin } = useContext(AuthContext);
   const [botMenuOpen, setBotMenuOpen] = useState(location.pathname.startsWith('/bot'));
   const [resultsMenuOpen, setResultsMenuOpen] = useState(location.pathname.startsWith('/results'));
   const [marketingMenuOpen, setMarketingMenuOpen] = useState(location.pathname.startsWith('/marketing'));
@@ -394,13 +394,15 @@ const Sidebar = ({ isOpen, onClose }) => {
                       >
                         Segurança (2FA)
                       </Link>
-                      <Link
-                        to="/settings/storage"
-                        className={`sidebar-submenu-item ${location.pathname === '/settings/storage' ? 'active' : ''}`}
-                        onClick={onClose}
-                      >
-                        Storage
-                      </Link>
+                      {isSuperAdmin && (
+                        <Link
+                          to="/settings/storage"
+                          className={`sidebar-submenu-item ${location.pathname === '/settings/storage' ? 'active' : ''}`}
+                          onClick={onClose}
+                        >
+                          Storage
+                        </Link>
+                      )}
                       {/* <Link
                         to="/ftp"
                         className={`sidebar-submenu-item ${location.pathname === '/ftp' ? 'active' : ''}`}
@@ -434,30 +436,34 @@ const Sidebar = ({ isOpen, onClose }) => {
                       Comandos Artisan
                     </Link>
                   )}
+                  {/* Admins e super_admin podem ver Usuários */}
+                  {isAdmin && (
+                    <Link
+                      to="/users"
+                      className={`sidebar-submenu-item ${location.pathname === '/users' ? 'active' : ''}`}
+                      onClick={onClose}
+                    >
+                      Usuários
+                    </Link>
+                  )}
+                  {/* Apenas super_admin pode ver Grupos de Usuários */}
+                  {(user?.user_type === 'super_admin' || user?.user_type === 'admin' || user?.role === 'admin') && (
+                    <Link
+                      to="/user-groups"
+                      className={`sidebar-submenu-item ${location.pathname === '/user-groups' ? 'active' : ''}`}
+                      onClick={onClose}
+                    >
+                      Grupos de Usuários
+                    </Link>
+                  )}
                   {user?.user_type === 'super_admin' && (
-                    <>
-                      <Link
-                        to="/users"
-                        className={`sidebar-submenu-item ${location.pathname === '/users' ? 'active' : ''}`}
-                        onClick={onClose}
-                      >
-                        Usuários
-                      </Link>
-                      <Link
-                        to="/user-groups"
-                        className={`sidebar-submenu-item ${location.pathname === '/user-groups' ? 'active' : ''}`}
-                        onClick={onClose}
-                      >
-                        Grupos de Usuários
-                      </Link>
-                      <Link
-                        to="/logs"
-                        className={`sidebar-submenu-item ${location.pathname === '/logs' ? 'active' : ''}`}
-                        onClick={onClose}
-                      >
-                        Logs
-                      </Link>
-                    </>
+                    <Link
+                      to="/logs"
+                      className={`sidebar-submenu-item ${location.pathname === '/logs' ? 'active' : ''}`}
+                      onClick={onClose}
+                    >
+                      Logs
+                    </Link>
                   )}
                 </div>
               )}

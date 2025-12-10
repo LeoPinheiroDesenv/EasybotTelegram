@@ -1,19 +1,38 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
+import { Navigate } from 'react-router-dom';
 import Layout from '../components/Layout';
+import { AuthContext } from '../contexts/AuthContext';
 import api from '../services/api';
 import useConfirm from '../hooks/useConfirm';
 import './StorageSettings.css';
 
 const StorageSettings = () => {
   const { confirm, DialogComponent } = useConfirm();
+  const { isSuperAdmin } = useContext(AuthContext);
   const [linkStatus, setLinkStatus] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
   useEffect(() => {
-    checkLinkStatus();
-  }, []);
+    if (isSuperAdmin) {
+      checkLinkStatus();
+    }
+  }, [isSuperAdmin]);
+
+  // Redireciona se não for super admin
+  if (!isSuperAdmin) {
+    return (
+      <Layout>
+        <div className="storage-settings-page">
+          <div className="alert alert-error">
+            <h2>Acesso Negado</h2>
+            <p>Apenas super administradores podem acessar esta funcionalidade.</p>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
 
   const checkLinkStatus = async () => {
     try {

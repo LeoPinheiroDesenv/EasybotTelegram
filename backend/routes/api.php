@@ -49,17 +49,15 @@ Route::middleware('auth:api')->group(function () {
     Route::post('/auth/2fa/verify', [AuthController::class, 'verifyAndEnable2FA']);
     Route::post('/auth/2fa/disable', [AuthController::class, 'disable2FA']);
 
-    // User routes (super admin only)
-    Route::middleware('super_admin')->group(function () {
-        Route::apiResource('users', UserController::class);
-    });
+    // User routes (admins podem criar usuários, mas apenas super admins podem criar outros admins)
+    // O controller já implementa as verificações de permissão adequadas
+    Route::apiResource('users', UserController::class);
 
-    // User Group routes (super admin only)
-    Route::middleware('super_admin')->group(function () {
-        Route::apiResource('user-groups', UserGroupController::class);
-        Route::get('/user-groups/menus/available', [UserGroupController::class, 'getAvailableMenus']);
-        Route::get('/user-groups/bots/available', [UserGroupController::class, 'getAvailableBots']);
-    });
+    // User Group routes (admins podem criar e gerenciar grupos de usuários)
+    // O controller já implementa as verificações de permissão adequadas
+    Route::apiResource('user-groups', UserGroupController::class);
+    Route::get('/user-groups/menus/available', [UserGroupController::class, 'getAvailableMenus']);
+    Route::get('/user-groups/bots/available', [UserGroupController::class, 'getAvailableBots']);
 
     // Bot routes
     Route::apiResource('bots', BotController::class);
@@ -117,8 +115,6 @@ Route::middleware('auth:api')->group(function () {
     // Payment routes
     Route::post('/payments/pix', [PaymentController::class, 'processPix']);
     Route::post('/payments/credit-card', [PaymentController::class, 'processCreditCard']);
-    Route::post('/payments/webhook/mercadopago', [PaymentController::class, 'mercadoPagoWebhook']);
-    Route::post('/payments/webhook/stripe', [PaymentController::class, 'stripeWebhook']);
 
     // Payment Status routes
     Route::get('/payment-status/contact/{contactId}', [PaymentStatusController::class, 'getContactStatus']);
@@ -128,6 +124,7 @@ Route::middleware('auth:api')->group(function () {
 
     // Payment Gateway Config routes
     Route::get('/payment-gateway-configs/config', [PaymentGatewayConfigController::class, 'getConfig']);
+    Route::get('/payment-gateway-configs/status', [PaymentGatewayConfigController::class, 'checkApiStatus']);
     Route::apiResource('payment-gateway-configs', PaymentGatewayConfigController::class);
 
     // Contact routes
@@ -151,6 +148,7 @@ Route::middleware('auth:api')->group(function () {
     Route::get('/billing', [\App\Http\Controllers\BillingController::class, 'getBilling']);
     Route::get('/billing/chart', [\App\Http\Controllers\BillingController::class, 'getChartData']);
     Route::get('/billing/total', [\App\Http\Controllers\BillingController::class, 'getTotalBilling']);
+    Route::get('/billing/dashboard-stats', [\App\Http\Controllers\BillingController::class, 'getDashboardStatistics']);
 
     // Alert routes
     Route::get('/alerts', [AlertController::class, 'index']);
@@ -168,10 +166,12 @@ Route::middleware('auth:api')->group(function () {
     Route::post('/ftp/directory', [FtpController::class, 'createDirectory']);
     Route::post('/ftp/test-connection', [FtpController::class, 'testConnection']);
 
-    // Storage routes
-    Route::get('/storage/link/status', [StorageController::class, 'checkStorageLink']);
-    Route::post('/storage/link/create', [StorageController::class, 'createStorageLink']);
-    Route::post('/storage/test', [StorageController::class, 'testStorageAccess']);
+    // Storage routes (super admin only)
+    Route::middleware('super_admin')->group(function () {
+        Route::get('/storage/link/status', [StorageController::class, 'checkStorageLink']);
+        Route::post('/storage/link/create', [StorageController::class, 'createStorageLink']);
+        Route::post('/storage/test', [StorageController::class, 'testStorageAccess']);
+    });
 
     // BotFather routes
     Route::get('/bots/{botId}/botfather/info', [BotFatherController::class, 'getBotInfo']);
@@ -199,6 +199,10 @@ Route::middleware('auth:api')->group(function () {
 
 // Telegram webhook (public route - Telegram precisa acessar)
 Route::post('/telegram/webhook/{botId}', [TelegramWebhookController::class, 'webhook']);
+
+// Payment webhooks (public routes - gateways de pagamento precisam acessar)
+Route::post('/payments/webhook/mercadopago', [PaymentController::class, 'mercadoPagoWebhook']);
+Route::post('/payments/webhook/stripe', [PaymentController::class, 'stripeWebhook']);
 
 // Process alerts (public route - pode ser chamado por serviços externos para processamento automático)
 // Protegido por token secreto configurado no .env (opcional - se não configurado, permite acesso sem autenticação)

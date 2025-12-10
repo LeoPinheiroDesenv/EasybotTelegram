@@ -315,6 +315,98 @@ const Billing = () => {
           </div>
         )}
 
+        {/* Resumo de Planos e Assinaturas */}
+        {billingData && billingData.transactions && billingData.transactions.length > 0 && (
+          <div className="billing-plans-section">
+            <div className="section-header">
+              <h2>Planos e Assinaturas</h2>
+            </div>
+            
+            <div className="plans-subscriptions-grid">
+              {/* Resumo por Plano */}
+              {billingData.plans && billingData.plans.length > 0 ? (
+                <div className="plans-card">
+                  <h3>📦 Recebimentos por Plano</h3>
+                  <div className="plans-list">
+                    {billingData.plans.map((plan, index) => (
+                      <div key={plan.plan_id || index} className="plan-item">
+                        <div className="plan-header">
+                          <span className="plan-title">{plan.plan_title}</span>
+                          <span className="plan-price">{formatCurrency(plan.plan_price)}</span>
+                        </div>
+                        <div className="plan-stats">
+                          <span className="stat-item">
+                            <strong>{plan.subscription_count}</strong> assinatura(s)
+                          </span>
+                          <span className="stat-item">
+                            Total: <strong>{formatCurrency(plan.total_revenue)}</strong>
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="plans-card">
+                  <h3>📦 Recebimentos por Plano</h3>
+                  <div className="empty-state">
+                    <p>Nenhum plano encontrado</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Resumo por Assinatura */}
+              {billingData.subscriptions && billingData.subscriptions.length > 0 ? (
+                <div className="subscriptions-card">
+                  <h3>👥 Assinaturas Ativas</h3>
+                  <div className="subscriptions-list">
+                    {billingData.subscriptions.slice(0, 10).map((subscription, index) => (
+                      <div key={index} className="subscription-item">
+                        <div className="subscription-header">
+                          <span className="subscription-user">
+                            {subscription.contact_name}
+                            {subscription.contact_username && (
+                              <span className="subscription-username">@{subscription.contact_username}</span>
+                            )}
+                          </span>
+                          <span className="subscription-plan">{subscription.plan_title}</span>
+                        </div>
+                        <div className="subscription-details">
+                          <span className="detail-item">
+                            <strong>{subscription.transaction_count}</strong> pagamento(s)
+                          </span>
+                          <span className="detail-item">
+                            Ciclo: <strong>{subscription.cycle_name}</strong> ({subscription.cycle_days} dias)
+                          </span>
+                          <span className="detail-item">
+                            Total: <strong>{formatCurrency(subscription.total_revenue)}</strong>
+                          </span>
+                        </div>
+                        <div className="subscription-dates">
+                          <small>Primeiro pagamento: {subscription.first_payment}</small>
+                          <small>Último pagamento: {subscription.last_payment}</small>
+                        </div>
+                      </div>
+                    ))}
+                    {billingData.subscriptions.length > 10 && (
+                      <div className="subscriptions-more">
+                        <small>E mais {billingData.subscriptions.length - 10} assinatura(s)...</small>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="subscriptions-card">
+                  <h3>👥 Assinaturas Ativas</h3>
+                  <div className="empty-state">
+                    <p>Nenhuma assinatura encontrada</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Tabela de Transações */}
         {billingData && (
           <div className="billing-transactions-section">
@@ -336,6 +428,7 @@ const Billing = () => {
                         <th>Data</th>
                         <th>Usuário</th>
                         <th>Bot</th>
+                        <th>Plano</th>
                         <th>Método</th>
                         <th>Gateway</th>
                         <th>Valor</th>
@@ -355,6 +448,12 @@ const Billing = () => {
                             </div>
                           </td>
                           <td>{transaction.bot.name}</td>
+                          <td>
+                            <div className="plan-cell">
+                              <div className="plan-name">{transaction.payment_plan?.title || 'N/A'}</div>
+                              <div className="plan-price-small">{formatCurrency(transaction.payment_plan?.price || 0)}</div>
+                            </div>
+                          </td>
                           <td>
                             <span className={`payment-method-badge ${transaction.payment_method}`}>
                               {transaction.payment_method === 'credit_card' ? '💳 Cartão' : '💰 PIX'}

@@ -141,6 +141,11 @@
 /* Padroniza containers internos - TODOS com padding de 32px e ocupando 100% */
 .manage-bot-content .welcome-message-content,
 .manage-bot-content .payment-plans-content,
+.manage-bot-content .redirect-buttons-content,
+.manage-bot-content .bot-commands-content,
+.manage-bot-content .bot-administrators-content,
+.manage-bot-content .bot-telegram-groups-content,
+.manage-bot-content .bot-father-content,
 .manage-bot-content .redirect-content,
 .manage-bot-content .commands-content,
 .manage-bot-content .administrators-content,
@@ -170,6 +175,11 @@
 /* Garante que elementos internos ocupem todo o espaço */
 .manage-bot-content .welcome-message-content > *,
 .manage-bot-content .payment-plans-content > *,
+.manage-bot-content .redirect-buttons-content > *,
+.manage-bot-content .bot-commands-content > *,
+.manage-bot-content .bot-administrators-content > *,
+.manage-bot-content .bot-telegram-groups-content > *,
+.manage-bot-content .bot-father-content > *,
 .manage-bot-content .redirect-content > *,
 .manage-bot-content .commands-content > *,
 .manage-bot-content .administrators-content > *,
@@ -220,6 +230,7 @@
 
 /* Força que todos os elementos dentro do payment-plans-content ocupem 100% */
 .manage-bot-content .payment-plans-content .payment-plans-header,
+.manage-bot-content .payment-plans-content .payment-plans-description,
 .manage-bot-content .payment-plans-content .earnings-card,
 .manage-bot-content .payment-plans-content .payment-plans-section {
   width: 100% !important;
@@ -248,7 +259,8 @@
 
 /* Remove padding duplicado do Administrators */
 .manage-bot-content .administrators-content,
-.manage-bot-content .telegram-groups-content {
+.manage-bot-content .telegram-groups-content,
+.manage-bot-content .bot-father-content {
   max-width: 100% !important;
   margin: 0 !important;
   padding: 24px !important;
@@ -365,6 +377,11 @@
 
   .manage-bot-content .welcome-message-content,
   .manage-bot-content .payment-plans-content,
+  .manage-bot-content .redirect-buttons-content,
+  .manage-bot-content .bot-commands-content,
+  .manage-bot-content .bot-administrators-content,
+  .manage-bot-content .bot-telegram-groups-content,
+  .manage-bot-content .bot-father-content,
   .manage-bot-content .redirect-content,
   .manage-bot-content .commands-content,
   .manage-bot-content .administrators-content,

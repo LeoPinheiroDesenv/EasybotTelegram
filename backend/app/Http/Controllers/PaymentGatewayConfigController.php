@@ -3,23 +3,45 @@
 namespace App\Http\Controllers;
 
 use App\Models\PaymentGatewayConfig;
+use App\Models\Bot;
+use App\Services\PermissionService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 
 class PaymentGatewayConfigController extends Controller
 {
+    protected $permissionService;
+
+    public function __construct(PermissionService $permissionService)
+    {
+        $this->permissionService = $permissionService;
+    }
+
     /**
      * Display a listing of the resource.
      */
     public function index(Request $request): JsonResponse
     {
         try {
+            $user = auth()->user();
             $query = PaymentGatewayConfig::query();
 
             // Filter by bot_id if provided
             if ($request->has('botId') && !empty($request->botId)) {
                 $query->where('bot_id', $request->botId);
+            }
+
+            // Aplicar filtro de acesso baseado em permissões de bot
+            // Super admin vê todas as configs, outros só veem configs de bots criados por eles
+            if (!$user->isSuperAdmin()) {
+                // Buscar IDs dos bots que o usuário tem acesso
+                $botQuery = Bot::query();
+                $botQuery = $this->permissionService->filterAccessibleBots($user, $botQuery);
+                $accessibleBotIds = $botQuery->pluck('id')->toArray();
+                
+                // Filtrar configs apenas dos bots acessíveis
+                $query->whereIn('bot_id', $accessibleBotIds);
             }
 
             $configs = $query->get();
@@ -59,6 +81,18 @@ class PaymentGatewayConfigController extends Controller
         }
 
         try {
+            $user = auth()->user();
+            
+            // Verificar se o usuário tem acesso ao bot
+            $bot = Bot::find($request->bot_id);
+            if (!$bot) {
+                return response()->json(['error' => 'Bot not found'], 404);
+            }
+            
+            if (!$user->isSuperAdmin() && $bot->user_id !== $user->id) {
+                return response()->json(['error' => 'Acesso negado'], 403);
+            }
+            
             // Mapear campos do frontend para o banco de dados
             $apiKey = $request->api_key ?? $request->access_token ?? null; // Mercado Pago usa access_token
             $apiSecret = $request->api_secret ?? $request->secret_key ?? null; // Stripe usa secret_key
@@ -95,10 +129,12 @@ class PaymentGatewayConfigController extends Controller
                 'api_key' => $apiKey,
                 'api_secret' => $apiSecret,
                 'webhook_url' => $request->webhook_url ?? null,
+                'webhook_secret' => $request->webhook_secret ?? null, // Para Mercado Pago
                 'active' => $active,
             ];
 
             // Para Stripe, salvar public_key e webhook_secret no api_secret como JSON
+            // Para Mercado Pago, webhook_secret é salvo diretamente no campo webhook_secret
             if ($request->gateway === 'stripe') {
                 // Se já existe uma configuração, preserva os dados existentes
                 $stripeData = [];
@@ -144,7 +180,17 @@ class PaymentGatewayConfigController extends Controller
     public function show(string $id): JsonResponse
     {
         try {
+            $user = auth()->user();
             $config = PaymentGatewayConfig::findOrFail($id);
+            
+            // Verificar se o usuário tem acesso ao bot desta configuração
+            if (!$user->isSuperAdmin()) {
+                $bot = Bot::find($config->bot_id);
+                if (!$bot || $bot->user_id !== $user->id) {
+                    return response()->json(['error' => 'Acesso negado'], 403);
+                }
+            }
+            
             return response()->json(['config' => $this->formatConfigForFrontend($config)]);
         } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
             return response()->json(['error' => 'Payment gateway config not found'], 404);
@@ -166,7 +212,7 @@ class PaymentGatewayConfigController extends Controller
             'access_token' => 'nullable|string|max:255', // Mercado Pago
             'secret_key' => 'nullable|string', // Stripe
             'public_key' => 'nullable|string|max:255', // Stripe
-            'webhook_secret' => 'nullable|string', // Stripe
+            'webhook_secret' => 'nullable|string', // Mercado Pago e Stripe
             'webhook_url' => 'nullable|string|max:255|url',
             'active' => 'sometimes|boolean',
             'is_active' => 'sometimes|boolean', // Frontend usa is_active
@@ -177,7 +223,16 @@ class PaymentGatewayConfigController extends Controller
         }
 
         try {
+            $user = auth()->user();
             $config = PaymentGatewayConfig::findOrFail($id);
+            
+            // Verificar se o usuário tem acesso ao bot desta configuração
+            if (!$user->isSuperAdmin()) {
+                $bot = Bot::find($config->bot_id);
+                if (!$bot || $bot->user_id !== $user->id) {
+                    return response()->json(['error' => 'Acesso negado'], 403);
+                }
+            }
             
             // Validação específica por gateway
             if ($config->gateway === 'stripe') {
@@ -271,6 +326,12 @@ class PaymentGatewayConfigController extends Controller
                 $updateData['webhook_url'] = $request->webhook_url;
             }
             
+            // Para Mercado Pago, webhook_secret é salvo diretamente no campo webhook_secret
+            // Para Stripe, webhook_secret é salvo dentro do api_secret como JSON
+            if ($config->gateway === 'mercadopago' && $request->has('webhook_secret')) {
+                $updateData['webhook_secret'] = $request->webhook_secret ?: null;
+            }
+            
             // Mapear active / is_active
             if ($request->has('is_active')) {
                 $updateData['active'] = $request->is_active;
@@ -294,7 +355,17 @@ class PaymentGatewayConfigController extends Controller
     public function destroy(string $id): JsonResponse
     {
         try {
+            $user = auth()->user();
             $config = PaymentGatewayConfig::findOrFail($id);
+            
+            // Verificar se o usuário tem acesso ao bot desta configuração
+            if (!$user->isSuperAdmin()) {
+                $bot = Bot::find($config->bot_id);
+                if (!$bot || $bot->user_id !== $user->id) {
+                    return response()->json(['error' => 'Acesso negado'], 403);
+                }
+            }
+            
             $config->delete();
 
             return response()->json(['message' => 'Payment gateway config deleted successfully']);
@@ -321,6 +392,18 @@ class PaymentGatewayConfigController extends Controller
         }
 
         try {
+            $user = auth()->user();
+            
+            // Verificar se o usuário tem acesso ao bot
+            $bot = Bot::find($request->botId);
+            if (!$bot) {
+                return response()->json(['error' => 'Bot not found'], 404);
+            }
+            
+            if (!$user->isSuperAdmin() && $bot->user_id !== $user->id) {
+                return response()->json(['error' => 'Acesso negado'], 403);
+            }
+            
             $config = PaymentGatewayConfig::where('bot_id', $request->botId)
                 ->where('gateway', $request->gateway)
                 ->where('environment', $request->environment)
@@ -354,6 +437,7 @@ class PaymentGatewayConfigController extends Controller
         // Mapear campos específicos por gateway
         if ($config->gateway === 'mercadopago') {
             $formatted['access_token'] = $config->api_key;
+            $formatted['webhook_secret'] = $config->webhook_secret;
         } else {
             $formatted['api_key'] = $config->api_key;
         }
@@ -375,5 +459,221 @@ class PaymentGatewayConfigController extends Controller
         }
 
         return $formatted;
+    }
+
+    /**
+     * Verifica o status da API do gateway de pagamento
+     */
+    public function checkApiStatus(Request $request): JsonResponse
+    {
+        $validator = Validator::make($request->all(), [
+            'botId' => 'required|exists:bots,id',
+            'gateway' => 'required|string|in:mercadopago,stripe',
+            'environment' => 'required|string|in:test,production',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 400);
+        }
+
+        try {
+            $user = auth()->user();
+            
+            // Verificar se o usuário tem acesso ao bot
+            $bot = Bot::find($request->botId);
+            if (!$bot) {
+                return response()->json(['error' => 'Bot not found'], 404);
+            }
+            
+            if (!$user->isSuperAdmin() && $bot->user_id !== $user->id) {
+                return response()->json(['error' => 'Acesso negado'], 403);
+            }
+            
+            $config = PaymentGatewayConfig::where('bot_id', $request->botId)
+                ->where('gateway', $request->gateway)
+                ->where('environment', $request->environment)
+                ->first();
+
+            if (!$config) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Configuração não encontrada',
+                    'details' => 'Configure as credenciais do gateway primeiro'
+                ], 404);
+            }
+
+            $status = $this->verifyGatewayStatus($config);
+
+            return response()->json($status);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Erro ao verificar status da API',
+                'details' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Verifica o status do gateway específico
+     */
+    private function verifyGatewayStatus($config)
+    {
+        if ($config->gateway === 'mercadopago') {
+            return $this->verifyMercadoPagoStatus($config);
+        } elseif ($config->gateway === 'stripe') {
+            return $this->verifyStripeStatus($config);
+        }
+
+        return [
+            'status' => 'error',
+            'message' => 'Gateway não suportado',
+            'details' => 'Apenas Mercado Pago e Stripe são suportados'
+        ];
+    }
+
+    /**
+     * Verifica o status da API do Mercado Pago
+     */
+    private function verifyMercadoPagoStatus($config)
+    {
+        try {
+            $accessToken = $config->api_key;
+            
+            if (empty($accessToken)) {
+                return [
+                    'status' => 'error',
+                    'message' => 'Access Token não configurado',
+                    'details' => 'Configure o Access Token nas configurações do gateway',
+                    'timestamp' => now()->toIso8601String()
+                ];
+            }
+
+            // Configura o SDK do Mercado Pago
+            \MercadoPago\MercadoPagoConfig::setAccessToken($accessToken);
+            
+            // Tenta buscar informações do usuário (endpoint simples para verificar autenticação)
+            $client = new \MercadoPago\Client\User\UserClient();
+            $user = $client->get();
+            
+            if ($user && isset($user->id)) {
+                return [
+                    'status' => 'success',
+                    'message' => 'API do Mercado Pago está funcionando',
+                    'details' => [
+                        'user_id' => $user->id ?? null,
+                        'environment' => $config->environment,
+                        'gateway' => 'Mercado Pago',
+                        'authenticated' => true
+                    ],
+                    'timestamp' => now()->toIso8601String()
+                ];
+            }
+
+            return [
+                'status' => 'warning',
+                'message' => 'Resposta inesperada da API',
+                'details' => 'A API respondeu mas com formato inesperado',
+                'timestamp' => now()->toIso8601String()
+            ];
+        } catch (\MercadoPago\Exceptions\MPApiException $e) {
+            $errorMessage = 'Erro na API do Mercado Pago';
+            if ($e->getApiResponse() && isset($e->getApiResponse()->getContent()['message'])) {
+                $errorMessage .= ': ' . $e->getApiResponse()->getContent()['message'];
+            } else {
+                $errorMessage .= ': ' . $e->getMessage();
+            }
+
+            return [
+                'status' => 'error',
+                'message' => 'Falha na autenticação ou conexão',
+                'details' => $errorMessage,
+                'timestamp' => now()->toIso8601String()
+            ];
+        } catch (\Exception $e) {
+            return [
+                'status' => 'error',
+                'message' => 'Erro ao conectar com a API',
+                'details' => $e->getMessage(),
+                'timestamp' => now()->toIso8601String()
+            ];
+        }
+    }
+
+    /**
+     * Verifica o status da API do Stripe
+     */
+    private function verifyStripeStatus($config)
+    {
+        try {
+            // Extrai a secret key do JSON ou usa diretamente
+            $stripeData = json_decode($config->api_secret, true);
+            $secretKey = null;
+            
+            if (is_array($stripeData) && isset($stripeData['secret_key'])) {
+                $secretKey = $stripeData['secret_key'];
+            } else {
+                $secretKey = $config->api_secret;
+            }
+            
+            if (empty($secretKey)) {
+                return [
+                    'status' => 'error',
+                    'message' => 'Secret Key não configurada',
+                    'details' => 'Configure a Secret Key nas configurações do gateway',
+                    'timestamp' => now()->toIso8601String()
+                ];
+            }
+
+            // Configura o Stripe
+            \Stripe\Stripe::setApiKey($secretKey);
+            
+            // Tenta buscar informações da conta (endpoint simples para verificar autenticação)
+            $account = \Stripe\Account::retrieve();
+            
+            if ($account && isset($account->id)) {
+                return [
+                    'status' => 'success',
+                    'message' => 'API do Stripe está funcionando',
+                    'details' => [
+                        'account_id' => $account->id ?? null,
+                        'country' => $account->country ?? null,
+                        'default_currency' => $account->default_currency ?? null,
+                        'environment' => $config->environment,
+                        'gateway' => 'Stripe',
+                        'authenticated' => true
+                    ],
+                    'timestamp' => now()->toIso8601String()
+                ];
+            }
+
+            return [
+                'status' => 'warning',
+                'message' => 'Resposta inesperada da API',
+                'details' => 'A API respondeu mas com formato inesperado',
+                'timestamp' => now()->toIso8601String()
+            ];
+        } catch (\Stripe\Exception\AuthenticationException $e) {
+            return [
+                'status' => 'error',
+                'message' => 'Falha na autenticação',
+                'details' => 'A Secret Key fornecida é inválida ou expirada',
+                'timestamp' => now()->toIso8601String()
+            ];
+        } catch (\Stripe\Exception\ApiErrorException $e) {
+            return [
+                'status' => 'error',
+                'message' => 'Erro na API do Stripe',
+                'details' => $e->getMessage(),
+                'timestamp' => now()->toIso8601String()
+            ];
+        } catch (\Exception $e) {
+            return [
+                'status' => 'error',
+                'message' => 'Erro ao conectar com a API',
+                'details' => $e->getMessage(),
+                'timestamp' => now()->toIso8601String()
+            ];
+        }
     }
 }

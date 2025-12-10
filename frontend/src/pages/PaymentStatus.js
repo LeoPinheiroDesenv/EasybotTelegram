@@ -349,11 +349,11 @@ const PaymentStatus = () => {
                       <td>
                         {status.is_expired ? (
                           <span className="days-remaining expired">
-                            Expirado há {Math.abs(daysRemaining)} dia(s)
+                            Expirado há {Math.abs(Math.round(daysRemaining || 0))} dia(s)
                           </span>
-                        ) : daysRemaining !== undefined ? (
-                          <span className={`days-remaining ${daysRemaining <= 7 ? 'warning' : ''}`}>
-                            {daysRemaining} dia(s)
+                        ) : daysRemaining !== undefined && daysRemaining !== null ? (
+                          <span className={`days-remaining ${Math.round(daysRemaining) <= 7 ? 'warning' : ''}`}>
+                            {Math.round(daysRemaining)} dia(s)
                           </span>
                         ) : (
                           '-'
