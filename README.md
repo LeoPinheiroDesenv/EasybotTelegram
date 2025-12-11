@@ -2,6 +2,24 @@
 
 Sistema completo de gerenciamento de usuários com autenticação e níveis de acesso.
 
+## ⚙️ Funcionamento da Aplicação
+
+1. O usuário acessa o frontend React, que mantém o estado global com Context API (ex.: `AuthContext` e `ManageBotContext`) e hooks customizados para alertas/diálogos.
+2. A autenticação ocorre via JWT: o frontend envia credenciais para `POST /api/auth/login`, recebe o token e o reaproveita em cada chamada subsequente usando interceptadores do `api.js`.
+3. As rotas protegidas no frontend utilizam componentes como `PrivateRoute`/`ProtectedRoute` para validar sessão antes de renderizar páginas administrativas.
+4. O backend Node/Express organiza lógica em camadas (controllers, services e middleware), seguindo o princípio Single Responsibility do SOLID para manter cada módulo focado em uma tarefa.
+5. Serviços do backend conversam com o PostgreSQL, executam migrações e expõem endpoints REST consumidos pelas páginas (ex.: Bots, Billing, Grupos, Logs).
+
+## ✨ Recursos Principais
+
+- Gestão completa de bots Telegram (criação, atualização, comandos e administração delegada).
+- Administração de usuários com níveis de acesso, grupos, reset de senha e auditoria de ações.
+- Monitoramento financeiro (Billing, Payment Cycles, Payment Plans, Card Payments) com gráficos em tempo real.
+- Configuração centralizada de integrações: gateways de pagamento, armazenamento, FTP e notificações.
+- Ferramentas de marketing (Downsell, Redirect Buttons, Welcome Messages) para otimizar conversões.
+- Segurança reforçada com controle de sessões, logs de atividades, políticas de senha e Health Check dedicado.
+- Execução de comandos Artisan/BotFather diretamente da interface, permitindo automação operacional.
+
 ## 🚀 Tecnologias
 
 - **Frontend**: React.js
