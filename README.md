@@ -5,11 +5,15 @@ Sistema completo de gerenciamento e automação de bots do Telegram com funciona
 ## 🚀 Tecnologias
 
 - **Frontend**: React.js com React Router
-- **Backend**: Laravel (PHP)
+- **Backend**: Laravel 12 (PHP 8.2+)
 - **Banco de Dados**: MySQL 8.0
 - **Containerização**: Docker & Docker Compose
 - **Pagamentos**: Integração com Stripe e Mercado Pago
-- **Integração**: API do Telegram Bot
+- **Integração**: API do Telegram Bot (longman/telegram-bot)
+- **Autenticação**: JWT (tymon/jwt-auth)
+- **Segurança**: Google2FA para autenticação de dois fatores
+- **QR Code**: SimpleSoftwareIO/simple-qrcode para PIX
+- **Armazenamento**: Flysystem com suporte FTP/SFTP
 
 ## 📋 Pré-requisitos
 
@@ -63,38 +67,49 @@ Este comando irá:
 
 ```
 botTelegram/
-├── backend/
-│   ├── config/
-│   │   └── database.js
-│   ├── controllers/
-│   │   ├── authController.js
-│   │   └── userController.js
-│   ├── middleware/
-│   │   └── auth.js
-│   ├── migrations/
-│   │   ├── createTables.sql
-│   │   ├── createDefaultAdmin.js
-│   │   └── runMigrations.js
+├── backend/                    # Laravel (PHP)
+│   ├── app/
+│   │   ├── Console/
+│   │   │   └── Commands/      # Comandos Artisan personalizados
+│   │   ├── Http/
+│   │   │   ├── Controllers/   # Controladores RESTful
+│   │   │   └── Middleware/    # Middlewares de autenticação e permissões
+│   │   ├── Jobs/              # Jobs para processamento assíncrono
+│   │   ├── Mail/              # Classes de e-mail
+│   │   ├── Models/            # Modelos Eloquent
+│   │   ├── Observers/         # Observers de modelos
+│   │   ├── Providers/         # Service Providers
+│   │   └── Services/          # Serviços de lógica de negócio
+│   ├── bootstrap/             # Arquivos de inicialização
+│   ├── config/                # Arquivos de configuração
+│   ├── database/
+│   │   ├── migrations/        # Migrações do banco de dados
+│   │   └── seeders/           # Seeders para dados iniciais
 │   ├── routes/
-│   │   ├── auth.js
-│   │   └── users.js
-│   ├── Dockerfile
-│   ├── package.json
-│   ├── server.js
-│   └── .env
-├── frontend/
+│   │   ├── api.php           # Rotas da API
+│   │   ├── web.php           # Rotas web
+│   │   └── console.php       # Rotas de comandos
+│   ├── storage/              # Arquivos de armazenamento
+│   ├── tests/                # Testes automatizados
+│   ├── composer.json         # Dependências PHP
+│   ├── artisan              # CLI do Laravel
+│   └── Dockerfile
+├── frontend/                  # React.js
 │   ├── public/
 │   ├── src/
-│   │   ├── components/
-│   │   ├── contexts/
-│   │   ├── pages/
-│   │   ├── services/
-│   │   ├── App.js
-│   │   └── index.js
+│   │   ├── components/       # Componentes reutilizáveis
+│   │   ├── contexts/         # Contextos React (Auth, ManageBot)
+│   │   ├── hooks/            # Hooks customizados
+│   │   ├── pages/            # Páginas da aplicação
+│   │   ├── services/         # Serviços de API
+│   │   ├── styles/           # Estilos globais
+│   │   ├── utils/            # Utilitários
+│   │   ├── App.js            # Componente principal
+│   │   └── index.js          # Ponto de entrada
 │   ├── Dockerfile
-│   └── package.json
-├── docker-compose.yml
-├── .env.example
+│   └── package.json          # Dependências Node.js
+├── docker-compose.yml        # Configuração Docker Compose
+├── .env.example              # Exemplo de variáveis de ambiente
 ├── .gitignore
 └── README.md
 ```
@@ -441,8 +456,12 @@ docker-compose exec backend php artisan route:clear
 ```bash
 cd backend
 composer install
-php artisan serve
+php artisan key:generate    # Gerar chave da aplicação
+php artisan migrate         # Executar migrações
+php artisan serve           # Iniciar servidor de desenvolvimento
 ```
+
+**Nota**: Certifique-se de ter o PHP 8.2+ e Composer instalados. O arquivo `composer.json` está configurado com as dependências necessárias, incluindo Laravel 12, integrações de pagamento (Stripe, Mercado Pago), Telegram Bot API, e outras bibliotecas essenciais.
 
 #### Frontend
 
