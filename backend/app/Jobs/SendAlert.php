@@ -14,7 +14,17 @@ use Illuminate\Support\Facades\Log;
 
 class SendAlert implements ShouldQueue
 {
-    use Queueable, SerializesModels;
+    use Queueable, SerializesModels, InteractsWithQueue;
+
+    /**
+     * Número de tentativas em caso de falha
+     */
+    public $tries = 3;
+
+    /**
+     * Timeout em segundos
+     */
+    public $timeout = 60;
 
     protected $alert;
     protected $contact;

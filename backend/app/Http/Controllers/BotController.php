@@ -59,7 +59,8 @@ class BotController extends Controller
             'request_email' => 'sometimes|boolean',
             'request_phone' => 'sometimes|boolean',
             'request_language' => 'sometimes|boolean',
-            'payment_method' => 'sometimes|string|in:credit_card,pix',
+            'payment_method' => 'sometimes|array|min:1',
+            'payment_method.*' => 'in:credit_card,pix',
             'activated' => 'sometimes|boolean',
         ]);
 
@@ -102,7 +103,7 @@ class BotController extends Controller
                 'request_email' => $request->request_email ?? false,
                 'request_phone' => $request->request_phone ?? false,
                 'request_language' => $request->request_language ?? false,
-                'payment_method' => $request->payment_method ?? 'credit_card',
+                'payment_method' => $request->payment_method ?? ['credit_card'],
                 'activated' => $request->activated ?? false,
             ]);
 
@@ -173,7 +174,8 @@ class BotController extends Controller
             'request_email' => 'sometimes|boolean',
             'request_phone' => 'sometimes|boolean',
             'request_language' => 'sometimes|boolean',
-            'payment_method' => 'sometimes|string|in:credit_card,pix',
+            'payment_method' => 'sometimes|array|min:1',
+            'payment_method.*' => 'in:credit_card,pix',
             'activated' => 'sometimes|boolean',
         ]);
 
@@ -656,6 +658,85 @@ class BotController extends Controller
         }
         
         return round($bytes, $precision) . ' ' . $units[$i];
+    }
+
+    /**
+     * Update invite link for bot's Telegram group
+     */
+    public function updateInviteLink(string $id): JsonResponse
+    {
+        try {
+            $user = auth()->user();
+            $bot = Bot::findOrFail($id);
+
+            // Verifica permissão de leitura
+            if (!$this->permissionService->hasBotPermission($user, (int)$id, 'read')) {
+                return response()->json(['error' => 'Acesso negado'], 403);
+            }
+
+            // Verifica se o bot tem um grupo configurado
+            if (!$bot->telegram_group_id) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'O bot não tem um grupo do Telegram configurado. Configure o ID do grupo primeiro.'
+                ], 400);
+            }
+
+            $telegramService = new TelegramService();
+            
+            // Obtém o ID do bot a partir do token
+            $botId = null;
+            try {
+                $validation = $telegramService->validateToken($bot->token);
+                if ($validation['valid'] && isset($validation['bot']['id'])) {
+                    $botId = $validation['bot']['id'];
+                }
+            } catch (\Exception $e) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Erro ao validar token do bot: ' . $e->getMessage()
+                ], 500);
+            }
+
+            // Obtém o link de convite
+            $result = $telegramService->getChatInviteLink($bot->token, $bot->telegram_group_id, $botId);
+
+            if (!$result['success']) {
+                $errorMessage = $result['error'] ?? 'Erro ao obter link de convite';
+                $details = $result['details'] ?? [];
+                
+                // Adiciona informações detalhadas se disponíveis
+                $fullErrorMessage = $errorMessage;
+                if (isset($details['status'])) {
+                    $fullErrorMessage .= ' Status do bot: ' . $details['status'];
+                }
+                if (isset($details['is_admin']) && $details['is_admin'] === false) {
+                    $fullErrorMessage .= ' O bot não é administrador do grupo.';
+                } elseif (isset($details['can_invite_users']) && $details['can_invite_users'] === false) {
+                    $fullErrorMessage .= ' O bot não tem permissão para convidar usuários.';
+                }
+
+                return response()->json([
+                    'success' => false,
+                    'error' => $fullErrorMessage,
+                    'details' => $details
+                ], 400);
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Link de convite obtido com sucesso!',
+                'invite_link' => $result['invite_link'],
+                'details' => $result['details'] ?? []
+            ]);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json(['success' => false, 'error' => 'Bot não encontrado'], 404);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Erro ao atualizar link: ' . $e->getMessage()
+            ], 500);
+        }
     }
 
     /**

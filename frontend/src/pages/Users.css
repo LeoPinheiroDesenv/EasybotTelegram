@@ -82,6 +82,11 @@
   font-weight: 500;
 }
 
+.badge-super-admin {
+  background-color: #6f42c1;
+  color: white;
+}
+
 .badge-admin {
   background-color: #007bff;
   color: white;

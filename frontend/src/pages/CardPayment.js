@@ -12,6 +12,7 @@ const CardPayment = () => {
   const [success, setSuccess] = useState('');
   const [stripe, setStripe] = useState(null);
   const [clientSecret, setClientSecret] = useState(null);
+  // eslint-disable-next-line no-unused-vars
   const [paymentIntentId, setPaymentIntentId] = useState(null);
   const [stripePublicKey, setStripePublicKey] = useState(null);
   const elementsRef = useRef(null);
@@ -21,6 +22,7 @@ const CardPayment = () => {
     if (token) {
       loadTransaction();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
   useEffect(() => {

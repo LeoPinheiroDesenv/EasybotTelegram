@@ -7,6 +7,7 @@ use App\Models\Alert;
 use App\Models\Bot;
 use App\Models\Contact;
 use App\Services\PermissionService;
+use App\Services\TelegramService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -114,6 +115,19 @@ class AlertController extends Controller
                 'file_url' => $request->file_url,
                 'status' => 'active',
             ]);
+
+            // Se for alerta comum (common), processa imediatamente
+            if ($request->alert_type === 'common') {
+                try {
+                    $this->processAlertImmediately($alert);
+                } catch (\Exception $e) {
+                    Log::error('Erro ao processar alerta comum imediatamente', [
+                        'alert_id' => $alert->id,
+                        'error' => $e->getMessage()
+                    ]);
+                    // Não falha a criação do alerta, apenas loga o erro
+                }
+            }
 
             return response()->json(['alert' => $alert->load(['bot', 'plan'])], 201);
         } catch (\Exception $e) {
@@ -305,10 +319,39 @@ class AlertController extends Controller
                         continue;
                     }
 
-                    // Dispara jobs para enviar o alerta
+                    // Envia alertas (síncrono para garantir envio imediato, não depende de fila)
+                    $telegramService = app(TelegramService::class);
                     foreach ($contacts as $contact) {
-                        SendAlert::dispatch($alert, $contact);
-                        $totalSent++;
+                        try {
+                            // Verifica se o contato está bloqueado
+                            if ($contact->is_blocked) {
+                                continue;
+                            }
+
+                            // Envia a mensagem diretamente (síncrono)
+                            $telegramService->sendMessage($alert->bot, $contact->telegram_id, $alert->message);
+
+                            // Se houver arquivo, envia também
+                            if ($alert->file_url) {
+                                $this->sendAlertMedia($telegramService, $alert->bot, $contact->telegram_id, $alert);
+                            }
+
+                            $totalSent++;
+                        } catch (\Exception $e) {
+                            Log::error('Erro ao enviar alerta para contato', [
+                                'alert_id' => $alert->id,
+                                'contact_id' => $contact->id,
+                                'error' => $e->getMessage()
+                            ]);
+                        }
+                    }
+
+                    // Atualiza contador de envios uma vez após enviar para todos os contatos
+                    if ($totalSent > 0) {
+                        $alert->increment('sent_count', $totalSent);
+                        if (!$alert->sent_at) {
+                            $alert->update(['sent_at' => now()]);
+                        }
                     }
 
                     // Se for alerta agendado, marca como enviado
@@ -357,23 +400,157 @@ class AlertController extends Controller
             $query->where('language', $alert->user_language);
         }
 
+        // Filtro por plano específico
+        if ($alert->plan_id) {
+            // Busca contatos que têm transações aprovadas com o plano especificado
+            // e que ainda não expiraram (baseado no ciclo de pagamento)
+            $contactIds = Transaction::where('bot_id', $alert->bot_id)
+                ->where('payment_plan_id', $alert->plan_id)
+                ->whereIn('status', ['approved', 'paid', 'completed'])
+                ->whereHas('paymentCycle', function ($cycleQ) {
+                    // Verifica se a transação ainda está dentro do período do ciclo
+                    $cycleQ->whereRaw('DATE_ADD(transactions.created_at, INTERVAL payment_cycles.days DAY) >= NOW()');
+                })
+                ->pluck('contact_id')
+                ->unique()
+                ->toArray();
+            
+            if (empty($contactIds)) {
+                // Se não há contatos com o plano, retorna coleção vazia
+                return collect([]);
+            }
+            
+            $query->whereIn('id', $contactIds);
+        }
+
         // Filtro por categoria (premium/free)
         if ($alert->user_category !== 'all') {
-            // Aqui você pode adicionar lógica para determinar se o usuário é premium ou free
-            // Por exemplo, verificar se tem transações ativas, planos, etc.
-            // Por enquanto, vamos apenas filtrar se houver um plano específico
-            if ($alert->plan_id) {
-                // Se o alerta está vinculado a um plano, envia apenas para usuários desse plano
-                // Você pode implementar uma lógica mais complexa aqui
+            // Busca IDs de contatos premium (com transações ativas) para este bot
+            $premiumContactIds = Transaction::where('bot_id', $alert->bot_id)
+                ->whereIn('status', ['approved', 'paid', 'completed'])
+                ->whereHas('paymentCycle', function ($cycleQ) {
+                    $cycleQ->whereRaw('DATE_ADD(transactions.created_at, INTERVAL payment_cycles.days DAY) >= NOW()');
+                })
+                ->pluck('contact_id')
+                ->unique()
+                ->toArray();
+            
+            if ($alert->user_category === 'premium') {
+                // Usuários premium: têm transações aprovadas ativas
+                if (empty($premiumContactIds)) {
+                    return collect([]);
+                }
+                $query->whereIn('id', $premiumContactIds);
+            } elseif ($alert->user_category === 'free') {
+                // Usuários free: não têm transações aprovadas ativas
+                if (!empty($premiumContactIds)) {
+                    $query->whereNotIn('id', $premiumContactIds);
+                }
             }
         }
 
-        // Filtro por plano específico
-        if ($alert->plan_id) {
-            // Aqui você pode adicionar lógica para filtrar por plano
-            // Por exemplo, verificar transações ou assinaturas ativas
+        return $query->get();
+    }
+
+    /**
+     * Processa um alerta imediatamente (síncrono)
+     */
+    protected function processAlertImmediately(Alert $alert): void
+    {
+        // Recarrega o alerta com relacionamentos
+        $alert->refresh();
+        $alert->load(['bot']);
+
+        // Verifica se o alerta tem bot associado
+        if (!$alert->bot_id || !$alert->bot) {
+            Log::warning("Alerta ID: {$alert->id} não tem bot associado ou bot não encontrado");
+            return;
         }
 
-        return $query->get();
+        // Verifica se o bot está ativo
+        if (!$alert->bot->active || !$alert->bot->activated) {
+            Log::info("Bot ID: {$alert->bot_id} não está ativo, não processando alerta ID: {$alert->id}");
+            return;
+        }
+
+        // Busca contatos que devem receber o alerta
+        $contacts = $this->getTargetContacts($alert);
+
+        if ($contacts->isEmpty()) {
+            Log::info("Nenhum contato encontrado para o alerta ID: {$alert->id}");
+            return;
+        }
+
+        // Envia alertas síncronamente
+        $telegramService = app(TelegramService::class);
+        $sentCount = 0;
+
+        foreach ($contacts as $contact) {
+            try {
+                // Verifica se o contato está bloqueado
+                if ($contact->is_blocked) {
+                    continue;
+                }
+
+                // Envia a mensagem
+                $telegramService->sendMessage($alert->bot, $contact->telegram_id, $alert->message);
+
+                // Se houver arquivo, envia também
+                if ($alert->file_url) {
+                    $this->sendAlertMedia($telegramService, $alert->bot, $contact->telegram_id, $alert);
+                }
+
+                $sentCount++;
+            } catch (\Exception $e) {
+                Log::error('Erro ao enviar alerta para contato', [
+                    'alert_id' => $alert->id,
+                    'contact_id' => $contact->id,
+                    'error' => $e->getMessage()
+                ]);
+            }
+        }
+
+        // Atualiza contador de envios
+        if ($sentCount > 0) {
+            $alert->increment('sent_count', $sentCount);
+            if (!$alert->sent_at) {
+                $alert->update(['sent_at' => now()]);
+            }
+            Log::info("Alerta ID: {$alert->id} processado imediatamente. {$sentCount} mensagem(s) enviada(s).");
+        }
+    }
+
+    /**
+     * Envia mídia do alerta
+     */
+    protected function sendAlertMedia(TelegramService $telegramService, Bot $bot, int $chatId, Alert $alert): void
+    {
+        try {
+            $fileUrl = $alert->file_url;
+            
+            // Determina o tipo de mídia pela extensão
+            $extension = strtolower(pathinfo($fileUrl, PATHINFO_EXTENSION));
+            
+            $imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+            $videoExtensions = ['mp4', 'avi', 'mov', 'mkv'];
+            
+            $message = '';
+            if (in_array($extension, $imageExtensions)) {
+                $message = "📷 Imagem: {$fileUrl}";
+            } elseif (in_array($extension, $videoExtensions)) {
+                $message = "🎥 Vídeo: {$fileUrl}";
+            } else {
+                $message = "📎 Arquivo: {$fileUrl}";
+            }
+            
+            // Envia a URL como mensagem
+            $telegramService->sendMessage($bot, $chatId, $message);
+        } catch (\Exception $e) {
+            Log::warning('Erro ao enviar mídia do alerta', [
+                'alert_id' => $alert->id,
+                'file_url' => $alert->file_url,
+                'error' => $e->getMessage()
+            ]);
+        }
     }
 }

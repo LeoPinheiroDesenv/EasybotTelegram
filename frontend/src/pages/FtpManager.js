@@ -21,6 +21,7 @@ const FtpManager = () => {
   useEffect(() => {
     loadFiles();
     testConnection();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentPath, disk]);
 
   const loadFiles = async () => {

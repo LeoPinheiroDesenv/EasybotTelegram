@@ -15,11 +15,14 @@ use App\Http\Controllers\UserGroupController;
 use App\Http\Controllers\BotAdministratorController;
 use App\Http\Controllers\RedirectButtonController;
 use App\Http\Controllers\AlertController;
+use App\Http\Controllers\DownsellController;
 use App\Http\Controllers\FtpController;
 use App\Http\Controllers\StorageController;
 use App\Http\Controllers\ArtisanController;
 use App\Http\Controllers\BotFatherController;
 use App\Http\Controllers\PaymentStatusController;
+use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\PixDiagnosticController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -49,6 +52,15 @@ Route::middleware('auth:api')->group(function () {
     Route::post('/auth/2fa/verify', [AuthController::class, 'verifyAndEnable2FA']);
     Route::post('/auth/2fa/disable', [AuthController::class, 'disable2FA']);
 
+    // Profile routes
+    Route::get('/profile', [ProfileController::class, 'getProfile']);
+    Route::put('/profile', [ProfileController::class, 'updateProfile']);
+    Route::post('/profile/avatar', [ProfileController::class, 'uploadAvatar']);
+    Route::delete('/profile/avatar', [ProfileController::class, 'removeAvatar']);
+    Route::get('/profile/states', [ProfileController::class, 'getStates']);
+    Route::get('/profile/municipalities', [ProfileController::class, 'getMunicipalitiesByState']);
+    Route::get('/profile/consult-cep', [ProfileController::class, 'consultCep']);
+
     // User routes (admins podem criar usuários, mas apenas super admins podem criar outros admins)
     // O controller já implementa as verificações de permissão adequadas
     Route::apiResource('users', UserController::class);
@@ -69,6 +81,7 @@ Route::middleware('auth:api')->group(function () {
     Route::post('/bots/validate-token-and-group', [BotController::class, 'validateTokenAndGroup']);
     Route::post('/bots/{id}/media/upload', [BotController::class, 'uploadMedia']);
     Route::delete('/bots/{id}/media', [BotController::class, 'deleteMedia']);
+    Route::post('/bots/{id}/update-invite-link', [BotController::class, 'updateInviteLink']);
     
     // Bot commands routes
     Route::get('/bots/{botId}/commands', [BotCommandController::class, 'index']);
@@ -127,6 +140,13 @@ Route::middleware('auth:api')->group(function () {
     Route::get('/payment-gateway-configs/status', [PaymentGatewayConfigController::class, 'checkApiStatus']);
     Route::apiResource('payment-gateway-configs', PaymentGatewayConfigController::class);
 
+    // PIX Diagnostic routes (super admin only)
+    Route::middleware('super_admin')->group(function () {
+        Route::post('/pix-diagnostic/validate-code', [PixDiagnosticController::class, 'validatePixCode']);
+        Route::get('/pix-diagnostic/statistics', [PixDiagnosticController::class, 'getCrcStatistics']);
+        Route::get('/pix-diagnostic/mercado-pago-report', [PixDiagnosticController::class, 'generateMercadoPagoReport']);
+    });
+
     // Contact routes
     Route::post('/contacts/{id}/block', [ContactController::class, 'block']);
     Route::get('/contacts/stats', [ContactController::class, 'stats']);
@@ -157,6 +177,13 @@ Route::middleware('auth:api')->group(function () {
     Route::get('/alerts/{id}', [AlertController::class, 'show']);
     Route::put('/alerts/{id}', [AlertController::class, 'update']);
     Route::delete('/alerts/{id}', [AlertController::class, 'destroy']);
+
+    // Downsell routes
+    Route::get('/downsells', [DownsellController::class, 'index']);
+    Route::post('/downsells', [DownsellController::class, 'store']);
+    Route::get('/downsells/{id}', [DownsellController::class, 'show']);
+    Route::put('/downsells/{id}', [DownsellController::class, 'update']);
+    Route::delete('/downsells/{id}', [DownsellController::class, 'destroy']);
 
     // FTP routes
     Route::get('/ftp/files', [FtpController::class, 'listFiles']);

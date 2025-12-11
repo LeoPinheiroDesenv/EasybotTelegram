@@ -67,7 +67,7 @@ class BotFatherController extends Controller
                 'about' => $this->getMyAbout($token),
                 'commands' => $this->getMyCommands($token, ['type' => 'all_private_chats']),
                 'menu_button' => $this->getChatMenuButton($token),
-                'default_administrator_rights' => $this->getMyDefaultAdministratorRights($token),
+                'default_administrator_rights' => $this->getMyDefaultAdministratorRights($token, false),
             ];
 
             return response()->json($info);
@@ -294,6 +294,11 @@ class BotFatherController extends Controller
         ]);
 
         if ($validator->fails()) {
+            Log::error('BotFather: Validação falhou ao atualizar direitos', [
+                'bot_id' => $botId,
+                'errors' => $validator->errors()->toArray(),
+                'request_data' => $request->all()
+            ]);
             return response()->json(['errors' => $validator->errors()], 400);
         }
 
@@ -305,17 +310,14 @@ class BotFatherController extends Controller
                 return response()->json(['error' => 'Acesso negado'], 403);
             }
 
-            // Obtém os direitos atuais do bot para mesclar
             $forChannels = $request->has('for_channels') ? (bool)$request->for_channels : false;
-            $currentRights = $this->getMyDefaultAdministratorRights($bot->token, $forChannels);
             
             Log::info('BotFather: Processando direitos de administrador', [
                 'bot_id' => $botId,
                 'request_rights' => $request->rights,
-                'current_rights' => $currentRights,
                 'for_channels' => $forChannels,
-                'current_rights_is_array' => is_array($currentRights),
-                'current_rights_is_empty' => is_array($currentRights) && empty($currentRights)
+                'rights_count' => count($request->rights),
+                'rights_keys' => array_keys($request->rights)
             ]);
             
             // Lista completa de todas as permissões possíveis do Telegram
@@ -342,22 +344,19 @@ class BotFatherController extends Controller
                 $allPermissions[] = 'can_read_all_group_messages';
             }
             
-            // Inicia com os direitos atuais (se existirem e forem array)
-            $finalRights = is_array($currentRights) && !empty($currentRights) ? $currentRights : [];
+            // Prepara os direitos finais usando APENAS os valores enviados pelo frontend
+            // O frontend deve enviar TODAS as permissões (marcadas e desmarcadas)
+            $finalRights = [];
             
-            // Aplica as permissões enviadas na requisição sobre os direitos atuais
-            // Se uma permissão foi enviada na requisição, usa o valor enviado
-            // Se não foi enviada mas existe nos direitos atuais, mantém o valor atual
+            // Processa todas as permissões conhecidas
             foreach ($allPermissions as $permission) {
+                // Se a permissão foi enviada na requisição, usa o valor enviado
+                // Caso contrário, define como false
                 if (isset($request->rights[$permission])) {
-                    // Permissão foi explicitamente enviada na requisição
-                    $finalRights[$permission] = (bool)$request->rights[$permission];
-                } elseif (isset($finalRights[$permission])) {
-                    // Mantém o valor atual se existir
-                    $finalRights[$permission] = (bool)$finalRights[$permission];
+                    // Converte explicitamente para boolean
+                    $value = $request->rights[$permission];
+                    $finalRights[$permission] = filter_var($value, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? false;
                 } else {
-                    // Se não existe nem na requisição nem nos direitos atuais, define como false
-                    // Isso garante que todas as permissões sejam enviadas ao Telegram
                     $finalRights[$permission] = false;
                 }
             }
@@ -366,30 +365,32 @@ class BotFatherController extends Controller
             // (caso o Telegram adicione novas permissões no futuro)
             foreach ($request->rights as $key => $value) {
                 if (!in_array($key, $allPermissions)) {
-                    $finalRights[$key] = (bool)$value;
+                    $finalRights[$key] = filter_var($value, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? false;
                 }
             }
             
-            // Garante que todas as permissões sejam booleanas
+            // Garante que todas as permissões sejam booleanas (segunda verificação)
             foreach ($finalRights as $key => $value) {
                 $finalRights[$key] = (bool)$value;
             }
-
+            
             Log::info('BotFather: Direitos finais preparados para envio', [
                 'bot_id' => $botId,
                 'final_rights' => $finalRights,
                 'rights_count' => count($finalRights)
             ]);
 
+            // Prepara os dados para envio ao Telegram
+            // O Telegram aceita todas as permissões explicitamente (true e false)
             $data = ['rights' => $finalRights];
-            if ($request->has('for_channels')) {
-                $data['for_channels'] = $forChannels;
-            }
+            // Sempre envia for_channels para garantir que está configurado corretamente
+            $data['for_channels'] = $forChannels;
 
-            \Illuminate\Support\Facades\Log::info('BotFather: Enviando direitos de administrador', [
+            Log::info('BotFather: Enviando direitos de administrador', [
                 'bot_id' => $botId,
                 'rights' => $finalRights,
-                'for_channels' => $forChannels
+                'for_channels' => $forChannels,
+                'data' => $data
             ]);
 
             $result = $this->http()
@@ -398,20 +399,38 @@ class BotFatherController extends Controller
 
             $responseData = $result->json();
             
+            Log::info('BotFather: Resposta da API do Telegram', [
+                'bot_id' => $botId,
+                'successful' => $result->successful(),
+                'status' => $result->status(),
+                'response' => $responseData
+            ]);
+            
             if ($result->successful() && ($responseData['ok'] ?? false)) {
-                \Illuminate\Support\Facades\Log::info('BotFather: Direitos de administrador atualizados com sucesso', [
+                Log::info('BotFather: Direitos de administrador atualizados com sucesso', [
                     'bot_id' => $botId,
-                    'response' => $responseData
+                    'response' => $responseData,
+                    'sent_rights' => $finalRights
                 ]);
                 return response()->json([
                     'success' => true, 
                     'message' => 'Direitos padrão de administrador atualizados com sucesso',
-                    'rights' => $finalRights
+                    'rights' => $finalRights,
+                    'telegram_response' => $responseData
                 ]);
             }
 
             $errorDescription = $responseData['description'] ?? 'Erro ao atualizar direitos';
-            \Illuminate\Support\Facades\Log::error('BotFather: Erro ao atualizar direitos de administrador', [
+            
+            // Se a resposta não foi bem-sucedida, loga detalhes adicionais
+            if (!$result->successful()) {
+                Log::error('BotFather: Resposta HTTP não foi bem-sucedida', [
+                    'bot_id' => $botId,
+                    'status' => $result->status(),
+                    'body' => $result->body()
+                ]);
+            }
+            Log::error('BotFather: Erro ao atualizar direitos de administrador', [
                 'bot_id' => $botId,
                 'error' => $errorDescription,
                 'response' => $responseData,
@@ -420,7 +439,7 @@ class BotFatherController extends Controller
 
             return response()->json(['error' => $errorDescription], 400);
         } catch (\Exception $e) {
-            \Illuminate\Support\Facades\Log::error('BotFather: Exceção ao atualizar direitos de administrador', [
+            Log::error('BotFather: Exceção ao atualizar direitos de administrador', [
                 'bot_id' => $botId,
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()

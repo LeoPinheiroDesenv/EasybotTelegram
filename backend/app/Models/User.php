@@ -29,6 +29,8 @@ class User extends Authenticatable implements JWTSubject
         'two_factor_secret',
         'two_factor_enabled',
         'phone',
+        'avatar',
+        'description',
         'address_street',
         'address_number',
         'address_zipcode',

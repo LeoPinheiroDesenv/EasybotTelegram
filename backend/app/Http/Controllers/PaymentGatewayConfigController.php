@@ -68,9 +68,11 @@ class PaymentGatewayConfigController extends Controller
             'api_key' => 'nullable|string|max:255',
             'api_secret' => 'nullable|string',
             'access_token' => 'nullable|string|max:255', // Mercado Pago
+            'public_key' => 'nullable|string|max:255', // Mercado Pago e Stripe
+            'client_id' => 'nullable|string|max:255', // Mercado Pago
+            'client_secret' => 'nullable|string|max:255', // Mercado Pago
             'secret_key' => 'nullable|string', // Stripe
-            'public_key' => 'nullable|string|max:255', // Stripe
-            'webhook_secret' => 'nullable|string', // Stripe
+            'webhook_secret' => 'nullable|string', // Stripe e Mercado Pago
             'webhook_url' => 'nullable|string|max:255|url',
             'active' => 'sometimes|boolean',
             'is_active' => 'sometimes|boolean', // Frontend usa is_active
@@ -129,12 +131,18 @@ class PaymentGatewayConfigController extends Controller
                 'api_key' => $apiKey,
                 'api_secret' => $apiSecret,
                 'webhook_url' => $request->webhook_url ?? null,
-                'webhook_secret' => $request->webhook_secret ?? null, // Para Mercado Pago
+                'webhook_secret' => $request->webhook_secret ?? null,
                 'active' => $active,
             ];
 
+            // Para Mercado Pago, salvar todas as credenciais
+            if ($request->gateway === 'mercadopago') {
+                $dataToSave['public_key'] = $request->public_key ?? null;
+                $dataToSave['client_id'] = $request->client_id ?? null;
+                $dataToSave['client_secret'] = $request->client_secret ?? null;
+            }
+
             // Para Stripe, salvar public_key e webhook_secret no api_secret como JSON
-            // Para Mercado Pago, webhook_secret é salvo diretamente no campo webhook_secret
             if ($request->gateway === 'stripe') {
                 // Se já existe uma configuração, preserva os dados existentes
                 $stripeData = [];
@@ -210,8 +218,10 @@ class PaymentGatewayConfigController extends Controller
             'api_key' => 'nullable|string|max:255',
             'api_secret' => 'nullable|string',
             'access_token' => 'nullable|string|max:255', // Mercado Pago
+            'public_key' => 'nullable|string|max:255', // Mercado Pago e Stripe
+            'client_id' => 'nullable|string|max:255', // Mercado Pago
+            'client_secret' => 'nullable|string|max:255', // Mercado Pago
             'secret_key' => 'nullable|string', // Stripe
-            'public_key' => 'nullable|string|max:255', // Stripe
             'webhook_secret' => 'nullable|string', // Mercado Pago e Stripe
             'webhook_url' => 'nullable|string|max:255|url',
             'active' => 'sometimes|boolean',
@@ -326,10 +336,20 @@ class PaymentGatewayConfigController extends Controller
                 $updateData['webhook_url'] = $request->webhook_url;
             }
             
-            // Para Mercado Pago, webhook_secret é salvo diretamente no campo webhook_secret
-            // Para Stripe, webhook_secret é salvo dentro do api_secret como JSON
-            if ($config->gateway === 'mercadopago' && $request->has('webhook_secret')) {
-                $updateData['webhook_secret'] = $request->webhook_secret ?: null;
+            // Para Mercado Pago, salvar todas as credenciais
+            if ($config->gateway === 'mercadopago') {
+                if ($request->has('webhook_secret')) {
+                    $updateData['webhook_secret'] = $request->webhook_secret ?: null;
+                }
+                if ($request->has('public_key')) {
+                    $updateData['public_key'] = $request->public_key ?: null;
+                }
+                if ($request->has('client_id')) {
+                    $updateData['client_id'] = $request->client_id ?: null;
+                }
+                if ($request->has('client_secret')) {
+                    $updateData['client_secret'] = $request->client_secret ?: null;
+                }
             }
             
             // Mapear active / is_active
@@ -437,6 +457,9 @@ class PaymentGatewayConfigController extends Controller
         // Mapear campos específicos por gateway
         if ($config->gateway === 'mercadopago') {
             $formatted['access_token'] = $config->api_key;
+            $formatted['public_key'] = $config->public_key;
+            $formatted['client_id'] = $config->client_id;
+            $formatted['client_secret'] = $config->client_secret;
             $formatted['webhook_secret'] = $config->webhook_secret;
         } else {
             $formatted['api_key'] = $config->api_key;
@@ -557,15 +580,61 @@ class PaymentGatewayConfigController extends Controller
             $user = $client->get();
             
             if ($user && isset($user->id)) {
+                // Busca métodos de pagamento disponíveis
+                $paymentMethods = [];
+                $pixEnabled = false;
+                
+                try {
+                    // Usa o endpoint de payment methods para verificar métodos habilitados
+                    $paymentMethodsClient = new \MercadoPago\Client\PaymentMethod\PaymentMethodClient();
+                    $methods = $paymentMethodsClient->list();
+                    
+                    if ($methods && is_array($methods)) {
+                        foreach ($methods as $method) {
+                            if (isset($method->id)) {
+                                $paymentMethods[] = $method->id;
+                                if ($method->id === 'pix') {
+                                    $pixEnabled = true;
+                                }
+                            }
+                        }
+                    }
+                } catch (\Exception $e) {
+                    // Se não conseguir buscar métodos, continua sem essa informação
+                    // Não é crítico para a verificação de status
+                }
+                
+                // Verifica se PIX está na lista de métodos disponíveis
+                // Se não estiver na lista, pode não estar habilitado ou a lista pode estar incompleta
+                if (in_array('pix', $paymentMethods)) {
+                    $pixEnabled = true;
+                } else {
+                    // Se não está na lista, não podemos determinar com certeza
+                    // Pode ser que não esteja habilitado ou a API não retornou todos os métodos
+                    $pixEnabled = null; // Indeterminado
+                }
+                
+                $details = [
+                    'user_id' => $user->id ?? null,
+                    'environment' => $config->environment,
+                    'gateway' => 'Mercado Pago',
+                    'authenticated' => true
+                ];
+                
+                // Adiciona informações sobre métodos de pagamento
+                if (!empty($paymentMethods)) {
+                    $details['payment_methods_available'] = $paymentMethods;
+                    $details['pix_enabled'] = $pixEnabled;
+                } else {
+                    // Se não conseguiu buscar métodos, tenta inferir pelo menos sobre PIX
+                    $details['pix_enabled'] = $pixEnabled ? true : 'indeterminado';
+                    $details['note'] = 'Não foi possível verificar todos os métodos de pagamento disponíveis';
+                }
+                
                 return [
                     'status' => 'success',
                     'message' => 'API do Mercado Pago está funcionando',
-                    'details' => [
-                        'user_id' => $user->id ?? null,
-                        'environment' => $config->environment,
-                        'gateway' => 'Mercado Pago',
-                        'authenticated' => true
-                    ],
+                    'details' => $details,
                     'timestamp' => now()->toIso8601String()
                 ];
             }

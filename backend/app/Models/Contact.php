@@ -58,5 +58,13 @@ class Contact extends Model
     {
         return $this->hasMany(ContactAction::class);
     }
+
+    /**
+     * Get the transactions for this contact.
+     */
+    public function transactions(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(Transaction::class);
+    }
 }
 

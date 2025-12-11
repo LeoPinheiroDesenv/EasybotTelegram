@@ -126,6 +126,7 @@ class AuthController extends Controller
             $twoFactorService->verifyLoginCode($user->id, $request->token);
 
             $token = JWTAuth::fromUser($user);
+            $user->load(['state', 'municipality']);
 
             // Obtém menus acessíveis
             $permissionService = app(\App\Services\PermissionService::class);
@@ -140,6 +141,23 @@ class AuthController extends Controller
                     'role' => $user->role,
                     'user_type' => $user->user_type,
                     'user_group_id' => $user->user_group_id,
+                    'phone' => $user->phone,
+                    'avatar' => $user->avatar,
+                    'description' => $user->description,
+                    'address_street' => $user->address_street,
+                    'address_number' => $user->address_number,
+                    'address_zipcode' => $user->address_zipcode,
+                    'state_id' => $user->state_id,
+                    'municipality_id' => $user->municipality_id,
+                    'state' => $user->state ? [
+                        'id' => $user->state->id,
+                        'nome' => $user->state->nome,
+                        'uf' => $user->state->uf,
+                    ] : null,
+                    'municipality' => $user->municipality ? [
+                        'id' => $user->municipality->id,
+                        'nome' => $user->municipality->nome,
+                    ] : null,
                     'accessible_menus' => $accessibleMenus,
                 ]
             ]);
@@ -163,6 +181,7 @@ class AuthController extends Controller
     {
         try {
             $user = $this->authService->getCurrentUser(auth()->id());
+            $user->load(['state', 'municipality']);
             
             // Obtém menus acessíveis
             $accessibleMenus = $this->permissionService->getAccessibleMenus($user);
@@ -175,6 +194,23 @@ class AuthController extends Controller
                     'role' => $user->role,
                     'user_type' => $user->user_type,
                     'user_group_id' => $user->user_group_id,
+                    'phone' => $user->phone,
+                    'avatar' => $user->avatar,
+                    'description' => $user->description,
+                    'address_street' => $user->address_street,
+                    'address_number' => $user->address_number,
+                    'address_zipcode' => $user->address_zipcode,
+                    'state_id' => $user->state_id,
+                    'municipality_id' => $user->municipality_id,
+                    'state' => $user->state ? [
+                        'id' => $user->state->id,
+                        'nome' => $user->state->nome,
+                        'uf' => $user->state->uf,
+                    ] : null,
+                    'municipality' => $user->municipality ? [
+                        'id' => $user->municipality->id,
+                        'nome' => $user->municipality->nome,
+                    ] : null,
                     'accessible_menus' => $accessibleMenus,
                 ]
             ]);

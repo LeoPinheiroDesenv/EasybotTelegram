@@ -6,6 +6,7 @@ import botService from '../services/botService';
 import useConfirm from '../hooks/useConfirm';
 import useAlert from '../hooks/useAlert';
 import RefreshButton from '../components/RefreshButton';
+import Pagination from '../components/Pagination';
 import './Logs.css';
 
 const Logs = () => {
@@ -440,23 +441,14 @@ const Logs = () => {
 
               {totalPages > 1 && (
                 <div className="logs-pagination">
-                  <button
-                    onClick={() => handlePageChange(Math.max(0, filters.offset - filters.limit))}
-                    disabled={filters.offset === 0}
-                    className="btn btn-secondary"
-                  >
-                    Anterior
-                  </button>
-                  <span className="pagination-info">
-                    Página {currentPage} de {totalPages}
-                  </span>
-                  <button
-                    onClick={() => handlePageChange(filters.offset + filters.limit)}
-                    disabled={filters.offset + filters.limit >= total}
-                    className="btn btn-secondary"
-                  >
-                    Próxima
-                  </button>
+                  <Pagination
+                    currentPage={currentPage}
+                    totalPages={totalPages}
+                    onPageChange={(page) => {
+                      const newOffset = (page - 1) * filters.limit;
+                      handlePageChange(newOffset);
+                    }}
+                  />
                 </div>
               )}
             </>

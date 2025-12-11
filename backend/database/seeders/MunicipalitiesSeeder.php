@@ -13,7 +13,7 @@ class MunicipalitiesSeeder extends Seeder
      */
     public function run(): void
     {
-        $sqlFile = base_path('manuais/Municipios.sql');
+        $sqlFile = base_path('../manuais/Municipios.sql');
         
         if (!File::exists($sqlFile)) {
             $this->command->error("Arquivo Municipios.sql não encontrado em: {$sqlFile}");

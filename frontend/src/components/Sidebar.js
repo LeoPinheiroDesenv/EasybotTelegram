@@ -13,8 +13,7 @@ import {
   faFileAlt,
   faCog,
   faSignOutAlt,
-  faCreditCard,
-  faClock
+  faCreditCard
 } from '@fortawesome/free-solid-svg-icons';
 import { AuthContext } from '../contexts/AuthContext';
 import billingService from '../services/billingService';
@@ -36,9 +35,12 @@ const Sidebar = ({ isOpen, onClose }) => {
     location.pathname === '/logs' ||
     location.pathname === '/ftp' ||
     location.pathname === '/settings/artisan' ||
+    location.pathname === '/settings/profile' ||
     location.pathname.includes('/botfather')
   );
+  // eslint-disable-next-line no-unused-vars
   const [monthlyBilling, setMonthlyBilling] = useState({ total: 0, transaction_count: 0 });
+  // eslint-disable-next-line no-unused-vars
   const [loadingBilling, setLoadingBilling] = useState(true);
 
   // Verifica se o usuário tem acesso a um menu específico
@@ -125,7 +127,6 @@ const Sidebar = ({ isOpen, onClose }) => {
   // Detecta qualquer rota de bot exceto /bot/create
   const isBotSubmenuActive = location.pathname.startsWith('/bot') && 
     !location.pathname.match(/^\/bot\/create$/);
-  const isBotListActive = location.pathname === '/bot/list';
   const isResultsActive = location.pathname.startsWith('/results');
   const isMarketingActive = location.pathname.startsWith('/marketing');
   // Menu de Configurações está ativo para /settings, /users, /user-groups, /logs, /ftp e /botfather
@@ -356,10 +357,23 @@ const Sidebar = ({ isOpen, onClose }) => {
 
         <div className="sidebar-section">
           <div className="sidebar-title">CONFIGURAÇÕES</div>
+          {/* Link "Meu Perfil" sempre visível para todos os usuários autenticados */}
+          <div className="sidebar-menu-group">
+            <Link
+              to="/settings/profile"
+              className={`sidebar-item ${location.pathname === '/settings/profile' ? 'active' : ''}`}
+              onClick={onClose}
+            >
+              <span className="sidebar-icon">{getIcon('settings')}</span>
+              <span className="sidebar-label">Meu Perfil</span>
+            </Link>
+          </div>
+          
+          {/* Menu de Configurações completo apenas para admins com acesso */}
           {isAdmin && hasMenuAccess('settings') && (
             <div className="sidebar-menu-group">
               <div
-                className={`sidebar-item ${isSettingsActive ? 'active' : ''} ${settingsMenuOpen ? 'expanded' : ''}`}
+                className={`sidebar-item ${isSettingsActive && location.pathname !== '/settings/profile' ? 'active' : ''} ${settingsMenuOpen ? 'expanded' : ''}`}
                 onClick={() => setSettingsMenuOpen(!settingsMenuOpen)}
               >
                 <span className="sidebar-icon">{getIcon('settings')}</span>
@@ -410,21 +424,6 @@ const Sidebar = ({ isOpen, onClose }) => {
                       >
                         Gerenciador FTP
                       </Link> */}
-                      {(() => {
-                        const storedBotId = localStorage.getItem('selectedBotId');
-                        if (storedBotId) {
-                          return (
-                            <Link
-                              to={`/bot/${storedBotId}/botfather`}
-                              className={`sidebar-submenu-item ${location.pathname.includes('/botfather') ? 'active' : ''}`}
-                              onClick={onClose}
-                            >
-                              Gerenciar via BotFather
-                            </Link>
-                          );
-                        }
-                        return null;
-                      })()}
                     </>
                   )}
                   {user?.user_type === 'super_admin' && (
@@ -473,40 +472,6 @@ const Sidebar = ({ isOpen, onClose }) => {
         </div>
 
         <div className="sidebar-footer">
-          <Link to="/billing" className="sidebar-billing-link" onClick={onClose}>
-            <div className="sidebar-billing">
-              <div className="billing-header">
-                <span>Faturamento</span>
-                <span className="billing-value">
-                  {loadingBilling ? '...' : 
-                    new Intl.NumberFormat('pt-BR', {
-                      style: 'currency',
-                      currency: 'BRL',
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2
-                    }).format(monthlyBilling.total || 0)
-                  }
-                </span>
-              </div>
-              <div className="billing-progress">
-                <div 
-                  className="billing-progress-bar" 
-                  style={{ 
-                    width: `${Math.min((monthlyBilling.total / 100000) * 100, 100)}%` 
-                  }}
-                ></div>
-              </div>
-              <div className="billing-limit">
-                {monthlyBilling.transaction_count > 0 && (
-                  <span className="billing-transactions">
-                    {monthlyBilling.transaction_count} transação{monthlyBilling.transaction_count !== 1 ? 'ões' : ''} este mês
-                  </span>
-                )}
-              </div>
-            </div>
-          </Link>
-
-          
 
           <button
             onClick={handleLogout}

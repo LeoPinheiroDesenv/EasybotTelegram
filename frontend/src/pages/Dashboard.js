@@ -16,7 +16,7 @@ import {
   Legend,
   Filler
 } from 'chart.js';
-import { Bar, Line, Pie, Doughnut } from 'react-chartjs-2';
+import { Bar, Pie, Doughnut } from 'react-chartjs-2';
 import './Dashboard.css';
 
 ChartJS.register(

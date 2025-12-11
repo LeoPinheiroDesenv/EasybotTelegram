@@ -131,6 +131,7 @@ const Users = () => {
                   <th>Email</th>
                   <th>Nível de Acesso</th>
                   <th>Status</th>
+                  {isSuperAdmin && <th>Criado por</th>}
                   <th>Criado em</th>
                   <th>Ações</th>
                 </tr>
@@ -138,7 +139,7 @@ const Users = () => {
               <tbody>
                 {users.length === 0 ? (
                   <tr>
-                    <td colSpan="7" className="text-center">
+                    <td colSpan={isSuperAdmin ? 8 : 7} className="text-center">
                       Nenhum usuário encontrado
                     </td>
                   </tr>
@@ -149,8 +150,12 @@ const Users = () => {
                       <td>{user.name}</td>
                       <td>{user.email}</td>
                       <td>
-                        <span className={`badge badge-${user.role}`}>
-                          {user.role === 'admin' ? 'Administrador' : 'Usuário'}
+                        <span className={`badge badge-${user.user_type === 'super_admin' ? 'super-admin' : user.role}`}>
+                          {user.user_type === 'super_admin' 
+                            ? 'Super Administrador' 
+                            : user.user_type === 'admin' 
+                            ? 'Administrador' 
+                            : 'Usuário'}
                         </span>
                       </td>
                       <td>
@@ -158,6 +163,17 @@ const Users = () => {
                           {user.active ? 'Ativo' : 'Inativo'}
                         </span>
                       </td>
+                      {isSuperAdmin && (
+                        <td>
+                          {user.creator ? (
+                            <span title={`ID: ${user.creator.id}`}>
+                              {user.creator.name} ({user.creator.email})
+                            </span>
+                          ) : (
+                            <span style={{ color: '#9ca3af', fontStyle: 'italic' }}>Sistema</span>
+                          )}
+                        </td>
+                      )}
                       <td>{formatDate(user.created_at)}</td>
                       <td>
                         <div className="actions">

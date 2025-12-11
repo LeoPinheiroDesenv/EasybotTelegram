@@ -24,10 +24,12 @@ const PaymentGatewayConfigs = () => {
     gateway: 'mercadopago',
     environment: 'test',
     access_token: '',
+    public_key: '',
+    client_id: '',
+    client_secret: '',
     secret_key: '',
     webhook_secret: '',
     webhook_url: '',
-    public_key: '',
     is_active: false
   });
 
@@ -74,10 +76,12 @@ const PaymentGatewayConfigs = () => {
         gateway: existingConfig.gateway || gateway,
         environment: existingConfig.environment || environment,
         access_token: existingConfig.access_token || existingConfig.api_key || '',
+        public_key: existingConfig.public_key || '',
+        client_id: existingConfig.client_id || '',
+        client_secret: existingConfig.client_secret || '',
         secret_key: existingConfig.secret_key || existingConfig.api_secret || '',
         webhook_secret: existingConfig.webhook_secret || '',
         webhook_url: existingConfig.webhook_url || '',
-        public_key: existingConfig.public_key || '',
         is_active: existingConfig.is_active !== undefined ? existingConfig.is_active : (existingConfig.active !== undefined ? existingConfig.active : false)
       });
     } else {
@@ -86,10 +90,12 @@ const PaymentGatewayConfigs = () => {
         gateway: gateway,
         environment: environment,
         access_token: '',
+        public_key: '',
+        client_id: '',
+        client_secret: '',
         secret_key: '',
         webhook_secret: '',
         webhook_url: '',
-        public_key: '',
         is_active: false
       });
     }
@@ -104,10 +110,12 @@ const PaymentGatewayConfigs = () => {
       gateway: 'mercadopago',
       environment: 'test',
       access_token: '',
+      public_key: '',
+      client_id: '',
+      client_secret: '',
       secret_key: '',
       webhook_secret: '',
       webhook_url: '',
-      public_key: '',
       is_active: false
     });
   };
@@ -138,6 +146,10 @@ const PaymentGatewayConfigs = () => {
       // Adiciona campos específicos por gateway
       if (formData.gateway === 'mercadopago' || selectedGateway === 'mercadopago') {
         configToSave.access_token = formData.access_token || '';
+        configToSave.public_key = formData.public_key || '';
+        configToSave.client_id = formData.client_id || '';
+        configToSave.client_secret = formData.client_secret || '';
+        configToSave.webhook_secret = formData.webhook_secret || null;
       } else if (formData.gateway === 'stripe' || selectedGateway === 'stripe') {
         configToSave.secret_key = formData.secret_key || '';
         configToSave.public_key = formData.public_key || '';
@@ -309,6 +321,8 @@ const PaymentGatewayConfigs = () => {
                 {getConfigForGateway('mercadopago', 'test') ? (
                   <div className="config-card-content">
                     <p><strong>Access Token:</strong> {maskToken(getConfigForGateway('mercadopago', 'test').access_token || getConfigForGateway('mercadopago', 'test').api_key || '')}</p>
+                    <p><strong>Public Key:</strong> {getConfigForGateway('mercadopago', 'test').public_key ? maskToken(getConfigForGateway('mercadopago', 'test').public_key) : 'Não configurado'}</p>
+                    <p><strong>Client ID:</strong> {getConfigForGateway('mercadopago', 'test').client_id || 'Não configurado'}</p>
                     <p><strong>Webhook URL:</strong> {getConfigForGateway('mercadopago', 'test').webhook_url || 'Não configurado'}</p>
                     <div className="config-card-actions">
                       <button
@@ -349,6 +363,8 @@ const PaymentGatewayConfigs = () => {
                 {getConfigForGateway('mercadopago', 'production') ? (
                   <div className="config-card-content">
                     <p><strong>Access Token:</strong> {maskToken(getConfigForGateway('mercadopago', 'production').access_token || getConfigForGateway('mercadopago', 'production').api_key || '')}</p>
+                    <p><strong>Public Key:</strong> {getConfigForGateway('mercadopago', 'production').public_key ? maskToken(getConfigForGateway('mercadopago', 'production').public_key) : 'Não configurado'}</p>
+                    <p><strong>Client ID:</strong> {getConfigForGateway('mercadopago', 'production').client_id || 'Não configurado'}</p>
                     <p><strong>Webhook URL:</strong> {getConfigForGateway('mercadopago', 'production').webhook_url || 'Não configurado'}</p>
                     <div className="config-card-actions">
                       <button
@@ -527,7 +543,40 @@ const PaymentGatewayConfigs = () => {
                         required
                         placeholder="APP_USR-..."
                       />
-                      <small>Token de acesso do Mercado Pago</small>
+                      <small>Token de acesso do Mercado Pago (obrigatório)</small>
+                    </div>
+                    <div className="form-group">
+                      <label>Public Key</label>
+                      <input
+                        type="text"
+                        name="public_key"
+                        value={formData.public_key}
+                        onChange={handleChange}
+                        placeholder="APP_USR-..."
+                      />
+                      <small>Chave pública do Mercado Pago (usada no frontend)</small>
+                    </div>
+                    <div className="form-group">
+                      <label>Client ID</label>
+                      <input
+                        type="text"
+                        name="client_id"
+                        value={formData.client_id}
+                        onChange={handleChange}
+                        placeholder="1234567890123456"
+                      />
+                      <small>ID único da sua integração no Mercado Pago</small>
+                    </div>
+                    <div className="form-group">
+                      <label>Client Secret</label>
+                      <input
+                        type="password"
+                        name="client_secret"
+                        value={formData.client_secret}
+                        onChange={handleChange}
+                        placeholder="Chave secreta do cliente"
+                      />
+                      <small>Chave secreta usada em alguns plugins para gerar pagamentos</small>
                     </div>
                     <div className="form-group">
                       <label>Webhook URL</label>
@@ -660,11 +709,49 @@ const PaymentGatewayConfigs = () => {
                           <p>{apiStatus.details}</p>
                         ) : (
                           <div className="status-details-object">
-                            {Object.entries(apiStatus.details).map(([key, value]) => (
-                              <div key={key} className="status-detail-item">
-                                <strong>{key}:</strong> {String(value)}
-                              </div>
-                            ))}
+                            {Object.entries(apiStatus.details).map(([key, value]) => {
+                              // Formatação especial para métodos de pagamento
+                              if (key === 'payment_methods_available' && Array.isArray(value)) {
+                                return (
+                                  <div key={key} className="status-detail-item payment-methods">
+                                    <strong>Métodos de Pagamento Habilitados:</strong>
+                                    <div className="payment-methods-list">
+                                      {value.map((method, index) => (
+                                        <span key={index} className={`payment-method-badge ${method === 'pix' ? 'pix-badge' : ''}`}>
+                                          {method.toUpperCase()}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  </div>
+                                );
+                              }
+                              
+                              // Formatação especial para status PIX
+                              if (key === 'pix_enabled') {
+                                const pixStatus = value === true ? 'Habilitado' : value === false ? 'Não Habilitado' : 'Indeterminado';
+                                const pixClass = value === true ? 'pix-enabled' : value === false ? 'pix-disabled' : 'pix-indeterminate';
+                                return (
+                                  <div key={key} className={`status-detail-item ${pixClass}`}>
+                                    <strong>PIX:</strong> 
+                                    <span className={`pix-status ${pixClass}`}>
+                                      {pixStatus}
+                                      {value === false && (
+                                        <span className="pix-warning">
+                                          {' '}(Verifique se há uma chave PIX cadastrada na conta)
+                                        </span>
+                                      )}
+                                    </span>
+                                  </div>
+                                );
+                              }
+                              
+                              // Campos normais
+                              return (
+                                <div key={key} className="status-detail-item">
+                                  <strong>{key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}:</strong> {String(value)}
+                                </div>
+                              );
+                            })}
                           </div>
                         )}
                       </div>

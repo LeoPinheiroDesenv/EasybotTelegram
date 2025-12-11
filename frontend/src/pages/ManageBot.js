@@ -27,6 +27,7 @@ const ManageBot = () => {
         setLoading(false);
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [botId, navigate]);
 
   useEffect(() => {

@@ -35,6 +35,7 @@ import ArtisanCommands from './pages/ArtisanCommands';
 import ManageBot from './pages/ManageBot';
 import BotList from './pages/BotList';
 import PaymentStatus from './pages/PaymentStatus';
+import Profile from './pages/Profile';
 import './App.css';
 
 function App() {
@@ -307,6 +308,14 @@ function App() {
               element={
                 <ProtectedRoute>
                   <ArtisanCommands />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/settings/profile"
+              element={
+                <ProtectedRoute>
+                  <Profile />
                 </ProtectedRoute>
               }
             />

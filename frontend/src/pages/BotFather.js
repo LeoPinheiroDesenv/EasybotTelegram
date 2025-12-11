@@ -249,23 +249,37 @@ const BotFather = () => {
       setLoading(true);
       setError('');
       
+      // Prepara os direitos - garante que todos os valores sejam booleanos
       const rights = {};
       Object.keys(formData.admin_rights).forEach(key => {
-        rights[key] = formData.admin_rights[key] || false;
+        // Garante que o valor seja sempre boolean (true ou false)
+        rights[key] = Boolean(formData.admin_rights[key]);
       });
+      
+      // Log para debug
+      console.log('Enviando direitos de administrador:', rights);
+      console.log('FormData admin_rights:', formData.admin_rights);
       
       const response = await botFatherService.setMyDefaultAdministratorRights(botId, rights, false);
       
+      console.log('Resposta do servidor:', response);
+      
       if (response.success) {
         setSuccess('Direitos padrão de administrador atualizados com sucesso!');
+        // Aguarda um pouco para garantir que o Telegram processou a requisição
+        await new Promise(resolve => setTimeout(resolve, 1500));
         await loadBotInfo();
         setTimeout(() => setSuccess(''), 3000);
       } else {
-        setError(response.error || 'Erro ao atualizar direitos de administrador');
+        const errorMsg = response.error || 'Erro ao atualizar direitos de administrador';
+        setError(errorMsg);
+        console.error('Erro na resposta:', response);
       }
     } catch (err) {
       const errorMessage = err.response?.data?.error || err.response?.data?.errors || err.message || 'Erro ao atualizar direitos de administrador';
       setError(errorMessage);
+      console.error('Erro ao atualizar direitos:', err);
+      console.error('Detalhes do erro:', err.response?.data);
     } finally {
       setLoading(false);
     }

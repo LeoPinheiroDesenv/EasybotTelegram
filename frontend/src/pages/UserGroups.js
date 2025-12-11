@@ -15,6 +15,7 @@ const UserGroups = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingGroup, setEditingGroup] = useState(null);
   const [availableMenus, setAvailableMenus] = useState([]);
+  const [availableMenusWithLabels, setAvailableMenusWithLabels] = useState([]);
   const [availableBots, setAvailableBots] = useState([]);
   const { user: currentUser } = useContext(AuthContext);
 
@@ -47,10 +48,34 @@ const UserGroups = () => {
 
   const loadAvailableMenus = async () => {
     try {
-      const menus = await userGroupService.getAvailableMenus();
-      setAvailableMenus(menus);
+      const response = await userGroupService.getAvailableMenus();
+      // Backend retorna tanto menus simples quanto menus com labels
+      const menus = response.menus || response;
+      const menusWithLabels = response.menus_with_labels || [];
+      
+      // Garante que menus seja um array
+      const menusArray = Array.isArray(menus) ? menus : [];
+      
+      // Se não houver menus, usa os labels para criar a lista
+      if (menusArray.length === 0 && menusWithLabels.length > 0) {
+        const menusFromLabels = menusWithLabels.map(m => m.id || m.name);
+        setAvailableMenus(menusFromLabels);
+      } else {
+        setAvailableMenus(menusArray);
+      }
+      
+      setAvailableMenusWithLabels(menusWithLabels);
+      
+      // Log para debug (remover em produção se necessário)
+      console.log('Menus carregados:', {
+        menus: menusArray,
+        menusWithLabels: menusWithLabels,
+        response: response
+      });
     } catch (err) {
       console.error('Erro ao carregar menus:', err);
+      setAvailableMenus([]);
+      setAvailableMenusWithLabels([]);
     }
   };
 
@@ -204,6 +229,13 @@ const UserGroups = () => {
   };
 
   const getMenuLabel = (menu) => {
+    // Tenta usar o label do backend primeiro
+    const menuWithLabel = availableMenusWithLabels.find(m => m.id === menu || m.name === menu);
+    if (menuWithLabel && menuWithLabel.label) {
+      return menuWithLabel.label;
+    }
+    
+    // Fallback para labels locais
     const labels = {
       dashboard: 'Dashboard',
       billing: 'Faturamento',
@@ -376,18 +408,33 @@ const UserGroups = () => {
                   <h3>Permissões de Menus</h3>
                   <p className="section-description">Selecione os menus que este grupo pode acessar:</p>
                   
-                  <div className="permissions-grid">
-                    {availableMenus.map(menu => (
-                      <label key={menu} className="permission-item">
-                        <input
-                          type="checkbox"
-                          checked={formData.menu_permissions.includes(menu)}
-                          onChange={() => handleMenuToggle(menu)}
-                        />
-                        <span>{getMenuLabel(menu)}</span>
-                      </label>
-                    ))}
-                  </div>
+                  {availableMenus.length === 0 ? (
+                    <div className="no-menus-message">
+                      <p>Nenhum menu disponível. Verifique se o sistema está configurado corretamente.</p>
+                      <button 
+                        type="button" 
+                        className="btn btn-sm btn-secondary" 
+                        onClick={() => {
+                          loadAvailableMenus();
+                        }}
+                      >
+                        Recarregar Menus
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="permissions-grid">
+                      {availableMenus.map(menu => (
+                        <label key={menu} className="permission-item">
+                          <input
+                            type="checkbox"
+                            checked={formData.menu_permissions.includes(menu)}
+                            onChange={() => handleMenuToggle(menu)}
+                          />
+                          <span>{getMenuLabel(menu)}</span>
+                        </label>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 <div className="form-section">
@@ -395,7 +442,18 @@ const UserGroups = () => {
                   <p className="section-description">Selecione os bots e as permissões que este grupo pode ter:</p>
                   
                   {availableBots.length === 0 ? (
-                    <p className="no-bots">Nenhum bot disponível</p>
+                    <div className="no-bots-message">
+                      <p>Nenhum bot disponível.</p>
+                      <button 
+                        type="button" 
+                        className="btn btn-sm btn-secondary" 
+                        onClick={() => {
+                          loadAvailableBots();
+                        }}
+                      >
+                        Recarregar Bots
+                      </button>
+                    </div>
                   ) : (
                     <div className="bots-permissions">
                       {availableBots.map(bot => (

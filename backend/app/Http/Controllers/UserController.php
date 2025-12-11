@@ -19,9 +19,15 @@ class UserController extends Controller
             $query = User::with('userGroup', 'creator');
 
             // Super admin vê todos os usuários
-            // Admins veem apenas usuários criados por eles (subordinados)
+            // Admin comum vê apenas:
+            // - Usuários comuns (user_type = 'user') criados por ele
+            // - Administradores comuns (user_type = 'admin') criados por ele
             if (!$user->isSuperAdmin()) {
-                $query->where('created_by', $user->id);
+                $query->where('created_by', $user->id)
+                      ->where(function($q) {
+                          $q->where('user_type', 'user')
+                            ->orWhere('user_type', 'admin');
+                      });
             }
 
             $users = $query->get();
@@ -51,24 +57,37 @@ class UserController extends Controller
             'user_group_id' => 'nullable|exists:user_groups,id',
             'role' => 'sometimes|string|in:admin,user',
             'active' => 'sometimes|boolean',
+            'phone' => 'nullable|string|max:20',
+            'description' => 'nullable|string',
+            'address_street' => 'nullable|string|max:255',
+            'address_number' => 'nullable|string|max:20',
+            'address_zipcode' => 'nullable|string|max:10',
+            'state_id' => 'nullable|exists:states,id',
+            'municipality_id' => 'nullable|exists:municipalities,id',
         ]);
 
         if ($validator->fails()) {
             return response()->json(['errors' => $validator->errors()], 400);
         }
 
-        // Apenas super admin pode criar administradores
-        if ($request->user_type === 'admin' && !$currentUser->isSuperAdmin()) {
-            return response()->json(['error' => 'Acesso negado. Apenas super administradores podem criar administradores.'], 403);
+        // Super admin pode criar qualquer tipo de usuário
+        // Admin comum pode criar usuários comuns e administradores comuns (mas não super admin)
+        if ($request->user_type === 'super_admin' && !$currentUser->isSuperAdmin()) {
+            return response()->json(['error' => 'Acesso negado. Apenas super administradores podem criar super administradores.'], 403);
+        }
+
+        // Admin comum não pode criar super admin
+        if ($request->user_type === 'super_admin') {
+            return response()->json(['error' => 'Acesso negado. Não é possível criar super administradores via API.'], 403);
         }
 
         try {
             // Se user_type for admin, role também deve ser admin
             $role = $request->role ?? ($request->user_type === 'admin' ? 'admin' : 'user');
             
-            // Se não for super admin, força user_type como 'user'
+            // Admin comum pode criar admin comum, mas não super admin
             $userType = $request->user_type;
-            if (!$currentUser->isSuperAdmin() && $userType === 'admin') {
+            if (!$currentUser->isSuperAdmin() && $userType === 'super_admin') {
                 $userType = 'user';
                 $role = 'user';
             }
@@ -82,6 +101,13 @@ class UserController extends Controller
                 'role' => $role,
                 'created_by' => $currentUser->id, // Vincula ao admin que criou
                 'active' => $request->active ?? true,
+                'phone' => $request->phone,
+                'description' => $request->description,
+                'address_street' => $request->address_street,
+                'address_number' => $request->address_number,
+                'address_zipcode' => $request->address_zipcode,
+                'state_id' => $request->state_id,
+                'municipality_id' => $request->municipality_id,
             ]);
 
             return response()->json(['user' => $user], 201);
@@ -97,12 +123,20 @@ class UserController extends Controller
     {
         try {
             $currentUser = auth()->user();
-            $user = User::with('userGroup', 'creator')->findOrFail($id);
+            $user = User::with('userGroup', 'creator', 'state', 'municipality')->findOrFail($id);
 
             // Super admin pode ver qualquer usuário
-            // Admins só podem ver usuários criados por eles
-            if (!$currentUser->isSuperAdmin() && $user->created_by !== $currentUser->id) {
-                return response()->json(['error' => 'Acesso negado'], 403);
+            // Admin comum só pode ver:
+            // - Usuários comuns (user_type = 'user') criados por ele
+            // - Administradores comuns (user_type = 'admin') criados por ele
+            if (!$currentUser->isSuperAdmin()) {
+                if ($user->created_by !== $currentUser->id) {
+                    return response()->json(['error' => 'Acesso negado'], 403);
+                }
+                // Verifica se o usuário é do tipo permitido (user ou admin, mas não super_admin)
+                if ($user->user_type === 'super_admin') {
+                    return response()->json(['error' => 'Acesso negado. Você não pode visualizar super administradores.'], 403);
+                }
             }
 
             return response()->json(['user' => $user]);
@@ -124,10 +158,16 @@ class UserController extends Controller
             $user = User::findOrFail($id);
 
             // Super admin pode atualizar qualquer usuário
-            // Admins só podem atualizar usuários criados por eles
+            // Admin comum só pode atualizar:
+            // - Usuários comuns (user_type = 'user') criados por ele
+            // - Administradores comuns (user_type = 'admin') criados por ele
             if (!$currentUser->isSuperAdmin()) {
                 if ($user->created_by !== $currentUser->id) {
                     return response()->json(['error' => 'Acesso negado. Você só pode atualizar usuários criados por você.'], 403);
+                }
+                // Verifica se o usuário é do tipo permitido (user ou admin, mas não super_admin)
+                if ($user->user_type === 'super_admin') {
+                    return response()->json(['error' => 'Acesso negado. Você não pode atualizar super administradores.'], 403);
                 }
             }
 
@@ -139,18 +179,46 @@ class UserController extends Controller
                 'user_group_id' => 'nullable|exists:user_groups,id',
                 'role' => 'sometimes|string|in:admin,user',
                 'active' => 'sometimes|boolean',
+                'phone' => 'nullable|string|max:20',
+                'description' => 'nullable|string',
+                'address_street' => 'nullable|string|max:255',
+                'address_number' => 'nullable|string|max:20',
+                'address_zipcode' => 'nullable|string|max:10',
+                'state_id' => 'nullable|exists:states,id',
+                'municipality_id' => 'nullable|exists:municipalities,id',
             ]);
 
             if ($validator->fails()) {
                 return response()->json(['errors' => $validator->errors()], 400);
             }
 
-            // Apenas super admin pode alterar user_type para admin
-            if ($request->has('user_type') && $request->user_type === 'admin' && !$currentUser->isSuperAdmin()) {
-                return response()->json(['error' => 'Acesso negado. Apenas super administradores podem criar ou alterar usuários para administradores.'], 403);
+            // Super admin pode alterar para qualquer tipo (exceto super_admin via API)
+            // Admin comum pode alterar para 'user' ou 'admin' (mas não 'super_admin')
+            if ($request->has('user_type')) {
+                if ($request->user_type === 'super_admin') {
+                    return response()->json(['error' => 'Acesso negado. Não é possível alterar para super administrador via API.'], 403);
+                }
+                // Admin comum pode alterar para admin, desde que o usuário tenha sido criado por ele
+                if (!$currentUser->isSuperAdmin() && $request->user_type === 'admin' && $user->created_by !== $currentUser->id) {
+                    return response()->json(['error' => 'Acesso negado. Você só pode alterar usuários criados por você.'], 403);
+                }
             }
 
-            $updateData = $request->only(['name', 'email', 'user_type', 'user_group_id', 'role', 'active']);
+            $updateData = $request->only([
+                'name', 
+                'email', 
+                'user_type', 
+                'user_group_id', 
+                'role', 
+                'active',
+                'phone',
+                'description',
+                'address_street',
+                'address_number',
+                'address_zipcode',
+                'state_id',
+                'municipality_id'
+            ]);
             
             // Only update password if provided
             if ($request->has('password') && !empty($request->password)) {
@@ -201,11 +269,17 @@ class UserController extends Controller
                 return response()->json(['error' => 'Não é possível deletar um super administrador'], 400);
             }
 
-            // Super admin pode deletar qualquer usuário
-            // Admins só podem deletar usuários criados por eles
+            // Super admin pode deletar qualquer usuário (exceto super admin)
+            // Admin comum só pode deletar:
+            // - Usuários comuns (user_type = 'user') criados por ele
+            // - Administradores comuns (user_type = 'admin') criados por ele
             if (!$currentUser->isSuperAdmin()) {
                 if ($user->created_by !== $currentUser->id) {
                     return response()->json(['error' => 'Acesso negado. Você só pode deletar usuários criados por você.'], 403);
+                }
+                // Verifica se o usuário é do tipo permitido (user ou admin, mas não super_admin)
+                if ($user->user_type === 'super_admin') {
+                    return response()->json(['error' => 'Acesso negado. Você não pode deletar super administradores.'], 403);
                 }
             }
             

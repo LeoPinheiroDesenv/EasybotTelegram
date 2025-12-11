@@ -281,6 +281,31 @@
   border-radius: 50%;
 }
 
+.payment-checkbox {
+  width: 20px;
+  height: 20px;
+  border: 2px solid #d1d5db;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  flex-shrink: 0;
+  background-color: #ffffff;
+}
+
+.payment-option.active .payment-checkbox {
+  border-color: #9333ea;
+  background-color: #9333ea;
+  color: #ffffff;
+}
+
+.payment-checkbox svg {
+  width: 14px;
+  height: 14px;
+  stroke-width: 3;
+}
+
 .action-buttons {
   display: flex;
   gap: 16px;

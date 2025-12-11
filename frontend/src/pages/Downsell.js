@@ -1,13 +1,28 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import Layout from '../components/Layout';
 import useConfirm from '../hooks/useConfirm';
 import useAlert from '../hooks/useAlert';
+import downsellService from '../services/downsellService';
+import paymentPlanService from '../services/paymentPlanService';
 import './Downsell.css';
 
 const Downsell = () => {
   const { confirm, DialogComponent: ConfirmDialog } = useConfirm();
   const { alert, DialogComponent: AlertDialog } = useAlert();
+  const [searchParams] = useSearchParams();
+  let botId = searchParams.get('botId');
+  
+  // Tenta obter botId do localStorage se não estiver na URL
+  if (!botId) {
+    const storedBotId = localStorage.getItem('selectedBotId');
+    if (storedBotId) {
+      botId = storedBotId;
+    }
+  }
+
   const [downsells, setDownsells] = useState([]);
+  const [paymentPlans, setPaymentPlans] = useState([]);
   const [loading, setLoading] = useState(false);
   const [loadingData, setLoadingData] = useState(true);
   const [error, setError] = useState('');
@@ -15,30 +30,47 @@ const Downsell = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingDownsell, setEditingDownsell] = useState(null);
   const [formData, setFormData] = useState({
+    bot_id: botId || '',
     title: '',
     initial_media: null,
     message: '',
     plan_id: '',
     promotional_value: '',
-    quantity_uses: '',
-    trigger_after: ''
+    max_uses: '',
+    trigger_after_minutes: '',
+    trigger_event: 'payment_failed'
   });
 
   useEffect(() => {
-    loadDownsells();
-  }, []);
+    if (botId) {
+      loadDownsells();
+      loadPaymentPlans();
+    } else {
+      setError('Bot não selecionado. Por favor, selecione um bot primeiro.');
+      setLoadingData(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [botId]);
 
   const loadDownsells = async () => {
     try {
       setLoadingData(true);
-      // TODO: Implementar API para carregar downsells
-      // Por enquanto, usando dados mockados
-      setDownsells([]);
+      const downsellsData = await downsellService.getDownsells(botId);
+      setDownsells(downsellsData);
       setError('');
     } catch (err) {
-      console.error('Erro ao carregar downsells:', err);
+      setError(err.response?.data?.error || 'Erro ao carregar downsells');
     } finally {
       setLoadingData(false);
+    }
+  };
+
+  const loadPaymentPlans = async () => {
+    try {
+      const plans = await paymentPlanService.getPaymentPlans(botId);
+      setPaymentPlans(plans);
+    } catch (err) {
+      console.error('Erro ao carregar planos:', err);
     }
   };
 
@@ -53,13 +85,15 @@ const Downsell = () => {
   const handleCreate = () => {
     setEditingDownsell(null);
     setFormData({
+      bot_id: botId || '',
       title: '',
       initial_media: null,
       message: '',
       plan_id: '',
       promotional_value: '',
-      quantity_uses: '',
-      trigger_after: ''
+      max_uses: '',
+      trigger_after_minutes: '',
+      trigger_event: 'payment_failed'
     });
     setShowCreateModal(true);
   };
@@ -67,13 +101,15 @@ const Downsell = () => {
   const handleEdit = (downsell) => {
     setEditingDownsell(downsell);
     setFormData({
+      bot_id: downsell.bot_id || botId || '',
       title: downsell.title || '',
-      initial_media: downsell.initial_media || null,
+      initial_media: null, // Não carrega arquivo existente
       message: downsell.message || '',
       plan_id: downsell.plan_id || '',
       promotional_value: downsell.promotional_value || '',
-      quantity_uses: downsell.quantity_uses || '',
-      trigger_after: downsell.trigger_after || ''
+      max_uses: downsell.max_uses || '',
+      trigger_after_minutes: downsell.trigger_after_minutes || '',
+      trigger_event: downsell.trigger_event || 'payment_failed'
     });
     setShowCreateModal(true);
   };
@@ -90,7 +126,7 @@ const Downsell = () => {
 
     try {
       setLoading(true);
-      // TODO: Implementar API para deletar downsell
+      await downsellService.deleteDownsell(downsellId);
       setDownsells(downsells.filter(downsell => downsell.id !== downsellId));
       setSuccess('Downsell deletado com sucesso!');
       setTimeout(() => setSuccess(''), 3000);
@@ -102,7 +138,7 @@ const Downsell = () => {
   };
 
   const handleSave = async () => {
-    if (!formData.message || !formData.plan_id) {
+    if (!formData.message || !formData.plan_id || !formData.title || !formData.promotional_value || !formData.trigger_after_minutes) {
       await alert('Por favor, preencha todos os campos obrigatórios', 'Atenção', 'info');
       return;
     }
@@ -111,24 +147,31 @@ const Downsell = () => {
     setLoading(true);
 
     try {
-      // TODO: Implementar API para salvar downsell
+      const downsellData = {
+        bot_id: botId,
+        plan_id: formData.plan_id,
+        title: formData.title,
+        initial_media: formData.initial_media,
+        message: formData.message,
+        promotional_value: parseFloat(formData.promotional_value),
+        max_uses: formData.max_uses ? parseInt(formData.max_uses) : null,
+        trigger_after_minutes: parseInt(formData.trigger_after_minutes),
+        trigger_event: formData.trigger_event
+      };
+
       if (editingDownsell) {
-        setDownsells(downsells.map(downsell => 
-          downsell.id === editingDownsell.id ? { ...downsell, ...formData } : downsell
-        ));
+        await downsellService.updateDownsell(editingDownsell.id, downsellData);
         setSuccess('Downsell atualizado com sucesso!');
       } else {
-        const newDownsell = {
-          id: Date.now(),
-          ...formData
-        };
-        setDownsells([...downsells, newDownsell]);
+        await downsellService.createDownsell(downsellData);
         setSuccess('Downsell criado com sucesso!');
       }
+      
       setShowCreateModal(false);
+      loadDownsells();
       setTimeout(() => setSuccess(''), 3000);
     } catch (err) {
-      setError(err.response?.data?.error || 'Erro ao salvar downsell');
+      setError(err.response?.data?.error || err.response?.data?.errors?.message?.[0] || 'Erro ao salvar downsell');
     } finally {
       setLoading(false);
     }
@@ -138,7 +181,19 @@ const Downsell = () => {
     return (
       <Layout>
         <div className="downsell-page">
-          <div className="loading-container">Carregando...</div>
+          <div className="loading-container">Carregando downsells...</div>
+        </div>
+      </Layout>
+    );
+  }
+
+  if (!botId) {
+    return (
+      <Layout>
+        <div className="downsell-page">
+          <div className="error-container">
+            <p>{error}</p>
+          </div>
         </div>
       </Layout>
     );
@@ -193,11 +248,11 @@ const Downsell = () => {
                 ) : (
                   downsells.map((downsell) => (
                     <tr key={downsell.id}>
-                      <td>{downsell.title || downsell.name}</td>
-                      <td>{downsell.plan_name || '-'}</td>
+                      <td>{downsell.title}</td>
+                      <td>{downsell.plan?.title || '-'}</td>
                       <td>
-                        <span className={`status-badge status-${downsell.status || 'active'}`}>
-                          {downsell.status === 'active' ? 'Ativo' : 'Inativo'}
+                        <span className={`status-badge status-${downsell.active ? 'active' : 'inactive'}`}>
+                          {downsell.active ? 'Ativo' : 'Inativo'}
                         </span>
                       </td>
                       <td>
@@ -316,7 +371,9 @@ const Downsell = () => {
                   </div>
 
                   <div className="form-group">
-                    <label>Selecione o plano para que eu possa aplicar o downsell</label>
+                    <label>
+                      Selecione o plano para que eu possa aplicar o downsell <span className="required-asterisk">*</span>
+                    </label>
                     <select
                       name="plan_id"
                       value={formData.plan_id}
@@ -325,7 +382,28 @@ const Downsell = () => {
                       required
                     >
                       <option value="">Selecione uma opção</option>
-                      {/* TODO: Carregar planos da API */}
+                      {paymentPlans.map(plan => (
+                        <option key={plan.id} value={plan.id}>
+                          {plan.title} - R$ {parseFloat(plan.price).toFixed(2)}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="form-group">
+                    <label>
+                      Evento de Disparo <span className="required-asterisk">*</span>
+                    </label>
+                    <select
+                      name="trigger_event"
+                      value={formData.trigger_event}
+                      onChange={handleChange}
+                      className="form-input"
+                      required
+                    >
+                      <option value="payment_failed">Pagamento Falhou</option>
+                      <option value="payment_canceled">Pagamento Cancelado</option>
+                      <option value="checkout_abandoned">Checkout Abandonado</option>
                     </select>
                   </div>
 
@@ -386,7 +464,7 @@ const Downsell = () => {
                     className="btn btn-create-message"
                     disabled={loading}
                   >
-                    {loading ? 'Salvando...' : 'Criar mensagem'}
+                    {loading ? 'Salvando...' : (editingDownsell ? 'Atualizar' : 'Criar mensagem')}
                   </button>
                 </div>
               </div>

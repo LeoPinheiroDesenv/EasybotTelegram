@@ -83,6 +83,11 @@ const botService = {
     const data = webhookUrl ? { url: webhookUrl } : {};
     const response = await api.post(`/telegram/webhook/${botId}/set`, data);
     return response.data;
+  },
+
+  updateInviteLink: async (id) => {
+    const response = await api.post(`/bots/${id}/update-invite-link`);
+    return response.data;
   }
 };
 

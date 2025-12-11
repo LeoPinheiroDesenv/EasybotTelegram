@@ -1546,6 +1546,85 @@ collection:
         send: true
         store: true
       rebuildPath: true
+  - url: "{{ base_url }}/pix-diagnostic/validate-code"
+    name: Validate PIX Code
+    meta:
+      id: req_pix_validate_code_001
+      created: 1764685002400
+      modified: 1764685002400
+      isPrivate: false
+      description: "Validar código PIX e retornar diagnóstico completo. Verifica formato, CRC e fornece recomendações."
+      sortKey: 4800000000000
+    method: POST
+    body:
+      mimeType: application/json
+      text: |-
+        {
+          "pix_code": "00020126600014br.gov.bcb.pix0124packsbrasilvip@gmail.com52040000530398654041.005802BR5922JOAOJOAO202310252142256009SaoPaulo62250521mpqrinter1373512816506304B4C1"
+        }
+    headers:
+      - name: Authorization
+        value: Bearer {{ token }}
+      - name: Content-Type
+        value: application/json
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+  - url: "{{ base_url }}/pix-diagnostic/statistics"
+    name: Get CRC Statistics
+    meta:
+      id: req_pix_statistics_001
+      created: 1764685002401
+      modified: 1764685002401
+      isPrivate: false
+      description: "Obter estatísticas de correção de CRC. Retorna total de transações, correções aplicadas e taxa de correção."
+      sortKey: 4800000001000
+    method: GET
+    parameters:
+      - name: days
+        value: "7"
+        description: "Número de dias para analisar (padrão: 7)"
+    headers:
+      - name: Authorization
+        value: Bearer {{ token }}
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+  - url: "{{ base_url }}/pix-diagnostic/mercado-pago-report"
+    name: Generate Mercado Pago Report
+    meta:
+      id: req_pix_mercado_pago_report_001
+      created: 1764685002402
+      modified: 1764685002402
+      isPrivate: false
+      description: "Gerar relatório formatado para reportar problema de CRC ao Mercado Pago. Inclui exemplos, estatísticas e detalhes técnicos."
+      sortKey: 4800000002000
+    method: GET
+    parameters:
+      - name: days
+        value: "30"
+        description: "Número de dias para analisar (padrão: 30)"
+    headers:
+      - name: Authorization
+        value: Bearer {{ token }}
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
 cookieJar:
   name: Default Jar
   meta:

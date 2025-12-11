@@ -87,7 +87,7 @@
 .badge {
   padding: 8px 16px;
   border: 1px solid #ddd;
-  background: white;
+  /* background: white; */
   border-radius: 4px;
   cursor: pointer;
   font-size: 14px;
@@ -462,5 +462,79 @@
   text-align: center;
   padding: 40px 20px;
   color: #dc3545;
+}
+
+/* Payment Methods Styles */
+.payment-methods {
+  margin-top: 10px;
+}
+
+.payment-methods-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.payment-method-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  background: #e9ecef;
+  color: #495057;
+  border: 1px solid #dee2e6;
+}
+
+.payment-method-badge.pix-badge {
+  background: #32cd32;
+  color: white;
+  border-color: #28a745;
+}
+
+/* PIX Status Styles */
+.status-detail-item.payment-methods {
+  margin-top: 15px;
+  padding-top: 15px;
+  border-top: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.status-detail-item.pix-enabled {
+  color: #155724;
+}
+
+.status-detail-item.pix-disabled {
+  color: #721c24;
+}
+
+.status-detail-item.pix-indeterminate {
+  color: #856404;
+}
+
+.pix-status {
+  font-weight: 600;
+  margin-left: 8px;
+}
+
+.pix-status.pix-enabled {
+  color: #28a745;
+}
+
+.pix-status.pix-disabled {
+  color: #dc3545;
+}
+
+.pix-status.pix-indeterminate {
+  color: #ffc107;
+}
+
+.pix-warning {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  font-weight: normal;
+  color: #856404;
+  font-style: italic;
 }
 

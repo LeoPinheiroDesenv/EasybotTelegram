@@ -43,10 +43,12 @@ const userGroupService = {
 
   /**
    * Obtém menus disponíveis
+   * Retorna tanto a lista simples de menus quanto menus com labels
    */
   async getAvailableMenus() {
     const response = await api.get('/user-groups/menus/available');
-    return response.data.menus;
+    // Retorna o objeto completo com menus e menus_with_labels
+    return response.data;
   },
 
   /**

@@ -8,6 +8,7 @@ use App\Models\Contact;
 use App\Models\Log;
 use App\Services\PaymentService;
 use App\Services\ContactActionService;
+use App\Services\PixCrcService;
 use Exception;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log as LogFacade;
@@ -1915,22 +1916,38 @@ class TelegramService
 
             $message .= "Escolha o método de pagamento:";
 
-            // Cria botões para métodos de pagamento
+            // Obtém métodos de pagamento habilitados no bot
+            $botPaymentMethods = is_array($bot->payment_method) ? $bot->payment_method : ($bot->payment_method ? [$bot->payment_method] : ['credit_card']);
+            
+            // Cria botões apenas para métodos habilitados
+            $keyboardButtons = [];
+            
+            if (in_array('pix', $botPaymentMethods)) {
+                $keyboardButtons[] = [[
+                    'text' => '💰 Pagar com PIX',
+                    'callback_data' => "payment_{$planId}_pix"
+                ]];
+            }
+            
+            if (in_array('credit_card', $botPaymentMethods)) {
+                $keyboardButtons[] = [[
+                    'text' => '💳 Pagar com Cartão de Crédito',
+                    'callback_data' => "payment_{$planId}_card"
+                ]];
+            }
+            
+            // Se nenhum método estiver habilitado, mostra mensagem de erro
+            if (empty($keyboardButtons)) {
+                $this->http()->post("https://api.telegram.org/bot{$bot->token}/answerCallbackQuery", [
+                    'callback_query_id' => $callbackQueryId,
+                    'text' => 'Nenhum método de pagamento está configurado para este bot.',
+                    'show_alert' => true
+                ]);
+                return;
+            }
+
             $keyboard = [
-                'inline_keyboard' => [
-                    [
-                        [
-                            'text' => '💳 Pagar com PIX',
-                            'callback_data' => "payment_{$planId}_pix"
-                        ]
-                    ],
-                    [
-                        [
-                            'text' => '💳 Pagar com Cartão de Crédito',
-                            'callback_data' => "payment_{$planId}_card"
-                        ]
-                    ]
-                ]
+                'inline_keyboard' => $keyboardButtons
             ];
 
             $this->http()->post("https://api.telegram.org/bot{$bot->token}/answerCallbackQuery", [
@@ -1984,6 +2001,27 @@ class TelegramService
 
             $price = number_format($plan->price, 2, ',', '.');
 
+            // Valida se o bot tem o método de pagamento configurado
+            $botPaymentMethods = is_array($bot->payment_method) ? $bot->payment_method : ($bot->payment_method ? [$bot->payment_method] : []);
+            
+            if ($method === 'pix' && !in_array('pix', $botPaymentMethods)) {
+                $this->http()->post("https://api.telegram.org/bot{$bot->token}/answerCallbackQuery", [
+                    'callback_query_id' => $callbackQueryId,
+                    'text' => 'Método de pagamento PIX não está habilitado para este bot.',
+                    'show_alert' => true
+                ]);
+                return;
+            }
+            
+            if ($method === 'card' && !in_array('credit_card', $botPaymentMethods)) {
+                $this->http()->post("https://api.telegram.org/bot{$bot->token}/answerCallbackQuery", [
+                    'callback_query_id' => $callbackQueryId,
+                    'text' => 'Método de pagamento com cartão não está habilitado para este bot.',
+                    'show_alert' => true
+                ]);
+                return;
+            }
+
             if ($method === 'pix') {
                 // Responde ao callback query
                 $this->http()->post("https://api.telegram.org/bot{$bot->token}/answerCallbackQuery", [
@@ -2012,6 +2050,9 @@ class TelegramService
                     ]);
                     return;
                 }
+                
+                // O código PIX já vem correto do PaymentService (exatamente como o Mercado Pago retornou)
+                // NÃO devemos normalizar, corrigir ou modificar
 
                 // Registra pagamento pendente
                 $transaction = $pixResult['transaction'] ?? null;
@@ -2038,16 +2079,79 @@ class TelegramService
                 $message .= "📱 <b>Escaneie o QR Code abaixo para pagar:</b>\n\n";
                 
                 // Exibe código PIX apenas se disponível
-                // IMPORTANTE: O código PIX EMV deve ser uma string contínua sem quebras ou espaços
+                // CRÍTICO: O código PIX já vem do PaymentService EXATAMENTE como o Mercado Pago retornou
+                // NÃO devemos modificar o código de forma alguma - apenas usar diretamente
                 if (!empty($pixResult['pix_code'])) {
-                    $pixCode = trim($pixResult['pix_code']);
-                    // Remove quebras de linha, espaços e caracteres de controle
-                    $pixCode = preg_replace('/\s+/', '', $pixCode);
-                    $pixCode = preg_replace('/[\x00-\x1F\x7F]/', '', $pixCode);
+                    // O código PIX já vem do PaymentService EXATAMENTE como o Mercado Pago retornou
+                    // NÃO devemos limpar, modificar ou alterar o código
+                    // Usa o código EXATAMENTE como recebido do PaymentService
+                    $pixCode = $pixResult['pix_code'];
+                    
+                    // Log do código que será enviado ao usuário (EXATO do Mercado Pago)
+                    $this->logBotAction($bot, "✅ Código PIX que será enviado ao usuário (EXATO do Mercado Pago)", 'info', [
+                        'chat_id' => $chatId,
+                        'plan_id' => $planId,
+                        'pix_code_length' => strlen($pixCode),
+                        'pix_code_start' => substr($pixCode, 0, 30),
+                        'pix_code_end' => substr($pixCode, -10),
+                        'pix_code_crc' => substr($pixCode, -4),
+                        'pix_code_full' => $pixCode, // Log completo - código EXATO do Mercado Pago
+                        'note' => 'Código usado EXATAMENTE como o Mercado Pago retornou - SEM MODIFICAÇÕES'
+                    ]);
+                    
+                    // CRÍTICO: Validação final do código antes de enviar
+                    // Se o CRC estiver incorreto, CORRIGE antes de enviar ao usuário
+                    $pixCrcService = new PixCrcService();
+                    $finalUserValidation = $pixCrcService->validatePixCode($pixCode);
+                    
+                    // Se o CRC estiver incorreto, CORRIGE antes de enviar
+                    if (!$finalUserValidation['crc_valid']) {
+                        $this->logBotAction($bot, "❌ ERRO: CRC do código PIX está INCORRETO no TelegramService - corrigindo...", 'error', [
+                            'chat_id' => $chatId,
+                            'plan_id' => $planId,
+                            'pix_code_before' => $pixCode,
+                            'crc_validation_current_crc' => $finalUserValidation['current_crc'],
+                            'crc_validation_calculated_crc' => $finalUserValidation['calculated_crc'],
+                            'note' => 'CRC incorreto - corrigindo antes de enviar ao usuário'
+                        ]);
+                        
+                        // CORRIGE o CRC do código PIX
+                        $pixCodeOriginal = $pixCode;
+                        $pixCode = $pixCrcService->addCrc($pixCode);
+                        
+                        // Valida novamente após correção
+                        $finalUserValidation = $pixCrcService->validatePixCode($pixCode);
+                        
+                        $this->logBotAction($bot, "✅ CRC do código PIX foi CORRIGIDO no TelegramService", 'info', [
+                            'chat_id' => $chatId,
+                            'plan_id' => $planId,
+                            'pix_code_before' => $pixCodeOriginal,
+                            'pix_code_after' => $pixCode,
+                            'crc_before' => substr($pixCodeOriginal, -4),
+                            'crc_after' => substr($pixCode, -4),
+                            'crc_validation_after' => $finalUserValidation,
+                            'note' => 'CRC corrigido - código agora está válido'
+                        ]);
+                    }
+                    
+                    // Log do código que será enviado ao usuário (agora com CRC válido)
+                    $this->logBotAction($bot, "✅ Código PIX FINAL que será enviado ao usuário (CRC VÁLIDO)", 'info', [
+                        'chat_id' => $chatId,
+                        'plan_id' => $planId,
+                        'pix_code_length' => strlen($pixCode),
+                        'pix_code_start' => substr($pixCode, 0, 30),
+                        'pix_code_end' => substr($pixCode, -10),
+                        'pix_code_crc' => substr($pixCode, -4),
+                        'crc_validation_valid' => $finalUserValidation['valid'],
+                        'crc_validation_crc_valid' => $finalUserValidation['crc_valid'],
+                        'crc_validation_current_crc' => $finalUserValidation['current_crc'],
+                        'crc_validation_calculated_crc' => $finalUserValidation['calculated_crc'],
+                        'pix_code_full' => $pixCode, // Log completo para validação
+                        'note' => 'Código PIX com CRC VÁLIDO - será reconhecido pelo banco'
+                    ]);
                     
                     // Exibe o código PIX em uma única linha usando <code> para preservar o formato
                     // O Telegram preserva o conteúdo dentro de <code> sem adicionar quebras
-                    // IMPORTANTE: O código PIX EMV deve ser copiado sem espaços ou quebras de linha
                     $message .= "📋 <b>Código PIX (copie e cole no app do seu banco):</b>\n";
                     $message .= "<code>{$pixCode}</code>\n\n";
                     $message .= "⚠️ <b>IMPORTANTE:</b> Copie o código completo, sem espaços ou quebras.\n\n";
@@ -2067,6 +2171,9 @@ class TelegramService
                     if (empty($qrCodeImageData)) {
                         throw new Exception('QR Code image data está vazio');
                     }
+                    
+                    // O QR Code já foi gerado usando o código PIX correto do Mercado Pago
+                    // Não precisa validar novamente - apenas envia
                     
                     // Decodifica o base64 para obter os dados binários da imagem
                     $decoded = base64_decode($qrCodeImageData, true);

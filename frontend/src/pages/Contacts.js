@@ -6,6 +6,7 @@ import botService from '../services/botService';
 import groupManagementService from '../services/groupManagementService';
 import useConfirm from '../hooks/useConfirm';
 import RefreshButton from '../components/RefreshButton';
+import Pagination from '../components/Pagination';
 import './Contacts.css';
 
 const Contacts = () => {
@@ -200,20 +201,79 @@ const Contacts = () => {
     }
   };
 
-  const loadContactHistory = async (contactId) => {
-    if (!botId) return;
-    
-    try {
-      await groupManagementService.getContactHistory(botId, contactId);
-    } catch (err) {
-      setError(err.response?.data?.error || 'Erro ao carregar histórico');
-    }
+  // eslint-disable-next-line no-unused-vars
+  const handleViewHistory = (contactId) => {
+    // Navega para a página de detalhes do contato onde o histórico pode ser visualizado
+    navigate(`/results/contacts/${contactId}?botId=${botId}`);
   };
 
-  const handleExport = () => {
-    // TODO: Implementar exportação
-    setSuccess('Exportação iniciada...');
-    setTimeout(() => setSuccess(''), 3000);
+  const handleExport = async () => {
+    if (!botId) {
+      setError('Bot não selecionado. Por favor, selecione um bot primeiro.');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError('');
+      
+      // Busca todos os contatos para exportação
+      const allContacts = [];
+      let currentPage = 1;
+      let hasMore = true;
+      
+      while (hasMore) {
+        const result = await contactService.getAllContacts(botId, {}, { page: currentPage, limit: 100 });
+        allContacts.push(...result.contacts);
+        
+        if (currentPage >= result.pagination.totalPages) {
+          hasMore = false;
+        } else {
+          currentPage++;
+        }
+      }
+
+      // Prepara dados para CSV
+      const headers = ['ID', 'Telegram ID', 'Nome', 'Sobrenome', 'Username', 'Email', 'Telefone', 'Status', 'É Bot', 'Bloqueado', 'Data de Criação', 'Última Interação'];
+      const rows = allContacts.map(contact => [
+        contact.id,
+        contact.telegram_id,
+        contact.first_name || '',
+        contact.last_name || '',
+        contact.username || '',
+        contact.email || '',
+        contact.phone || '',
+        contact.telegram_status || 'inactive',
+        contact.is_bot ? 'Sim' : 'Não',
+        contact.is_blocked ? 'Sim' : 'Não',
+        contact.created_at ? new Date(contact.created_at).toLocaleString('pt-BR') : '',
+        contact.last_interaction_at ? new Date(contact.last_interaction_at).toLocaleString('pt-BR') : ''
+      ]);
+
+      // Cria CSV
+      const csvContent = [
+        headers.join(','),
+        ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+      ].join('\n');
+
+      // Cria blob e faz download
+      const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+      link.setAttribute('download', `contatos_${botId}_${new Date().toISOString().split('T')[0]}.csv`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      setSuccess(`Exportação concluída! ${allContacts.length} contato(s) exportado(s).`);
+      setTimeout(() => setSuccess(''), 5000);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Erro ao exportar contatos');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleSyncGroupMembers = async () => {
@@ -347,13 +407,13 @@ const Contacts = () => {
                 </select>
               </div>
 
-              <button onClick={handleSearch} className="btn-apply">
+              <button onClick={handleSearch} className="btn btn-primary-600 radius-8 px-20 py-11">
                 Aplicar
               </button>
 
               <button 
                 onClick={handleSyncGroupMembers} 
-                className="btn-sync-members"
+                className="btn btn-info-600 radius-8 px-20 py-11"
                 disabled={!botId || syncingMembers}
                 title="Sincronizar membros do grupo do Telegram"
               >
@@ -416,7 +476,7 @@ const Contacts = () => {
                           <div className="action-buttons">
                             <button
                               onClick={() => navigate(`/results/contacts/${contact.id}?botId=${botId}`)}
-                              className="btn-details"
+                              className="btn btn-primary-600 radius-8 px-16 py-9"
                               title="Detalhes"
                             >
                               Detalhes
@@ -426,62 +486,51 @@ const Contacts = () => {
                                 {memberStatuses[contact.id].is_member ? '✓ No grupo' : '✗ Fora'}
                               </span>
                             )}
-                            {managingMember === contact.id ? (
-                              <span className="loading-spinner">...</span>
-                            ) : (
-                              <>
                             {!contact.is_bot && (
                               <>
-                                <button
-                                  onClick={() => checkMemberStatus(contact.id)}
-                                  className="btn-check-status"
-                                  title="Verificar status no grupo"
-                                >
-                                  Verificar
-                                </button>
-                                <button
-                                  onClick={() => loadContactHistory(contact.id)}
-                                  className="btn-history"
-                                  title="Ver histórico de ações"
-                                >
-                                  Histórico
-                                </button>
-                                <button
-                                  onClick={() => handleManageMember(contact, 'add')}
-                                  className="btn-add-member"
-                                  title="Adicionar ao grupo"
-                                  disabled={!botId}
-                                >
-                                  + Grupo
-                                </button>
-                                <button
-                                  onClick={() => handleManageMember(contact, 'remove')}
-                                  className="btn-remove-member"
-                                  title="Remover do grupo"
-                                  disabled={!botId}
-                                >
-                                  - Grupo
-                                </button>
+                                {managingMember === contact.id ? (
+                                  <span className="loading-spinner">...</span>
+                                ) : (
+                                  <>
+                                    <button
+                                      onClick={() => checkMemberStatus(contact.id)}
+                                      className="btn btn-info-600 radius-8 px-14 py-6 text-sm"
+                                      title="Verificar status no grupo"
+                                      disabled={!botId}
+                                    >
+                                      Verificar
+                                    </button>
+                                    <button
+                                      onClick={() => handleManageMember(contact, 'add')}
+                                      className="btn btn-success-600 radius-8 px-14 py-6 text-sm"
+                                      title="Adicionar ao grupo"
+                                      disabled={!botId}
+                                    >
+                                      + Grupo
+                                    </button>
+                                    <button
+                                      onClick={() => handleManageMember(contact, 'remove')}
+                                      className="btn btn-warning-600 radius-8 px-14 py-6 text-sm"
+                                      title="Remover do grupo"
+                                      disabled={!botId}
+                                    >
+                                      - Grupo
+                                    </button>
+                                    <button
+                                      onClick={() => handleBlock(contact.id)}
+                                      className="btn btn-danger-600 radius-8 px-14 py-6 text-sm"
+                                      title="Bloquear"
+                                    >
+                                      Bloquear
+                                    </button>
+                                  </>
+                                )}
                               </>
                             )}
                             {contact.is_bot && (
                               <span className="bot-indicator" title="Este é um bot - ações de grupo não disponíveis">
                                 Bot
                               </span>
-                            )}
-                              </>
-                            )}
-                            {!contact.is_bot && (
-                              <button
-                                onClick={() => handleBlock(contact.id)}
-                                className="btn-block"
-                                title="Bloquear"
-                              >
-                                Bloquear
-                              </button>
-                            )}
-                            {contact.is_bot && (
-                              <span className="bot-indicator" title="Este é um bot">Bot</span>
                             )}
                           </div>
                         </td>
@@ -496,25 +545,13 @@ const Contacts = () => {
             <div className="contacts-footer">
               <div className="contacts-info">
                 <span>Total de usuários: {pagination.total || 0}</span>
-                <div className="pagination">
-                  <button
-                    onClick={() => handlePageChange(pagination.page - 1)}
-                    disabled={pagination.page <= 1}
-                    className="pagination-btn"
-                  >
-                    &lt;
-                  </button>
-                  <span>{pagination.page}/{pagination.totalPages || 1}</span>
-                  <button
-                    onClick={() => handlePageChange(pagination.page + 1)}
-                    disabled={pagination.page >= pagination.totalPages}
-                    className="pagination-btn"
-                  >
-                    &gt;
-                  </button>
-                </div>
+                <Pagination
+                  currentPage={pagination.page || 1}
+                  totalPages={pagination.totalPages || 1}
+                  onPageChange={handlePageChange}
+                />
               </div>
-              <button onClick={handleExport} className="btn-export">
+              <button onClick={handleExport} className="btn btn-success-600 radius-8 px-20 py-11 d-flex align-items-center gap-2">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
                   <polyline points="7 10 12 15 17 10"></polyline>
@@ -645,14 +682,14 @@ const Contacts = () => {
               </div>
               <div className="modal-footer">
                 <button
-                  className="btn-cancel"
+                  className="btn btn-outline-primary-600 radius-8 px-20 py-11"
                   onClick={() => setShowMemberModal(false)}
                   disabled={managingMember === selectedContact.id}
                 >
                   Cancelar
                 </button>
                 <button
-                  className={`btn-confirm ${memberAction === 'add' ? 'btn-add' : 'btn-remove'}`}
+                  className={`btn radius-8 px-20 py-11 ${memberAction === 'add' ? 'btn-success-600' : 'btn-danger-600'}`}
                   onClick={confirmManageMember}
                   disabled={managingMember === selectedContact.id}
                 >

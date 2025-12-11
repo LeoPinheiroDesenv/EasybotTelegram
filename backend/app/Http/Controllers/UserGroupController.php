@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\UserGroup;
 use App\Models\UserGroupPermission;
 use App\Models\Bot;
+use App\Services\ResourceDiscoveryService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Validator;
@@ -288,19 +289,65 @@ class UserGroupController extends Controller
 
     /**
      * Obtém menus disponíveis para permissões
+     * Agora usa o ResourceDiscoveryService para descobrir automaticamente todos os menus disponíveis
      */
     public function getAvailableMenus(): JsonResponse
     {
-        $menus = [
-            'dashboard',
-            'billing',
-            'bot',
-            'results',
-            'marketing',
-            'settings',
-        ];
+        try {
+            $resourceDiscoveryService = app(ResourceDiscoveryService::class);
+            $menus = $resourceDiscoveryService->discoverAvailableMenus();
+            
+            // Garante que menus seja um array
+            if (!is_array($menus)) {
+                $menus = [];
+            }
+            
+            // Se não houver menus, usa os menus padrão como fallback
+            if (empty($menus)) {
+                $menus = ['dashboard', 'billing', 'bot', 'results', 'marketing', 'settings'];
+            }
+            
+            // Adiciona labels amigáveis para cada menu
+            $menusWithLabels = array_map(function($menu) use ($resourceDiscoveryService) {
+                return [
+                    'id' => $menu,
+                    'name' => $menu,
+                    'label' => $resourceDiscoveryService->getMenuLabel($menu)
+                ];
+            }, $menus);
 
-        return response()->json(['menus' => $menus]);
+            return response()->json([
+                'menus' => $menus,
+                'menus_with_labels' => $menusWithLabels,
+                'count' => count($menus)
+            ]);
+        } catch (\Exception $e) {
+            // Em caso de erro, retorna menus padrão
+            $defaultMenus = ['dashboard', 'billing', 'bot', 'results', 'marketing', 'settings'];
+            $defaultLabels = [
+                'dashboard' => 'Dashboard',
+                'billing' => 'Faturamento',
+                'bot' => 'Bot',
+                'results' => 'Resultados',
+                'marketing' => 'Marketing',
+                'settings' => 'Configurações'
+            ];
+            
+            $menusWithLabels = array_map(function($menu) use ($defaultLabels) {
+                return [
+                    'id' => $menu,
+                    'name' => $menu,
+                    'label' => $defaultLabels[$menu] ?? ucfirst($menu)
+                ];
+            }, $defaultMenus);
+            
+            return response()->json([
+                'menus' => $defaultMenus,
+                'menus_with_labels' => $menusWithLabels,
+                'count' => count($defaultMenus),
+                'error' => 'Erro ao descobrir menus: ' . $e->getMessage()
+            ]);
+        }
     }
 
     /**

@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { Navigate } from 'react-router-dom';
 import Layout from '../components/Layout';
 import { AuthContext } from '../contexts/AuthContext';
 import api from '../services/api';

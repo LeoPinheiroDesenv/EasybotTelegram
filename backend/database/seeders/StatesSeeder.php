@@ -13,7 +13,7 @@ class StatesSeeder extends Seeder
      */
     public function run(): void
     {
-        $sqlFile = base_path('manuais/Estados.sql');
+        $sqlFile = base_path('../manuais/Estados.sql');
         
         if (!File::exists($sqlFile)) {
             $this->command->error("Arquivo Estados.sql não encontrado em: {$sqlFile}");

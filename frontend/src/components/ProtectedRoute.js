@@ -4,31 +4,59 @@ import { AuthContext } from '../contexts/AuthContext';
 
 /**
  * Mapeamento de rotas para menus
+ * 
+ * ⚠️ IMPORTANTE: Sempre que uma nova tela/rota for criada, atualize este mapeamento!
+ * Este mapeamento deve estar sincronizado com:
+ * - backend/app/Services/ResourceDiscoveryService.php (ROUTE_TO_MENU_MAP)
+ * - frontend/src/App.js (rotas definidas)
+ * 
+ * Última atualização: 2025-12-10
  */
 const routeToMenuMap = {
+  // Dashboard
   '/': 'dashboard',
+  
+  // Billing (Faturamento)
   '/billing': 'billing',
+  
+  // Bot (Gerenciamento de Bots) - todas as rotas relacionadas
+  '/bot': 'bot',
+  '/bot/list': 'bot',
   '/bot/create': 'bot',
   '/bot/update': 'bot',
+  '/bot/manage': 'bot',
   '/bot/welcome': 'bot',
   '/bot/payment-plans': 'bot',
   '/bot/redirect': 'bot',
   '/bot/administrators': 'bot',
   '/bot/groups': 'bot',
   '/bot/telegram-groups': 'bot',
-  '/bot/': 'bot', // Para rotas que começam com /bot/
+  '/bot/commands': 'bot',
+  '/bot/botfather': 'bot',
+  '/bot/group-management': 'bot',
+  '/bot/': 'bot', // Wildcard para capturar todas as rotas /bot/*
+  
+  // Results (Resultados)
+  '/results': 'results',
   '/results/contacts': 'results',
+  
+  // Marketing
   '/marketing': 'marketing',
   '/marketing/alerts': 'marketing',
   '/marketing/downsell': 'marketing',
+  
+  // Settings (Configurações)
+  '/settings': 'settings',
   '/settings/payment-cycles': 'settings',
   '/settings/payment-gateways': 'settings',
+  '/settings/profile': 'settings',
   '/settings/security': 'settings',
   '/settings/storage': 'settings',
   '/settings/artisan': 'settings',
   '/users': 'settings',
   '/user-groups': 'settings',
   '/logs': 'settings',
+  '/ftp': 'settings',
 };
 
 /**
@@ -99,6 +127,14 @@ const ProtectedRoute = ({ children }) => {
         <p>Você não tem permissão para acessar esta página.</p>
       </div>
     );
+  }
+
+  // Rotas que todos os usuários autenticados podem acessar (não precisam de permissão de menu)
+  const publicRoutes = ['/settings/profile'];
+  
+  // Se a rota é pública, permite acesso
+  if (publicRoutes.includes(location.pathname)) {
+    return children;
   }
 
   // Obtém o menu correspondente à rota atual

@@ -161,36 +161,6 @@ const CreateBot = () => {
                     https://t.me/botfather
                   </a>
                 </div>
-
-                <div className="tutorial-step">
-                  <p>
-                    Caso seja sua primeira vez criando um bot, recomendamos que assista ao nosso vídeo tutorial. 
-                    Gravamos com o intuito de te orientar a preencher cada informação com total consciência, visando 
-                    a criação de um bot funcional.
-                  </p>
-                  <a
-                    href="https://youtu.be/EoS22at6eWO"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="tutorial-link"
-                  >
-                    https://youtu.be/EoS22at6eWO
-                  </a>
-                </div>
-
-                <div className="tutorial-step">
-                  <p>
-                    Caso o vídeo não seja o suficiente para sanar suas dúvidas, fique à vontade para acionar nosso 
-                    suporte, iremos lhe ajudar com o maior prazer.
-                  </p>
-                </div>
-
-                <button className="btn btn-support">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
-                  </svg>
-                  Acionar suporte
-                </button>
               </div>
             </div>
           </div>

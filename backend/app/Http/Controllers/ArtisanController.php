@@ -17,6 +17,7 @@ class ArtisanController extends Controller
         'config:clear' => 'Limpar cache de configuração',
         'route:clear' => 'Limpar cache de rotas',
         'view:clear' => 'Limpar cache de views',
+        'pix:crc-diagnostic-report' => 'Gerar relatório de diagnóstico de CRC PIX',
     ];
 
     /**
@@ -26,6 +27,7 @@ class ArtisanController extends Controller
     {
         try {
             $command = $request->input('command');
+            $parameters = $request->input('parameters', []);
 
             if (!$command) {
                 return response()->json([
@@ -42,12 +44,27 @@ class ArtisanController extends Controller
                 ], 403);
             }
 
-            // Executa o comando
-            Artisan::call($command);
+            // Prepara parâmetros para comandos específicos
+            $commandParameters = [];
+            
+            // Comando pix:crc-diagnostic-report com parâmetros padrão
+            if ($command === 'pix:crc-diagnostic-report') {
+                $days = $parameters['days'] ?? 7;
+                $output = $parameters['output'] ?? 'console';
+                
+                $commandParameters = [
+                    '--days' => (int) $days,
+                    '--output' => $output,
+                ];
+            }
+
+            // Executa o comando com parâmetros
+            Artisan::call($command, $commandParameters);
             $output = Artisan::output();
 
             Log::info('Artisan command executed', [
                 'command' => $command,
+                'parameters' => $commandParameters,
                 'user_id' => auth()->id(),
             ]);
 
@@ -56,11 +73,13 @@ class ArtisanController extends Controller
                 'message' => $this->allowedCommands[$command] . ' executado com sucesso',
                 'output' => $output ?: 'Comando executado sem saída',
                 'command' => $command,
+                'parameters' => $commandParameters,
             ]);
 
         } catch (\Exception $e) {
             Log::error('Error executing artisan command', [
                 'command' => $request->input('command'),
+                'parameters' => $request->input('parameters', []),
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
@@ -140,8 +159,39 @@ class ArtisanController extends Controller
      */
     public function availableCommands(): JsonResponse
     {
+        $commands = [];
+        
+        foreach ($this->allowedCommands as $command => $description) {
+            $commandInfo = [
+                'command' => $command,
+                'description' => $description,
+                'parameters' => [],
+            ];
+            
+            // Adiciona parâmetros específicos para cada comando
+            if ($command === 'pix:crc-diagnostic-report') {
+                $commandInfo['parameters'] = [
+                    'days' => [
+                        'type' => 'integer',
+                        'default' => 7,
+                        'description' => 'Número de dias para analisar',
+                        'required' => false,
+                    ],
+                    'output' => [
+                        'type' => 'string',
+                        'default' => 'console',
+                        'description' => 'Formato de saída (console, json, file)',
+                        'required' => false,
+                        'options' => ['console', 'json', 'file'],
+                    ],
+                ];
+            }
+            
+            $commands[$command] = $commandInfo;
+        }
+        
         return response()->json([
-            'commands' => $this->allowedCommands,
+            'commands' => $commands,
         ]);
     }
 }

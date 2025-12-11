@@ -10,7 +10,6 @@ import {
   faExclamationTriangle, 
   faClock, 
   faTimesCircle,
-  faSync,
   faBell,
   faUserMinus
 } from '@fortawesome/free-solid-svg-icons';
@@ -18,7 +17,7 @@ import './PaymentStatus.css';
 
 const PaymentStatus = () => {
   const { botId: paramBotId } = useParams();
-  const [botId, setBotId] = useState(paramBotId || localStorage.getItem('selectedBotId'));
+  const [botId] = useState(paramBotId || localStorage.getItem('selectedBotId'));
   const [bot, setBot] = useState(null);
   const [statuses, setStatuses] = useState([]);
   const [summary, setSummary] = useState({
@@ -44,6 +43,7 @@ const PaymentStatus = () => {
       setError('Bot não selecionado. Por favor, selecione um bot primeiro.');
       setLoading(false);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [botId]);
 
   const loadBot = async () => {

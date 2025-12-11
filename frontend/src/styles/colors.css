@@ -34,5 +34,92 @@
   --color-error: #dc3545;
   --color-warning: #ffc107;
   --color-info: #17a2b8;
+
+  /* Variáveis CSS do Template - Cores Primary */
+  --primary-50: #e4f1ff;
+  --primary-100: #bfdcff;
+  --primary-200: #95c7ff;
+  --primary-300: #6bb1ff;
+  --primary-400: #519fff;
+  --primary-500: #458eff;
+  --primary-600: #487fff;
+  --primary-700: #486cea;
+  --primary-800: #4759d6;
+  --primary-900: #4536b6;
+
+  /* Variáveis CSS do Template - Cores Neutral */
+  --neutral-50: #f5f6fa;
+  --neutral-100: #f3f4f6;
+  --neutral-200: #ebecef;
+  --neutral-300: #d1d5db;
+  --neutral-400: #9ca3af;
+  --neutral-500: #6b7280;
+  --neutral-600: #4b5563;
+  --neutral-700: #374151;
+  --neutral-800: #1f2937;
+  --neutral-900: #111827;
+
+  /* Variáveis CSS do Template - Cores Danger */
+  --danger-50: #fef2f2;
+  --danger-100: #fee2e2;
+  --danger-200: #fecaca;
+  --danger-300: #fca5a5;
+  --danger-400: #f87171;
+  --danger-500: #ef4444;
+  --danger-600: #dc2626;
+  --danger-700: #b91c1c;
+  --danger-800: #991b1b;
+  --danger-900: #7f1d1d;
+
+  /* Variáveis CSS do Template - Cores Success */
+  --success-50: #f0fdf4;
+  --success-100: #dcfce7;
+  --success-200: #bbf7d0;
+  --success-300: #86efac;
+  --success-400: #4ade80;
+  --success-500: #22c55e;
+  --success-600: #16a34a;
+  --success-700: #15803d;
+  --success-800: #166534;
+  --success-900: #14532d;
+
+  /* Variáveis CSS do Template - Cores Warning */
+  --warning-50: #fefce8;
+  --warning-100: #fef9c3;
+  --warning-200: #fef08a;
+  --warning-300: #fde047;
+  --warning-400: #facc15;
+  --warning-500: #eab308;
+  --warning-600: #ff9f29;
+  --warning-700: #f39016;
+  --warning-800: #e58209;
+  --warning-900: #d77907;
+
+  /* Variáveis CSS do Template - Cores Info */
+  --info-50: #ecfeff;
+  --info-100: #cffafe;
+  --info-200: #a5f3fc;
+  --info-300: #67e8f9;
+  --info-400: #22d3ee;
+  --info-500: #06b6d4;
+  --info-600: #0891b2;
+  --info-700: #0e7490;
+  --info-800: #155e75;
+  --info-900: #164e63;
+
+  /* Variáveis CSS do Template - Cores Lilac (Secondary) */
+  --lilac-50: #faf5ff;
+  --lilac-100: #f3e8ff;
+  --lilac-200: #e9d5ff;
+  --lilac-300: #d8b4fe;
+  --lilac-400: #c084fc;
+  --lilac-500: #a855f7;
+  --lilac-600: #9333ea;
+  --lilac-700: #7e22ce;
+  --lilac-800: #6b21a8;
+  --lilac-900: #581c87;
+
+  /* Variáveis CSS do Template - Base */
+  --base: #ffffff;
 }
 

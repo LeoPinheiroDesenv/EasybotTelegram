@@ -52,6 +52,7 @@ const Alerts = () => {
       setError('Bot não selecionado. Por favor, selecione um bot primeiro.');
       setLoadingData(false);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [botId]);
 
   const loadAlerts = async () => {
@@ -92,6 +93,7 @@ const Alerts = () => {
     });
   };
 
+  // eslint-disable-next-line no-unused-vars
   const handleDateTimeChange = (e) => {
     const { value } = e.target;
     // Formato: dd/mm/aaaa, hh:mm

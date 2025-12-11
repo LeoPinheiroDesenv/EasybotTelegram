@@ -34,6 +34,7 @@ class Bot extends Model
         'request_email' => 'boolean',
         'request_phone' => 'boolean',
         'request_language' => 'boolean',
+        'payment_method' => 'array',
         'activated' => 'boolean',
     ];
 
