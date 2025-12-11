@@ -4,10 +4,38 @@ Sistema completo de gerenciamento de usuários com autenticação e níveis de a
 
 ## 🚀 Tecnologias
 
-- **Frontend**: React.js
-- **Backend**: Node.js com Express
-- **Banco de Dados**: PostgreSQL
+- **Frontend**: React 18 (Create React App) com Context API, Chart.js e Axios
+- **Backend**: Laravel 12 em PHP 8.2 com serviços e jobs dedicados
+- **Banco de Dados**: MySQL 8 (serviço `mysql` definido em `docker-compose.yml`)
+- **Filas & Tarefas**: Jobs Laravel (`ProcessTelegramUpdate`, `ProcessAlertsJob`, `SendDownsell`) executados via Artisan
+- **Integrações**: Telegram Bot API, Mercado Pago, Stripe e PIX (via `PixCrcService`)
 - **Containerização**: Docker & Docker Compose
+
+## 🧠 Visão Geral do Funcionamento
+
+O sistema oferece um painel administrativo para orquestrar bots do Telegram, contatos e cobranças. O frontend React (`frontend/src`) consome a API Laravel (`backend/app`) por meio de tokens JWT emitidos por `AuthController`. Todo o tráfego passa por middlewares como `AuthenticateToken`, `AdminMiddleware` e `CheckPermission`, garantindo autorização granular antes de alcançar os controladores setoriais.
+
+### Fluxo de alto nível
+1. **Autenticação e sessão**: o usuário acessa o frontend, realiza login e recebe um JWT que fica armazenado no `AuthContext`. Requisições subsequentes incluem o token via `frontend/src/services/api.js`.
+2. **Orquestração de bots**: dados de bots são carregados por `botService`, e a tela de gerenciamento (`ManageBot`) libera abas de configurações, mensagens, planos e integrações do Telegram.
+3. **Cobranças e métricas**: `billingService` busca estatísticas consolidadas que alimentam o dashboard financeiro e as páginas de planos/pagamentos.
+4. **Automações**: comandos Artisan (`ProcessScheduledAlerts`, `TelegramPollingCommand`, `GenerateCrcDiagnosticReport`) alimentam filas que disparam jobs (`SendAlert`, `SendDownsell`) e serviços (`TelegramService`, `NotificationService`).
+
+### Backend (Laravel 12)
+- Controladores REST em `backend/app/Http/Controllers` delegam regras para serviços especializados em `backend/app/Services`, aplicando o princípio **Single Responsibility (SRP)** do SOLID.
+- `PaymentService`, `BillingService` e `PaymentGatewayConfigController` conectam-se a Mercado Pago, Stripe e PIX; `PixCrcService` valida QR Codes e logs são centralizados via `DatabaseLogHandler`.
+- Middleware de segurança (`AdminMiddleware`, `SuperAdminOnly`, `GroupManagementPermission`) protege rotas, enquanto `TwoFactorService` habilita MFA.
+- Fila padrão do Laravel processa integrações do Telegram e disparos de downsell/alertas, garantindo resiliência quando há alta demanda.
+
+### Frontend (React 18)
+- Layout unificado em `frontend/src/components/Layout.js` organiza páginas em `frontend/src/pages`, cada uma conectada ao backend via serviços dedicados (`frontend/src/services/*`).
+- `ManageBotContext` e `useAlert` concentram estado e feedbacks; `PrivateRoute` e `ProtectedRoute` controlam o acesso baseado em autenticação.
+- Componentes de UI (cards, botões, tabelas) e gráficos (`react-chartjs-2`) fornecem experiência responsiva e orientada a métricas.
+
+### Processos assíncronos e integrações
+- **Telegram**: `TelegramService`, `TelegramWebhookController` e comandos `TelegramPollingCommand`/`ProcessTelegramUpdate` sincronizam bots, grupos e webhooks.
+- **Cobrança**: `PaymentStatusService`, `PaymentGatewayConfig` e `TransactionObserver` acompanham o ciclo de vida de pagamentos e atualizam dashboards em tempo quase real.
+- **Alertas/Diagnósticos**: `ProcessScheduledAlerts`, `PixDiagnosticController` e `GenerateCrcDiagnosticReport` monitoram critério de sucesso dos disparos PIX e notificações transacionais.
 
 ## 📋 Pré-requisitos
 
@@ -39,7 +67,7 @@ docker-compose up -d
 ```
 
 Este comando irá:
-- Criar e iniciar o banco de dados PostgreSQL
+- Criar e iniciar o banco de dados MySQL
 - Criar e iniciar o servidor backend
 - Criar e iniciar o frontend React
 - Executar as migrações do banco de dados
@@ -97,6 +125,36 @@ botTelegram/
 └── README.md
 ```
 
+## ✨ Principais Recursos
+
+### Dashboard financeiro e insights em tempo real
+- Consolidação de métricas de receita, assinaturas e transações através de `billingService.getDashboardStatistics`, exibindo gráficos (barras, pizza, donut) em `Dashboard.js`.
+- Visão por método de pagamento, gateway e bot, com alertas de ausência de dados e ações rápidas como "Criar Bot" ou "Atualizar" diretamente na interface.
+
+### Gestão completa de bots Telegram
+- CRUD de bots, validação de tokens, upload de mídia e controle de webhooks expostos por `BotController`/`botService`.
+- Tela de gerenciamento (`ManageBot`) com abas para Configurações, Mensagens Iniciais, Planos de Pagamento, Botões de Redirecionamento, Comandos, Administradores, Grupos/Canais e BotFather, permitindo acompanhar a jornada do usuário sem sair do fluxo.
+
+### Planos, ciclos e meios de pagamento flexíveis
+- `PaymentPlanController`, `PaymentCycleController` e `PaymentGatewayConfigController` administram assinaturas, recorrência, gateways e credenciais.
+- `PaymentStatusController` e `BillingController` fornecem relatórios, exportações e histórico de transações para conciliações financeiras.
+
+### Contatos, grupos e segmentação
+- `ContactController`, `GroupManagementController` e `TelegramGroupController` mantêm contatos sincronizados ao Telegram, possibilitando segmentações por grupos e botões de downsell.
+- `UserGroupController` e `UserGroupPermission` viabilizam perfis de acesso específicos por módulo, alinhados ao princípio **Interface Segregation**.
+
+### Automação, alertas e jornadas de downsell
+- `AlertController`, `DownsellController` e jobs `ProcessAlertsJob`/`SendDownsell` coordenam campanhas (alertas, mensagens pós-compra, fluxos de recuperação).
+- Observadores como `TransactionObserver` disparam eventos após cada pagamento, atualizando estatísticas e filas.
+
+### Governança, segurança e auditoria
+- Autenticação JWT com refresh tokens, MFA via `TwoFactorService`, redefinição de senha e monitoramento de login por `AuthController`.
+- `LogController`, `DatabaseLogHandler` e `logs/` fornecem histórico de ações administrativas e integração com observabilidade externa.
+
+### Infraestrutura pronta para DevOps
+- Docker Compose sobe `mysql`, `backend` e `frontend` com healthcheck, hot reload (volumes) e secrets via `.env`.
+- Scripts Composer (`composer setup`, `composer dev`) realizam provisioning completo: dependências PHP, geração de chave, migrações e build front.
+
 ## 🔐 API Endpoints
 
 ### Autenticação
@@ -140,13 +198,13 @@ docker-compose up -d --build
 ### Executar migrações manualmente
 
 ```bash
-docker-compose exec backend npm run migrate
+docker-compose exec backend php artisan migrate --force
 ```
 
 ### Criar usuário admin padrão manualmente
 
 ```bash
-docker-compose exec backend node migrations/createDefaultAdmin.js
+docker-compose exec backend php artisan db:seed --class=CreateAdminUserSeeder
 ```
 
 ## 🛠️ Desenvolvimento
@@ -157,8 +215,11 @@ docker-compose exec backend node migrations/createDefaultAdmin.js
 
 ```bash
 cd backend
-npm install
-npm run dev
+cp .env.example .env
+composer install
+php artisan key:generate
+php artisan migrate --seed
+php artisan serve
 ```
 
 #### Frontend
@@ -173,8 +234,8 @@ npm start
 
 Certifique-se de configurar as seguintes variáveis:
 
-- `DB_HOST`: Host do PostgreSQL
-- `DB_PORT`: Porta do PostgreSQL
+- `DB_HOST`: Host do MySQL
+- `DB_PORT`: Porta do MySQL
 - `DB_USER`: Usuário do banco de dados
 - `DB_PASSWORD`: Senha do banco de dados
 - `DB_NAME`: Nome do banco de dados
@@ -186,14 +247,14 @@ Certifique-se de configurar as seguintes variáveis:
 
 - O sistema utiliza JWT para autenticação
 - As senhas são criptografadas usando bcrypt
-- O banco de dados PostgreSQL é persistido em um volume Docker
+- O banco de dados MySQL é persistido em um volume Docker
 - Em produção, certifique-se de alterar a `JWT_SECRET` e outras credenciais padrão
 
 ## 🐛 Troubleshooting
 
 ### Erro de conexão com o banco de dados
 
-Verifique se o PostgreSQL está rodando e as credenciais estão corretas.
+Verifique se o MySQL está rodando e as credenciais estão corretas.
 
 ### Erro de permissão no Docker
 
