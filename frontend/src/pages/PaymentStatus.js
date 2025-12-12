@@ -11,7 +11,9 @@ import {
   faClock, 
   faTimesCircle,
   faBell,
-  faUserMinus
+  faUserMinus,
+  faInfoCircle,
+  faTimes
 } from '@fortawesome/free-solid-svg-icons';
 import './PaymentStatus.css';
 
@@ -34,6 +36,10 @@ const PaymentStatus = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [processingExpired, setProcessingExpired] = useState(false);
   const [processingExpiring, setProcessingExpiring] = useState(false);
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [selectedTransaction, setSelectedTransaction] = useState(null);
+  const [transactionDetails, setTransactionDetails] = useState(null);
+  const [loadingDetails, setLoadingDetails] = useState(false);
 
   useEffect(() => {
     if (botId) {
@@ -186,6 +192,37 @@ const PaymentStatus = () => {
     );
   });
 
+  const handleShowDetails = async (status) => {
+    if (!status.transaction?.id) {
+      setError('Transação não encontrada');
+      return;
+    }
+
+    setSelectedTransaction(status);
+    setShowDetailsModal(true);
+    setLoadingDetails(true);
+    setTransactionDetails(null);
+
+    try {
+      const response = await paymentStatusService.getTransactionDetails(status.transaction.id);
+      if (response.success) {
+        setTransactionDetails(response.data);
+      } else {
+        setError(response.error || 'Erro ao carregar detalhes da transação');
+      }
+    } catch (err) {
+      setError(err.response?.data?.error || 'Erro ao carregar detalhes da transação');
+    } finally {
+      setLoadingDetails(false);
+    }
+  };
+
+  const handleCloseModal = () => {
+    setShowDetailsModal(false);
+    setSelectedTransaction(null);
+    setTransactionDetails(null);
+  };
+
   if (loading && statuses.length === 0) {
     return (
       <Layout>
@@ -300,12 +337,13 @@ const PaymentStatus = () => {
                 <th>Status</th>
                 <th>Expira em</th>
                 <th>Dias restantes</th>
+                <th>Ações</th>
               </tr>
             </thead>
             <tbody>
               {filteredStatuses.length === 0 ? (
                 <tr>
-                  <td colSpan="7" className="no-data">
+                  <td colSpan="8" className="no-data">
                     {searchTerm ? 'Nenhum resultado encontrado' : 'Nenhum pagamento encontrado'}
                   </td>
                 </tr>
@@ -359,6 +397,17 @@ const PaymentStatus = () => {
                           '-'
                         )}
                       </td>
+                      <td>
+                        {status.transaction?.id && (
+                          <button
+                            className="btn btn-sm btn-info"
+                            onClick={() => handleShowDetails(status)}
+                            title="Ver detalhes da confirmação do pagamento"
+                          >
+                            <FontAwesomeIcon icon={faInfoCircle} /> Detalhes
+                          </button>
+                        )}
+                      </td>
                     </tr>
                   );
                 })
@@ -366,6 +415,194 @@ const PaymentStatus = () => {
             </tbody>
           </table>
         </div>
+
+        {/* Modal de Detalhes da Transação */}
+        {showDetailsModal && (
+          <div className="modal-overlay" onClick={handleCloseModal}>
+            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+              <div className="modal-header">
+                <h2>Detalhes da Confirmação do Pagamento</h2>
+                <button className="modal-close" onClick={handleCloseModal}>
+                  <FontAwesomeIcon icon={faTimes} />
+                </button>
+              </div>
+              <div className="modal-body">
+                {loadingDetails ? (
+                  <div className="loading-container">Carregando detalhes...</div>
+                ) : transactionDetails ? (
+                  <div className="transaction-details">
+                    <div className="details-section">
+                      <h3>Informações da Transação</h3>
+                      <div className="details-grid">
+                        <div className="detail-item">
+                          <label>ID da Transação:</label>
+                          <span>{transactionDetails.transaction.id}</span>
+                        </div>
+                        <div className="detail-item">
+                          <label>Valor:</label>
+                          <span>{formatCurrency(transactionDetails.transaction.amount)} {transactionDetails.transaction.currency}</span>
+                        </div>
+                        <div className="detail-item">
+                          <label>Status:</label>
+                          <span className={`status-badge ${transactionDetails.transaction.status}`}>
+                            {transactionDetails.transaction.status}
+                          </span>
+                        </div>
+                        <div className="detail-item">
+                          <label>Método de Pagamento:</label>
+                          <span>{transactionDetails.transaction.payment_method || '-'}</span>
+                        </div>
+                        <div className="detail-item">
+                          <label>Gateway:</label>
+                          <span>{transactionDetails.transaction.gateway || '-'}</span>
+                        </div>
+                        <div className="detail-item">
+                          <label>Data de Criação:</label>
+                          <span>{formatDate(transactionDetails.transaction.created_at)}</span>
+                        </div>
+                        <div className="detail-item">
+                          <label>Última Atualização:</label>
+                          <span>{formatDate(transactionDetails.transaction.updated_at)}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {transactionDetails.gateway_data && Object.keys(transactionDetails.gateway_data).length > 0 && (
+                      <div className="details-section">
+                        <h3>Dados do Gateway ({transactionDetails.gateway_data.gateway})</h3>
+                        <div className="details-grid">
+                          {transactionDetails.gateway_data.payment_id && (
+                            <div className="detail-item">
+                              <label>ID do Pagamento:</label>
+                              <span>{transactionDetails.gateway_data.payment_id}</span>
+                            </div>
+                          )}
+                          {transactionDetails.gateway_data.payment_intent_id && (
+                            <div className="detail-item">
+                              <label>Payment Intent ID:</label>
+                              <span>{transactionDetails.gateway_data.payment_intent_id}</span>
+                            </div>
+                          )}
+                          {transactionDetails.gateway_data.charge_id && (
+                            <div className="detail-item">
+                              <label>Charge ID:</label>
+                              <span>{transactionDetails.gateway_data.charge_id}</span>
+                            </div>
+                          )}
+                          {transactionDetails.gateway_data.status && (
+                            <div className="detail-item">
+                              <label>Status no Gateway:</label>
+                              <span>{transactionDetails.gateway_data.status}</span>
+                            </div>
+                          )}
+                          {transactionDetails.gateway_data.status_detail && (
+                            <div className="detail-item">
+                              <label>Detalhes do Status:</label>
+                              <span>{transactionDetails.gateway_data.status_detail}</span>
+                            </div>
+                          )}
+                          {transactionDetails.gateway_data.card_brand && (
+                            <div className="detail-item">
+                              <label>Bandeira do Cartão:</label>
+                              <span>{transactionDetails.gateway_data.card_brand}</span>
+                            </div>
+                          )}
+                          {transactionDetails.gateway_data.card_last4 && (
+                            <div className="detail-item">
+                              <label>Últimos 4 dígitos:</label>
+                              <span>**** {transactionDetails.gateway_data.card_last4}</span>
+                            </div>
+                          )}
+                          {transactionDetails.gateway_data.last_webhook_update && (
+                            <div className="detail-item">
+                              <label>Última Atualização via Webhook:</label>
+                              <span>{formatDate(transactionDetails.gateway_data.last_webhook_update)}</span>
+                            </div>
+                          )}
+                          {transactionDetails.gateway_data.webhook_action && (
+                            <div className="detail-item">
+                              <label>Ação do Webhook:</label>
+                              <span>{transactionDetails.gateway_data.webhook_action}</span>
+                            </div>
+                          )}
+                          {transactionDetails.gateway_data.last_status_check && (
+                            <div className="detail-item">
+                              <label>Última Verificação de Status:</label>
+                              <span>{formatDate(transactionDetails.gateway_data.last_status_check)}</span>
+                            </div>
+                          )}
+                          {transactionDetails.gateway_data.expiration_date && (
+                            <div className="detail-item">
+                              <label>Data de Expiração (PIX):</label>
+                              <span>{formatDate(transactionDetails.gateway_data.expiration_date)}</span>
+                            </div>
+                          )}
+                          {transactionDetails.gateway_data.pix_ticket_url && (
+                            <div className="detail-item">
+                              <label>URL do Ticket PIX:</label>
+                              <span>
+                                <a href={transactionDetails.gateway_data.pix_ticket_url} target="_blank" rel="noopener noreferrer">
+                                  {transactionDetails.gateway_data.pix_ticket_url}
+                                </a>
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {transactionDetails.payment_plan && (
+                      <div className="details-section">
+                        <h3>Plano de Pagamento</h3>
+                        <div className="details-grid">
+                          <div className="detail-item">
+                            <label>Plano:</label>
+                            <span>{transactionDetails.payment_plan.title}</span>
+                          </div>
+                          <div className="detail-item">
+                            <label>Valor do Plano:</label>
+                            <span>{formatCurrency(transactionDetails.payment_plan.price)}</span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {transactionDetails.contact && (
+                      <div className="details-section">
+                        <h3>Contato</h3>
+                        <div className="details-grid">
+                          <div className="detail-item">
+                            <label>Nome:</label>
+                            <span>{transactionDetails.contact.first_name} {transactionDetails.contact.last_name || ''}</span>
+                          </div>
+                          {transactionDetails.contact.username && (
+                            <div className="detail-item">
+                              <label>Usuário:</label>
+                              <span>@{transactionDetails.contact.username}</span>
+                            </div>
+                          )}
+                          {transactionDetails.contact.email && (
+                            <div className="detail-item">
+                              <label>Email:</label>
+                              <span>{transactionDetails.contact.email}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="error-message">Erro ao carregar detalhes da transação</div>
+                )}
+              </div>
+              <div className="modal-footer">
+                <button className="btn btn-secondary" onClick={handleCloseModal}>
+                  Fechar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </Layout>
   );

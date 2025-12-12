@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faChevronLeft, faChevronRight } from '@fortawesome/free-solid-svg-icons';
 import './Pagination.css';
@@ -10,32 +10,32 @@ const Pagination = ({
   showPageNumbers = true,
   maxVisiblePages = 5
 }) => {
-  if (totalPages <= 1) return null;
-
   const handlePageClick = (page) => {
     if (page >= 1 && page <= totalPages && page !== currentPage) {
       onPageChange(page);
     }
   };
 
-  const getVisiblePages = () => {
-    const pages = [];
-    const half = Math.floor(maxVisiblePages / 2);
-    let start = Math.max(1, currentPage - half);
-    let end = Math.min(totalPages, start + maxVisiblePages - 1);
+  const visiblePages = useMemo(() => {
+    const calculatePages = () => {
+      const pages = [];
+      const half = Math.floor(maxVisiblePages / 2);
+      let start = Math.max(1, currentPage - half);
+      let end = Math.min(totalPages, start + maxVisiblePages - 1);
 
-    if (end - start < maxVisiblePages - 1) {
-      start = Math.max(1, end - maxVisiblePages + 1);
-    }
+      if (end - start < maxVisiblePages - 1) {
+        start = Math.max(1, end - maxVisiblePages + 1);
+      }
 
-    for (let i = start; i <= end; i++) {
-      pages.push(i);
-    }
+      for (let i = start; i <= end; i++) {
+        pages.push(i);
+      }
+      return pages;
+    };
+    return calculatePages();
+  }, [currentPage, totalPages, maxVisiblePages]);
 
-    return pages;
-  };
-
-  const visiblePages = getVisiblePages();
+  if (totalPages <= 1) return null;
 
   return (
     <ul className="pagination d-flex flex-wrap align-items-center gap-2 justify-content-center">
@@ -45,10 +45,6 @@ const Pagination = ({
           onClick={() => handlePageClick(currentPage - 1)}
           disabled={currentPage <= 1}
           className="page-link bg-primary-50 text-secondary-light fw-medium rounded-circle border-0 py-10 d-flex align-items-center justify-content-center h-48-px w-48-px"
-          style={{ 
-            cursor: currentPage <= 1 ? 'not-allowed' : 'pointer',
-            opacity: currentPage <= 1 ? 0.5 : 1
-          }}
         >
           <FontAwesomeIcon icon={faChevronLeft} />
         </button>
@@ -116,10 +112,6 @@ const Pagination = ({
           onClick={() => handlePageClick(currentPage + 1)}
           disabled={currentPage >= totalPages}
           className="page-link bg-primary-50 text-secondary-light fw-medium rounded-circle border-0 py-10 d-flex align-items-center justify-content-center h-48-px w-48-px"
-          style={{ 
-            cursor: currentPage >= totalPages ? 'not-allowed' : 'pointer',
-            opacity: currentPage >= totalPages ? 0.5 : 1
-          }}
         >
           <FontAwesomeIcon icon={faChevronRight} />
         </button>
@@ -129,4 +121,3 @@ const Pagination = ({
 };
 
 export default Pagination;
-

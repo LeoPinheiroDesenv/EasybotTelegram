@@ -3,13 +3,19 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faExclamationTriangle, faInfoCircle, faCheckCircle } from '@fortawesome/free-solid-svg-icons';
 import './ConfirmDialog.css';
 
-const ConfirmDialog = ({ isOpen, onClose, onConfirm, title, message, type = 'confirm', confirmText = 'Confirmar', cancelText = 'Cancelar' }) => {
+const ConfirmDialog = ({ isOpen, onClose, onConfirm, onCancel, title, message, type = 'confirm', confirmText = 'Confirmar', cancelText = 'Cancelar' }) => {
   if (!isOpen) return null;
 
   const handleBackdropClick = (e) => {
     if (e.target === e.currentTarget) {
-      onClose();
+      if (onCancel) onCancel();
+      else onClose();
     }
+  };
+
+  const handleCancel = () => {
+    if (onCancel) onCancel();
+    else onClose();
   };
 
   const getIcon = () => {
@@ -56,7 +62,7 @@ const ConfirmDialog = ({ isOpen, onClose, onConfirm, title, message, type = 'con
           {cancelText && (
             <button
               className="confirm-dialog-btn confirm-dialog-btn-cancel"
-              onClick={onClose}
+              onClick={handleCancel}
             >
               {cancelText}
             </button>

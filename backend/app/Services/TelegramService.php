@@ -504,24 +504,51 @@ class TelegramService
                 'chat_id' => $groupId
             ]);
 
+            $responseData = $response->json() ?? [];
+            
             if (!$response->successful()) {
-                $errorData = $response->json();
-                $errorMessage = $errorData['description'] ?? 'Erro ao acessar grupo';
+                // Verifica se o erro é devido a migração de grupo para supergrupo
+                $migration = $this->detectGroupMigration($responseData);
+                
+                if ($migration) {
+                    return [
+                        'valid' => false,
+                        'error' => 'Grupo foi atualizado para supergrupo',
+                        'migrated' => true,
+                        'new_chat_id' => $migration['new_chat_id'],
+                        'old_chat_id' => $groupId
+                    ];
+                }
+                
+                $errorMessage = $responseData['description'] ?? 'Erro ao acessar grupo';
                 
                 return [
                     'valid' => false,
                     'error' => $errorMessage
                 ];
             }
-
-            $data = $response->json();
             
-            if (!$data['ok']) {
+            if (!($responseData['ok'] ?? false)) {
+                // Verifica se o erro é devido a migração de grupo para supergrupo
+                $migration = $this->detectGroupMigration($responseData);
+                
+                if ($migration) {
+                    return [
+                        'valid' => false,
+                        'error' => 'Grupo foi atualizado para supergrupo',
+                        'migrated' => true,
+                        'new_chat_id' => $migration['new_chat_id'],
+                        'old_chat_id' => $groupId
+                    ];
+                }
+                
                 return [
                     'valid' => false,
-                    'error' => $data['description'] ?? 'Grupo não encontrado ou inacessível'
+                    'error' => $responseData['description'] ?? 'Grupo não encontrado ou inacessível'
                 ];
             }
+
+            $data = $responseData;
 
             $chat = $data['result'];
             $chatType = $chat['type'] ?? '';
@@ -612,14 +639,30 @@ class TelegramService
                 'user_id' => $userId
             ]);
 
-            if (!$response->successful() || !$response->json()['ok']) {
+            $responseData = $response->json() ?? [];
+            
+            if (!$response->successful() || !($responseData['ok'] ?? false)) {
+                // Verifica se o erro é devido a migração de grupo para supergrupo
+                $migration = $this->detectGroupMigration($responseData);
+                
+                if ($migration) {
+                    // Retorna informação sobre migração para que o chamador possa atualizar
+                    return [
+                        'is_member' => false,
+                        'status' => 'not_member',
+                        'migrated' => true,
+                        'new_chat_id' => $migration['new_chat_id'],
+                        'old_chat_id' => $groupId
+                    ];
+                }
+                
                 return [
                     'is_member' => false,
                     'status' => 'not_member'
                 ];
             }
 
-            $member = $response->json()['result'];
+            $member = $responseData['result'] ?? [];
             $status = $member['status'] ?? 'unknown';
             $isAdmin = in_array($status, ['administrator', 'creator']);
 
@@ -693,6 +736,22 @@ class TelegramService
             // Verifica se o bot é membro e tem permissões
             $botMemberInfo = $this->getChatMember($token, $normalizedChatId, $botId);
             
+            // Verifica se o grupo foi migrado para supergrupo
+            if (isset($botMemberInfo['migrated']) && $botMemberInfo['migrated'] === true) {
+                $newChatId = $botMemberInfo['new_chat_id'] ?? null;
+                
+                if ($newChatId) {
+                    LogFacade::info('🔄 Grupo migrado detectado em getChatInviteLink, usando novo chat_id', [
+                        'old_chat_id' => $normalizedChatId,
+                        'new_chat_id' => $newChatId
+                    ]);
+                    
+                    // Atualiza o chat_id e tenta novamente
+                    $normalizedChatId = $newChatId;
+                    $botMemberInfo = $this->getChatMember($token, $normalizedChatId, $botId);
+                }
+            }
+            
             if (!$botMemberInfo['is_member']) {
                 return [
                     'success' => false,
@@ -741,25 +800,43 @@ class TelegramService
                     'chat_id' => $normalizedChatId
                 ]);
 
-                if ($response->successful()) {
-                    $data = $response->json();
-                    if (isset($data['ok']) && $data['ok'] && isset($data['result'])) {
-                        return [
-                            'success' => true,
-                            'invite_link' => $data['result'],
-                            'error' => null,
-                            'details' => [
-                                'method' => 'exportChatInviteLink',
-                                'status' => $status,
-                                'is_admin' => $isAdmin
-                            ]
-                        ];
+                $responseData = $response->json() ?? [];
+                
+                // Verifica se o erro é devido a migração de grupo para supergrupo
+                if (!$response->successful() || !($responseData['ok'] ?? false)) {
+                    $migration = $this->detectGroupMigration($responseData);
+                    
+                    if ($migration) {
+                        $newChatId = $migration['new_chat_id'];
+                        LogFacade::info('🔄 Grupo migrado detectado em exportChatInviteLink, usando novo chat_id', [
+                            'old_chat_id' => $normalizedChatId,
+                            'new_chat_id' => $newChatId
+                        ]);
+                        
+                        // Atualiza o chat_id e tenta novamente
+                        $normalizedChatId = $newChatId;
+                        $response = $this->http()->post("https://api.telegram.org/bot{$token}/exportChatInviteLink", [
+                            'chat_id' => $normalizedChatId
+                        ]);
+                        $responseData = $response->json() ?? [];
                     }
                 }
 
+                if ($response->successful() && ($responseData['ok'] ?? false) && isset($responseData['result'])) {
+                    return [
+                        'success' => true,
+                        'invite_link' => $responseData['result'],
+                        'error' => null,
+                        'details' => [
+                            'method' => 'exportChatInviteLink',
+                            'status' => $status,
+                            'is_admin' => $isAdmin
+                        ]
+                    ];
+                }
+
                 // Se exportChatInviteLink falhou, tenta createChatInviteLink
-                $errorData = $response->json();
-                $errorMessage = $errorData['description'] ?? 'Erro desconhecido';
+                $errorMessage = $responseData['description'] ?? 'Erro desconhecido';
                 
                 LogFacade::info('exportChatInviteLink falhou, tentando createChatInviteLink', [
                     'chat_id' => $normalizedChatId,
@@ -780,24 +857,43 @@ class TelegramService
                     'creates_join_request' => false
                 ]);
 
-                if ($response->successful()) {
-                    $data = $response->json();
-                    if (isset($data['ok']) && $data['ok'] && isset($data['result']['invite_link'])) {
-                        return [
-                            'success' => true,
-                            'invite_link' => $data['result']['invite_link'],
-                            'error' => null,
-                            'details' => [
-                                'method' => 'createChatInviteLink',
-                                'status' => $status,
-                                'is_admin' => $isAdmin
-                            ]
-                        ];
+                $responseData = $response->json() ?? [];
+                
+                // Verifica se o erro é devido a migração de grupo para supergrupo
+                if (!$response->successful() || !($responseData['ok'] ?? false)) {
+                    $migration = $this->detectGroupMigration($responseData);
+                    
+                    if ($migration) {
+                        $newChatId = $migration['new_chat_id'];
+                        LogFacade::info('🔄 Grupo migrado detectado em createChatInviteLink, usando novo chat_id', [
+                            'old_chat_id' => $normalizedChatId,
+                            'new_chat_id' => $newChatId
+                        ]);
+                        
+                        // Atualiza o chat_id e tenta novamente
+                        $normalizedChatId = $newChatId;
+                        $response = $this->http()->post("https://api.telegram.org/bot{$token}/createChatInviteLink", [
+                            'chat_id' => $normalizedChatId,
+                            'creates_join_request' => false
+                        ]);
+                        $responseData = $response->json() ?? [];
                     }
                 }
 
-                $errorData = $response->json();
-                $errorMessage = $errorData['description'] ?? 'Erro ao criar link de convite';
+                if ($response->successful() && ($responseData['ok'] ?? false) && isset($responseData['result']['invite_link'])) {
+                    return [
+                        'success' => true,
+                        'invite_link' => $responseData['result']['invite_link'],
+                        'error' => null,
+                        'details' => [
+                            'method' => 'createChatInviteLink',
+                            'status' => $status,
+                            'is_admin' => $isAdmin
+                        ]
+                    ];
+                }
+
+                $errorMessage = $responseData['description'] ?? 'Erro ao criar link de convite';
 
                 return [
                     'success' => false,
@@ -1716,9 +1812,14 @@ class TelegramService
                     $this->logBotAction($bot, "Solicitando idioma", 'info');
                     $this->sendMessage($bot, $chatId, '🌐 Por favor, escolha um idioma (pt, en, es, fr):');
                 } else {
-                    // Todos os dados foram coletados, verifica se tem plano ativo
-                    $this->checkAndShowPlansIfNeeded($bot, $chatId, $contact);
+                    // Todos os dados foram coletados, sempre exibe os planos disponíveis
+                    $this->logBotAction($bot, "Exibindo planos disponíveis após /start", 'info');
+                    $this->handlePlansCommand($bot, $chatId, $from);
                 }
+            } else {
+                // Se não é chat privado ou não tem contato, exibe planos diretamente
+                $this->logBotAction($bot, "Exibindo planos disponíveis após /start", 'info');
+                $this->handlePlansCommand($bot, $chatId, $from);
             }
 
             $this->logBotAction($bot, "Comando /start processado com sucesso para chat {$chatId}", 'info');
@@ -2041,12 +2142,13 @@ class TelegramService
                 $pixResult = $paymentService->generatePixQrCode($bot, $plan, $contact);
 
                 if (!$pixResult['success']) {
-                    $this->sendMessage($bot, $chatId, "❌ Erro ao gerar QR Code PIX. Por favor, tente novamente.");
-                    $this->logBotAction($bot, "Erro ao gerar QR Code PIX", 'error', [
+                    $errorMessage = $pixResult['error'] ?? 'Erro desconhecido ao gerar código PIX';
+                    $this->sendMessage($bot, $chatId, "❌ Erro ao gerar código PIX: {$errorMessage}\n\nPor favor, tente novamente ou entre em contato com o suporte.");
+                    $this->logBotAction($bot, "Erro ao gerar código PIX", 'error', [
                         'chat_id' => $chatId,
                         'user_id' => $from['id'] ?? null,
                         'plan_id' => $planId,
-                        'error' => $pixResult['error'] ?? 'Erro desconhecido'
+                        'error' => $errorMessage
                     ]);
                     return;
                 }
@@ -2067,7 +2169,7 @@ class TelegramService
                     );
                 }
 
-                // Monta mensagem
+                // Monta mensagem inicial
                 $message = "💳 <b>Pagamento via PIX</b>\n\n";
                 $message .= "📦 <b>Plano:</b> {$plan->title}\n";
                 $message .= "💰 <b>Valor:</b> R$ {$price}\n\n";
@@ -2076,15 +2178,12 @@ class TelegramService
                     $message .= $plan->pix_message . "\n\n";
                 }
 
-                $message .= "📱 <b>Escaneie o QR Code abaixo para pagar:</b>\n\n";
-                
                 // Exibe código PIX apenas se disponível
                 // CRÍTICO: O código PIX já vem do PaymentService EXATAMENTE como o Mercado Pago retornou
                 // NÃO devemos modificar o código de forma alguma - apenas usar diretamente
                 if (!empty($pixResult['pix_code'])) {
-                    // O código PIX já vem do PaymentService EXATAMENTE como o Mercado Pago retornou
-                    // NÃO devemos limpar, modificar ou alterar o código
-                    // Usa o código EXATAMENTE como recebido do PaymentService
+                    // CRÍTICO: O código PIX já vem do PaymentService EXATAMENTE como o Mercado Pago retornou
+                    // NÃO devemos limpar, modificar ou alterar o código - usa EXATAMENTE como recebido
                     $pixCode = $pixResult['pix_code'];
                     
                     // Log do código que será enviado ao usuário (EXATO do Mercado Pago)
@@ -2092,76 +2191,67 @@ class TelegramService
                         'chat_id' => $chatId,
                         'plan_id' => $planId,
                         'pix_code_length' => strlen($pixCode),
-                        'pix_code_start' => substr($pixCode, 0, 30),
-                        'pix_code_end' => substr($pixCode, -10),
-                        'pix_code_crc' => substr($pixCode, -4),
-                        'pix_code_full' => $pixCode, // Log completo - código EXATO do Mercado Pago
-                        'note' => 'Código usado EXATAMENTE como o Mercado Pago retornou - SEM MODIFICAÇÕES'
+                        'pix_code_full' => $pixCode,
+                        'note' => 'Código usado EXATAMENTE como recebido do Mercado Pago - SEM MODIFICAÇÕES'
                     ]);
                     
-                    // CRÍTICO: Validação final do código antes de enviar
-                    // Se o CRC estiver incorreto, CORRIGE antes de enviar ao usuário
-                    $pixCrcService = new PixCrcService();
-                    $finalUserValidation = $pixCrcService->validatePixCode($pixCode);
+                    // Adiciona informações na mensagem principal
+                    $message .= "📱 <b>Escaneie o QR Code abaixo para pagar:</b>\n\n";
+                    $message .= "💡 <i>Ou use o código PIX copia e cola abaixo</i>\n\n";
+                    $message .= "⏰ Este QR Code expira em 30 minutos.";
                     
-                    // Se o CRC estiver incorreto, CORRIGE antes de enviar
-                    if (!$finalUserValidation['crc_valid']) {
-                        $this->logBotAction($bot, "❌ ERRO: CRC do código PIX está INCORRETO no TelegramService - corrigindo...", 'error', [
+                    // Envia mensagem informativa primeiro
+                    $this->sendMessage($bot, $chatId, $message);
+                    
+                    // Aguarda um pequeno delay para garantir ordem das mensagens
+                    usleep(500000); // 0.5 segundos
+                    
+                    // Envia o código PIX EXATAMENTE como recebido (sem modificações)
+                    // Apenas remove quebras de linha para exibição (não altera o código em si)
+                    $pixCodeForDisplay = str_replace(["\r\n", "\r", "\n"], '', $pixCode);
+                    
+                    // Envia o código PIX em uma mensagem isolada usando HTML
+                    try {
+                        $response = $this->http()->post("https://api.telegram.org/bot{$bot->token}/sendMessage", [
                             'chat_id' => $chatId,
-                            'plan_id' => $planId,
-                            'pix_code_before' => $pixCode,
-                            'crc_validation_current_crc' => $finalUserValidation['current_crc'],
-                            'crc_validation_calculated_crc' => $finalUserValidation['calculated_crc'],
-                            'note' => 'CRC incorreto - corrigindo antes de enviar ao usuário'
+                            'text' => "<pre><code>{$pixCodeForDisplay}</code></pre>",
+                            'parse_mode' => 'HTML'
                         ]);
                         
-                        // CORRIGE o CRC do código PIX
-                        $pixCodeOriginal = $pixCode;
-                        $pixCode = $pixCrcService->addCrc($pixCode);
-                        
-                        // Valida novamente após correção
-                        $finalUserValidation = $pixCrcService->validatePixCode($pixCode);
-                        
-                        $this->logBotAction($bot, "✅ CRC do código PIX foi CORRIGIDO no TelegramService", 'info', [
-                            'chat_id' => $chatId,
-                            'plan_id' => $planId,
-                            'pix_code_before' => $pixCodeOriginal,
-                            'pix_code_after' => $pixCode,
-                            'crc_before' => substr($pixCodeOriginal, -4),
-                            'crc_after' => substr($pixCode, -4),
-                            'crc_validation_after' => $finalUserValidation,
-                            'note' => 'CRC corrigido - código agora está válido'
-                        ]);
+                        if ($response->successful()) {
+                            LogFacade::info('✅ Código PIX enviado ao usuário', [
+                                'chat_id' => $chatId,
+                                'pix_code_length' => strlen($pixCodeForDisplay),
+                                'note' => 'Código enviado EXATAMENTE como recebido do Mercado Pago'
+                            ]);
+                        }
+                    } catch (\Exception $e) {
+                        // Fallback: envia sem formatação HTML
+                        try {
+                            $this->http()->post("https://api.telegram.org/bot{$bot->token}/sendMessage", [
+                                'chat_id' => $chatId,
+                                'text' => $pixCodeForDisplay
+                            ]);
+                        } catch (\Exception $e2) {
+                            LogFacade::error('Erro ao enviar código PIX', [
+                                'error' => $e2->getMessage(),
+                                'chat_id' => $chatId
+                            ]);
+                        }
                     }
                     
-                    // Log do código que será enviado ao usuário (agora com CRC válido)
-                    $this->logBotAction($bot, "✅ Código PIX FINAL que será enviado ao usuário (CRC VÁLIDO)", 'info', [
-                        'chat_id' => $chatId,
-                        'plan_id' => $planId,
-                        'pix_code_length' => strlen($pixCode),
-                        'pix_code_start' => substr($pixCode, 0, 30),
-                        'pix_code_end' => substr($pixCode, -10),
-                        'pix_code_crc' => substr($pixCode, -4),
-                        'crc_validation_valid' => $finalUserValidation['valid'],
-                        'crc_validation_crc_valid' => $finalUserValidation['crc_valid'],
-                        'crc_validation_current_crc' => $finalUserValidation['current_crc'],
-                        'crc_validation_calculated_crc' => $finalUserValidation['calculated_crc'],
-                        'pix_code_full' => $pixCode, // Log completo para validação
-                        'note' => 'Código PIX com CRC VÁLIDO - será reconhecido pelo banco'
-                    ]);
-                    
-                    // Exibe o código PIX em uma única linha usando <code> para preservar o formato
-                    // O Telegram preserva o conteúdo dentro de <code> sem adicionar quebras
-                    $message .= "📋 <b>Código PIX (copie e cole no app do seu banco):</b>\n";
-                    $message .= "<code>{$pixCode}</code>\n\n";
-                    $message .= "⚠️ <b>IMPORTANTE:</b> Copie o código completo, sem espaços ou quebras.\n\n";
-                    $message .= "💡 <i>Ou escaneie o QR Code abaixo</i>\n\n";
+                    // Define $message como vazio para não enviar novamente abaixo
+                    $message = '';
+                } else {
+                    // Se não tem código PIX, monta mensagem normal
+                    $message .= "📱 <b>Escaneie o QR Code abaixo para pagar:</b>\n\n";
+                    $message .= "⏰ Este QR Code expira em 30 minutos.";
                 }
                 
-                $message .= "⏰ Este QR Code expira em 30 minutos.";
-
-                // Envia mensagem com texto
-                $this->sendMessage($bot, $chatId, $message);
+                // Envia mensagem apenas se não foi enviada acima (quando tem código PIX)
+                if (!empty($message)) {
+                    $this->sendMessage($bot, $chatId, $message);
+                }
 
                 // Envia QR Code como imagem
                 try {
@@ -3142,6 +3232,39 @@ class TelegramService
      * @param string $chatId ID do chat (grupo/canal)
      * @return array ['success' => bool, 'administrators' => array, 'error' => string|null]
      */
+    /**
+     * Detecta se um erro do Telegram indica migração de grupo para supergrupo
+     * e extrai o novo chat_id dos parâmetros da resposta
+     *
+     * @param array $responseData Dados da resposta JSON do Telegram
+     * @return array|null ['migrated' => true, 'new_chat_id' => string] ou null se não for migração
+     */
+    protected function detectGroupMigration(array $responseData): ?array
+    {
+        $description = $responseData['description'] ?? '';
+        $parameters = $responseData['parameters'] ?? [];
+        
+        // Verifica se o erro indica migração de grupo para supergrupo
+        if (strpos($description, 'group chat was upgraded to a supergroup chat') !== false) {
+            // O Telegram retorna o novo chat_id nos parâmetros
+            $newChatId = $parameters['migrate_to_chat_id'] ?? null;
+            
+            if ($newChatId) {
+                LogFacade::info('🔄 Grupo migrado para supergrupo detectado', [
+                    'old_chat_id' => $parameters['chat_id'] ?? 'unknown',
+                    'new_chat_id' => $newChatId
+                ]);
+                
+                return [
+                    'migrated' => true,
+                    'new_chat_id' => (string)$newChatId
+                ];
+            }
+        }
+        
+        return null;
+    }
+
     public function getChatAdministrators(string $token, string $chatId): array
     {
         try {
@@ -3151,15 +3274,32 @@ class TelegramService
                 'chat_id' => $normalizedChatId
             ]);
 
-            if (!$response->successful() || !$response->json()['ok']) {
+            $responseData = $response->json() ?? [];
+            
+            if (!$response->successful() || !($responseData['ok'] ?? false)) {
+                // Verifica se o erro é devido a migração de grupo para supergrupo
+                $migration = $this->detectGroupMigration($responseData);
+                
+                if ($migration) {
+                    // Retorna informação sobre a migração para que o chamador possa atualizar
+                    return [
+                        'success' => false,
+                        'administrators' => [],
+                        'error' => 'Grupo foi atualizado para supergrupo',
+                        'migrated' => true,
+                        'new_chat_id' => $migration['new_chat_id'],
+                        'old_chat_id' => $normalizedChatId
+                    ];
+                }
+                
                 return [
                     'success' => false,
                     'administrators' => [],
-                    'error' => 'Erro ao obter administradores: ' . ($response->json()['description'] ?? 'Erro desconhecido')
+                    'error' => 'Erro ao obter administradores: ' . ($responseData['description'] ?? 'Erro desconhecido')
                 ];
             }
 
-            $administrators = $response->json()['result'] ?? [];
+            $administrators = $responseData['result'] ?? [];
             
             return [
                 'success' => true,
@@ -3191,15 +3331,31 @@ class TelegramService
                 'chat_id' => $normalizedChatId
             ]);
 
-            if (!$response->successful() || !$response->json()['ok']) {
+            $responseData = $response->json() ?? [];
+            
+            if (!$response->successful() || !($responseData['ok'] ?? false)) {
+                // Verifica se o erro é devido a migração de grupo para supergrupo
+                $migration = $this->detectGroupMigration($responseData);
+                
+                if ($migration) {
+                    return [
+                        'success' => false,
+                        'member_count' => 0,
+                        'error' => 'Grupo foi atualizado para supergrupo',
+                        'migrated' => true,
+                        'new_chat_id' => $migration['new_chat_id'],
+                        'old_chat_id' => $normalizedChatId
+                    ];
+                }
+                
                 return [
                     'success' => false,
                     'member_count' => 0,
-                    'error' => 'Erro ao obter contagem de membros: ' . ($response->json()['description'] ?? 'Erro desconhecido')
+                    'error' => 'Erro ao obter contagem de membros: ' . ($responseData['description'] ?? 'Erro desconhecido')
                 ];
             }
 
-            $memberCount = $response->json()['result'] ?? 0;
+            $memberCount = $responseData['result'] ?? 0;
             
             return [
                 'success' => true,
@@ -3236,6 +3392,49 @@ class TelegramService
 
             // Obtém administradores do grupo
             $adminsResult = $this->getChatAdministrators($bot->token, $bot->telegram_group_id);
+            
+            // Verifica se o grupo foi migrado para supergrupo
+            if (isset($adminsResult['migrated']) && $adminsResult['migrated'] === true) {
+                $newChatId = $adminsResult['new_chat_id'] ?? null;
+                
+                if ($newChatId) {
+                    LogFacade::info('🔄 Atualizando telegram_group_id do bot após migração para supergrupo', [
+                        'bot_id' => $bot->id,
+                        'old_chat_id' => $bot->telegram_group_id,
+                        'new_chat_id' => $newChatId
+                    ]);
+                    
+                    // Atualiza o telegram_group_id do bot no banco de dados
+                    $bot->update(['telegram_group_id' => $newChatId]);
+                    $bot->refresh();
+                    
+                    // Tenta novamente com o novo chat_id
+                    $adminsResult = $this->getChatAdministrators($bot->token, $newChatId);
+                    
+                    if (!$adminsResult['success']) {
+                        return [
+                            'success' => false,
+                            'synced_count' => 0,
+                            'error' => 'Erro ao obter administradores após migração: ' . ($adminsResult['error'] ?? 'Erro desconhecido'),
+                            'details' => [],
+                            'migrated' => true,
+                            'new_chat_id' => $newChatId
+                        ];
+                    }
+                    
+                    LogFacade::info('✅ Sincronização continuada após migração para supergrupo', [
+                        'bot_id' => $bot->id,
+                        'new_chat_id' => $newChatId
+                    ]);
+                } else {
+                    return [
+                        'success' => false,
+                        'synced_count' => 0,
+                        'error' => 'Grupo foi migrado para supergrupo, mas novo chat_id não foi encontrado',
+                        'details' => []
+                    ];
+                }
+            }
             
             if (!$adminsResult['success']) {
                 return [
@@ -3364,14 +3563,15 @@ class TelegramService
                         $message .= "Obrigado por ser nosso cliente!";
                         
                         $this->sendMessage($bot, $chatId, $message);
-                        return;
+                        // Continua para exibir os planos disponíveis mesmo tendo plano ativo
                     }
                 }
             }
 
-            // Se não tem plano ativo, lista os planos disponíveis
-            $this->logBotAction($bot, "Contato não tem plano ativo, listando planos disponíveis", 'info', [
-                'contact_id' => $contact->id
+            // Sempre lista os planos disponíveis (mesmo se tiver plano ativo)
+            $this->logBotAction($bot, "Listando planos disponíveis", 'info', [
+                'contact_id' => $contact->id,
+                'has_active_plan' => $hasActivePlan
             ]);
             
             $this->handlePlansCommand($bot, $chatId, [

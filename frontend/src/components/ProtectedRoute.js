@@ -53,6 +53,8 @@ const routeToMenuMap = {
   '/settings/security': 'settings',
   '/settings/storage': 'settings',
   '/settings/artisan': 'settings',
+  '/settings/cron-jobs': 'settings',
+  '/settings/laravel-logs': 'settings',
   '/users': 'settings',
   '/user-groups': 'settings',
   '/logs': 'settings',

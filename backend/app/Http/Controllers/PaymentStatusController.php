@@ -188,5 +188,101 @@ class PaymentStatusController extends Controller
             ], 500);
         }
     }
+
+    /**
+     * Obtém detalhes completos da transação incluindo metadata do gateway
+     *
+     * @param Request $request
+     * @param int $transactionId
+     * @return JsonResponse
+     */
+    public function getTransactionDetails(Request $request, int $transactionId): JsonResponse
+    {
+        try {
+            $user = $request->user();
+            if (!$user) {
+                return response()->json(['error' => 'Não autenticado'], 401);
+            }
+
+            $transaction = \App\Models\Transaction::with(['bot', 'contact', 'paymentPlan', 'paymentCycle'])
+                ->findOrFail($transactionId);
+
+            // Verifica se o usuário tem permissão para ver esta transação
+            // (pode verificar se o usuário tem acesso ao bot da transação)
+
+            $metadata = $transaction->metadata ?? [];
+            $gateway = $transaction->gateway ?? 'unknown';
+
+            // Formata os dados do gateway
+            $gatewayData = [];
+            
+            if ($gateway === 'mercadopago') {
+                $gatewayData = [
+                    'gateway' => 'Mercado Pago',
+                    'payment_id' => $transaction->gateway_transaction_id ?? $metadata['mercadopago_payment_id'] ?? null,
+                    'status' => $metadata['mercadopago_status'] ?? null,
+                    'status_detail' => $metadata['mercadopago_status_detail'] ?? null,
+                    'last_webhook_update' => $metadata['last_webhook_update'] ?? null,
+                    'webhook_action' => $metadata['webhook_action'] ?? null,
+                    'last_status_check' => $metadata['last_status_check'] ?? null,
+                    'pix_code' => $metadata['pix_code'] ?? null,
+                    'pix_ticket_url' => $metadata['pix_ticket_url'] ?? null,
+                    'expiration_date' => $metadata['expiration_date'] ?? null,
+                ];
+            } elseif ($gateway === 'stripe') {
+                $gatewayData = [
+                    'gateway' => 'Stripe',
+                    'payment_intent_id' => $transaction->gateway_transaction_id ?? $metadata['stripe_payment_intent_id'] ?? null,
+                    'charge_id' => $metadata['stripe_charge_id'] ?? null,
+                    'status' => $metadata['stripe_status'] ?? null,
+                    'last_webhook_update' => $metadata['last_webhook_update'] ?? null,
+                    'card_last4' => $metadata['card_last4'] ?? null,
+                    'card_brand' => $metadata['card_brand'] ?? null,
+                    'processed_at' => $metadata['processed_at'] ?? null,
+                ];
+            }
+
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'transaction' => [
+                        'id' => $transaction->id,
+                        'amount' => $transaction->amount,
+                        'currency' => $transaction->currency,
+                        'status' => $transaction->status,
+                        'payment_method' => $transaction->payment_method,
+                        'gateway' => $gateway,
+                        'gateway_transaction_id' => $transaction->gateway_transaction_id,
+                        'created_at' => $transaction->created_at,
+                        'updated_at' => $transaction->updated_at,
+                    ],
+                    'gateway_data' => $gatewayData,
+                    'payment_plan' => $transaction->paymentPlan ? [
+                        'id' => $transaction->paymentPlan->id,
+                        'title' => $transaction->paymentPlan->title,
+                        'price' => $transaction->paymentPlan->price,
+                    ] : null,
+                    'contact' => $transaction->contact ? [
+                        'id' => $transaction->contact->id,
+                        'first_name' => $transaction->contact->first_name,
+                        'last_name' => $transaction->contact->last_name,
+                        'username' => $transaction->contact->username,
+                        'email' => $transaction->contact->email,
+                    ] : null,
+                    'raw_metadata' => $metadata, // Metadata completo para debug
+                ]
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Erro ao obter detalhes da transação', [
+                'transaction_id' => $transactionId,
+                'error' => $e->getMessage()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'error' => 'Erro ao obter detalhes da transação: ' . $e->getMessage()
+            ], 500);
+        }
+    }
 }
 

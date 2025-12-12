@@ -235,40 +235,35 @@ class PaymentService
             // O qr_code_base64 é apenas a imagem do QR Code
             if (isset($pixData->qr_code)) {
                 $pixCodeRaw = $pixData->qr_code;
-                // CRÍTICO: O qr_code vem como string EMV do Mercado Pago
-                // Segundo a documentação, o código já vem no formato correto
-                // Preservamos o original EXATAMENTE como recebido
+                // CRÍTICO: Usa o código EXATAMENTE como vem do Mercado Pago - SEM MODIFICAÇÕES
                 $pixCode = $pixCodeRaw;
                 
-                Log::info('✅ Código PIX EMV extraído do campo qr_code do Mercado Pago (EXATO)', [
+                // Log do código original recebido
+                Log::info('🔵🔵🔵 CÓDIGO PIX ORIGINAL DO MERCADO PAGO (EXATAMENTE COMO RECEBIDO)', [
                     'payment_id' => $payment->id ?? null,
-                    'qr_code_type' => gettype($pixData->qr_code),
+                    'transaction_id' => $transaction->id ?? null,
+                    'bot_id' => $bot->id ?? null,
                     'qr_code_length' => strlen($pixCodeRaw),
                     'qr_code_start' => substr($pixCodeRaw, 0, 30),
                     'qr_code_end' => substr($pixCodeRaw, -10),
-                    'qr_code_crc' => substr($pixCodeRaw, -4),
-                    'qr_code_full' => $pixCodeRaw, // Log completo para validação
-                    'note' => 'Código EXATO do Mercado Pago - será usado sem modificações'
+                    'qr_code_full' => $pixCodeRaw, // CÓDIGO COMPLETO EXATAMENTE COMO VEIO DO MERCADO PAGO
+                    'note' => 'CÓDIGO SERÁ USADO EXATAMENTE COMO RECEBIDO - SEM MODIFICAÇÕES'
                 ]);
             } else {
                 // Se não tiver qr_code, é um erro - o Mercado Pago sempre retorna
-                // Isso geralmente indica problema na configuração da conta
-                Log::error('ERRO CRÍTICO: Mercado Pago não retornou qr_code (código EMV)', [
+                Log::error('ERRO: Mercado Pago não retornou qr_code (código EMV)', [
                     'payment_id' => $payment->id ?? null,
                     'payment_status' => $payment->status ?? null,
                     'transaction_data_keys' => array_keys((array)$pixData),
-                    'transaction_data' => (array)$pixData,
                     'has_qr_code_base64' => isset($pixData->qr_code_base64),
                     'environment' => $gatewayConfig->environment,
-                    'note' => 'Isso geralmente indica que a conta não possui chave PIX cadastrada ou não está habilitada para PIX'
                 ]);
                 
-                $errorMessage = 'Código PIX EMV (qr_code) não encontrado na resposta do Mercado Pago. ';
+                $errorMessage = 'Erro ao gerar código PIX: O Mercado Pago não retornou o código PIX. ';
                 $errorMessage .= 'Possíveis causas: ';
-                $errorMessage .= '1) A conta não possui uma chave PIX cadastrada - acesse sua conta do Mercado Pago e cadastre uma chave PIX; ';
+                $errorMessage .= '1) A conta não possui uma chave PIX cadastrada; ';
                 $errorMessage .= '2) A conta não está habilitada para receber pagamentos via PIX; ';
-                $errorMessage .= '3) A conta não está validada/verificada. ';
-                $errorMessage .= 'Verifique a documentação em PROBLEMAS_QRCODE_PIX_MERCADOPAGO.md para mais detalhes.';
+                $errorMessage .= '3) A conta não está validada/verificada.';
                 
                 throw new Exception($errorMessage);
             }
@@ -276,265 +271,23 @@ class PaymentService
             $pixCodeBase64 = $pixData->qr_code_base64 ?? null;
             $ticketUrl = $pixData->ticket_url ?? null;
 
-            // Log detalhado da estrutura recebida
-            Log::info('Dados PIX recebidos do Mercado Pago - Estrutura Completa', [
-                'payment_id' => $payment->id ?? null,
-                'has_qr_code' => isset($pixData->qr_code),
-                'has_qr_code_base64' => isset($pixData->qr_code_base64),
-                'has_ticket_url' => isset($pixData->ticket_url),
-                'transaction_data_keys' => array_keys((array)$pixData),
-                'qr_code_raw_length' => $pixCodeRaw ? strlen($pixCodeRaw) : null,
-                'qr_code_raw_start' => $pixCodeRaw ? substr($pixCodeRaw, 0, 30) : null,
-                'qr_code_raw_end' => $pixCodeRaw ? substr($pixCodeRaw, -10) : null,
-                'qr_code_has_spaces' => $pixCodeRaw ? (strpos($pixCodeRaw, ' ') !== false) : null,
-                'qr_code_has_newlines' => $pixCodeRaw ? (strpos($pixCodeRaw, "\n") !== false || strpos($pixCodeRaw, "\r") !== false) : null,
-                'qr_code_has_tabs' => $pixCodeRaw ? (strpos($pixCodeRaw, "\t") !== false) : null
-            ]);
-
             if (!$pixCode || empty($pixCode)) {
-                Log::error('Código PIX não encontrado na resposta do Mercado Pago', [
+                Log::error('Código PIX vazio na resposta do Mercado Pago', [
                     'payment_id' => $payment->id ?? null,
-                    'transaction_data' => (array)$pixData
                 ]);
-                throw new Exception('Código PIX não retornado pelo Mercado Pago.');
+                throw new Exception('Erro ao gerar código PIX: O código retornado pelo Mercado Pago está vazio.');
             }
 
             // CRÍTICO: O código PIX do Mercado Pago deve ser usado EXATAMENTE como retornado
-            // Segundo a documentação do Mercado Pago, o código já vem no formato correto e pronto para uso
-            // NÃO devemos limpar, modificar ou alterar o código de forma alguma
-            // O código PIX EMV deve ser uma string contínua, mas o Mercado Pago já retorna assim
+            // SEM MODIFICAÇÕES - SEM LIMPEZA - SEM VALIDAÇÃO - SEM CORREÇÃO
+            // O código será usado exatamente como recebido do Mercado Pago
             
-            $pixCrcService = new PixCrcService();
-            $pixCodeOriginal = $pixCode;
-            
-            // CRÍTICO: Segundo a documentação do Mercado Pago, o código já vem correto
-            // NÃO devemos limpar o código - apenas removemos espaços/quebras se realmente existirem
-            // Mas na prática, o Mercado Pago geralmente retorna o código já limpo
-            
-            // Verifica se há espaços/quebras (geralmente não há)
-            $hasSpaces = strpos($pixCode, ' ') !== false;
-            $hasNewlines = strpos($pixCode, "\n") !== false || strpos($pixCode, "\r") !== false;
-            $hasTabs = strpos($pixCode, "\t") !== false;
-            $hasLeadingTrailingSpaces = $pixCode !== trim($pixCode);
-            
-            // Só limpa se realmente houver espaços/quebras (geralmente não há)
-            if ($hasSpaces || $hasNewlines || $hasTabs || $hasLeadingTrailingSpaces) {
-                Log::warning('⚠️ Código PIX do Mercado Pago contém espaços/quebras (incomum) - removendo APENAS esses caracteres', [
-                    'has_spaces' => $hasSpaces,
-                    'has_newlines' => $hasNewlines,
-                    'has_tabs' => $hasTabs,
-                    'has_leading_trailing_spaces' => $hasLeadingTrailingSpaces,
-                    'original_length' => strlen($pixCodeOriginal),
-                    'original_start' => substr($pixCodeOriginal, 0, 30),
-                    'original_end' => substr($pixCodeOriginal, -10),
-                    'original_crc' => substr($pixCodeOriginal, -4),
-                    'original_full' => $pixCodeOriginal, // Log completo do original
-                    'note' => 'Código do Mercado Pago geralmente não tem espaços/quebras - removendo apenas esses'
-                ]);
-                
-                // Remove APENAS espaços em branco e quebras de linha
-                // Preserva TODOS os outros caracteres (alfanuméricos e especiais)
-                $pixCodeCleaned = trim($pixCode); // Remove espaços no início e fim
-                $pixCodeCleaned = str_replace(["\r\n", "\n", "\r", "\t"], '', $pixCodeCleaned); // Remove quebras
-                $pixCodeCleaned = preg_replace('/\s+/', '', $pixCodeCleaned); // Remove TODOS os espaços
-                
-                // Validação crítica: verifica se o código não foi corrompido
-                if (!str_starts_with($pixCodeCleaned, '000201') && str_starts_with($pixCodeOriginal, '000201')) {
-                    Log::error('ERRO CRÍTICO: Código PIX foi corrompido durante limpeza!', [
-                        'original_start' => substr($pixCodeOriginal, 0, 30),
-                        'cleaned_start' => substr($pixCodeCleaned, 0, 30),
-                        'original_length' => strlen($pixCodeOriginal),
-                        'cleaned_length' => strlen($pixCodeCleaned),
-                        'original_hex_start' => bin2hex(substr($pixCodeOriginal, 0, 20)),
-                        'cleaned_hex_start' => bin2hex(substr($pixCodeCleaned, 0, 20)),
-                        'original_full' => $pixCodeOriginal,
-                        'cleaned_full' => $pixCodeCleaned
-                    ]);
-                    // Retorna o original se corrompido
-                    $pixCode = $pixCodeOriginal;
-                } else {
-                    $pixCode = $pixCodeCleaned;
-                }
-                
-                // Valida que o comprimento não mudou drasticamente
-                $lengthDiff = strlen($pixCodeOriginal) - strlen($pixCode);
-                if ($lengthDiff > 10) {
-                    Log::warning('ATENÇÃO: Muitos caracteres removidos na limpeza', [
-                        'length_diff' => $lengthDiff,
-                        'original_length' => strlen($pixCodeOriginal),
-                        'cleaned_length' => strlen($pixCode),
-                        'percentage' => ($lengthDiff / strlen($pixCodeOriginal)) * 100,
-                        'original_full' => $pixCodeOriginal,
-                        'cleaned_full' => $pixCode
-                    ]);
-                }
-                
-                Log::info('Código PIX limpo (apenas espaços/quebras removidos)', [
-                    'original_length' => strlen($pixCodeOriginal),
-                    'cleaned_length' => strlen($pixCode),
-                    'length_diff' => $lengthDiff,
-                    'cleaned_start' => substr($pixCode, 0, 30),
-                    'cleaned_end' => substr($pixCode, -10),
-                    'cleaned_crc' => substr($pixCode, -4),
-                    'cleaned_full' => $pixCode // Log completo do código limpo
-                ]);
-            } else {
-                // Código já está limpo - usa EXATAMENTE como o Mercado Pago retornou
-                Log::info('✅✅✅ Código PIX usado EXATAMENTE como o Mercado Pago retornou (SEM MODIFICAÇÕES)', [
-                    'pix_code_length' => strlen($pixCode),
-                    'pix_code_start' => substr($pixCode, 0, 30),
-                    'pix_code_end' => substr($pixCode, -10),
-                    'pix_code_crc' => substr($pixCode, -4),
-                    'pix_code_full' => $pixCode, // Log completo - código EXATO do Mercado Pago
-                    'note' => 'Código usado EXATAMENTE como o Mercado Pago retornou - SEM NENHUMA MODIFICAÇÃO'
-                ]);
-            }
-            
-            // Valida formato básico (deve começar com 000201)
-            if (!str_starts_with($pixCode, '000201')) {
-                Log::error('Código PIX em formato incorreto - não começa com 000201', [
-                    'pix_code_start' => substr($pixCode, 0, 50),
-                    'pix_code_length' => strlen($pixCode),
-                    'pix_code_original_start' => substr($pixCodeOriginal, 0, 50),
-                    'pix_code_hex_start' => bin2hex(substr($pixCode, 0, 20))
-                ]);
-                throw new Exception('Código PIX retornado pelo Mercado Pago está em formato inválido.');
-            }
-            
-            // Valida comprimento mínimo (códigos PIX geralmente têm 200-500 caracteres)
-            if (strlen($pixCode) < 100) {
-                Log::error('Código PIX muito curto', [
-                    'pix_code_length' => strlen($pixCode),
-                    'pix_code_start' => substr($pixCode, 0, 50),
-                    'pix_code_end' => substr($pixCode, -10)
-                ]);
-                throw new Exception('Código PIX retornado pelo Mercado Pago está incompleto.');
-            }
-            
-            // CRÍTICO: Valida o CRC do código PIX do Mercado Pago
-            // Se o CRC estiver incorreto, o banco NÃO reconhecerá o QR Code
-            // Portanto, se o CRC estiver incorreto, devemos corrigi-lo
-            $crcValidation = $pixCrcService->validatePixCode($pixCode);
-            
-            // Log detalhado da validação CRC
-            Log::info('Validação CRC do código PIX do Mercado Pago', [
-                'crc_validation_valid' => $crcValidation['valid'],
-                'crc_validation_crc_valid' => $crcValidation['crc_valid'],
-                'crc_validation_format_valid' => $crcValidation['format_valid'],
-                'crc_validation_current_crc' => $crcValidation['current_crc'],
-                'crc_validation_calculated_crc' => $crcValidation['calculated_crc'],
-                'crc_validation_errors' => $crcValidation['errors'],
-                'crc_validation_result' => $crcValidation,
+            Log::info('✅✅✅ Código PIX será usado EXATAMENTE como recebido do Mercado Pago (SEM MODIFICAÇÕES)', [
                 'pix_code_length' => strlen($pixCode),
                 'pix_code_start' => substr($pixCode, 0, 30),
                 'pix_code_end' => substr($pixCode, -10),
-                'pix_code_crc' => substr($pixCode, -4),
-                'pix_code_full' => $pixCode, // Log completo para validação manual
-                'note' => 'Validando CRC do código PIX do Mercado Pago'
-            ]);
-            
-            // CRÍTICO: Se o CRC estiver inválido, CORRIGE antes de usar
-            // Um CRC inválido faz com que o banco NÃO reconheça o QR Code
-            $crcWasCorrected = false;
-            $crcCorrectionDetails = null;
-            
-            if (!$crcValidation['crc_valid']) {
-                // MÉTRICA: Registra ocorrência de CRC incorreto
-                $crcCorrectionDetails = [
-                    'payment_id' => $payment->id ?? null,
-                    'transaction_id' => $transaction->id ?? null,
-                    'bot_id' => $bot->id ?? null,
-                    'plan_id' => $plan->id ?? null,
-                    'timestamp' => now()->toIso8601String(),
-                    'mercado_pago_environment' => $gatewayConfig->environment ?? null,
-                    'crc_before' => $crcValidation['current_crc'],
-                    'crc_calculated' => $crcValidation['calculated_crc'],
-                    'pix_code_length' => strlen($pixCode),
-                    'pix_code_start' => substr($pixCode, 0, 30),
-                    'pix_code_end_before' => substr($pixCode, -10),
-                    'pix_code_full_before' => $pixCode,
-                ];
-                
-                Log::error('❌ ERRO CRÍTICO: CRC do código PIX do Mercado Pago está INCORRETO!', [
-                    'crc_validation_result' => $crcValidation,
-                    'pix_code_length' => strlen($pixCode),
-                    'pix_code_end' => substr($pixCode, -10),
-                    'current_crc' => $crcValidation['current_crc'],
-                    'calculated_crc' => $crcValidation['calculated_crc'],
-                    'pix_code_before_correction' => $pixCode,
-                    'payment_id' => $payment->id ?? null,
-                    'transaction_id' => $transaction->id ?? null,
-                    'bot_id' => $bot->id ?? null,
-                    'environment' => $gatewayConfig->environment ?? null,
-                    'note' => 'CRC incorreto - o banco NÃO reconhecerá o QR Code. Corrigindo CRC...',
-                    'metric' => 'crc_correction_required'
-                ]);
-                
-                // CORRIGE o CRC do código PIX
-                $pixCodeOriginal = $pixCode;
-                $pixCode = $pixCrcService->addCrc($pixCode);
-                
-                // Valida novamente após correção
-                $crcValidationAfter = $pixCrcService->validatePixCode($pixCode);
-                
-                // Atualiza detalhes da correção
-                $crcCorrectionDetails['crc_after'] = $crcValidationAfter['current_crc'];
-                $crcCorrectionDetails['pix_code_end_after'] = substr($pixCode, -10);
-                $crcCorrectionDetails['pix_code_full_after'] = $pixCode;
-                $crcCorrectionDetails['correction_successful'] = $crcValidationAfter['crc_valid'];
-                $crcWasCorrected = true;
-                
-                Log::info('✅ CRC do código PIX foi CORRIGIDO', [
-                    'pix_code_before' => $pixCodeOriginal,
-                    'pix_code_after' => $pixCode,
-                    'crc_before' => $crcValidation['current_crc'],
-                    'crc_after' => $crcValidationAfter['current_crc'],
-                    'crc_validation_after' => $crcValidationAfter,
-                    'pix_code_length' => strlen($pixCode),
-                    'pix_code_start' => substr($pixCode, 0, 30),
-                    'pix_code_end' => substr($pixCode, -10),
-                    'pix_code_crc' => substr($pixCode, -4),
-                    'pix_code_full' => $pixCode, // Log completo do código corrigido
-                    'payment_id' => $payment->id ?? null,
-                    'transaction_id' => $transaction->id ?? null,
-                    'bot_id' => $bot->id ?? null,
-                    'environment' => $gatewayConfig->environment ?? null,
-                    'note' => 'CRC corrigido - código agora deve ser reconhecido pelo banco',
-                    'metric' => 'crc_correction_applied'
-                ]);
-                
-                // Salva detalhes da correção no metadata da transação para análise posterior
-                $metadata = $transaction->metadata ?? [];
-                $metadata['crc_correction'] = $crcCorrectionDetails;
-                $transaction->update(['metadata' => $metadata]);
-                
-                // Atualiza a validação com o resultado após correção
-                $crcValidation = $crcValidationAfter;
-            } else {
-                Log::info('✅ CRC do código PIX do Mercado Pago está CORRETO', [
-                    'crc_validation_result' => $crcValidation,
-                    'pix_code_length' => strlen($pixCode),
-                    'pix_code_end' => substr($pixCode, -10),
-                    'current_crc' => $crcValidation['current_crc'],
-                    'calculated_crc' => $crcValidation['calculated_crc'],
-                    'payment_id' => $payment->id ?? null,
-                    'transaction_id' => $transaction->id ?? null,
-                    'bot_id' => $bot->id ?? null,
-                    'environment' => $gatewayConfig->environment ?? null,
-                    'note' => 'CRC válido - código está correto',
-                    'metric' => 'crc_valid'
-                ]);
-            }
-            
-            // Log final do código PIX que será usado (EXATO do Mercado Pago)
-            Log::info('Código PIX do Mercado Pago pronto para uso (SEM MODIFICAÇÕES)', [
-                'pix_code_length' => strlen($pixCode),
-                'pix_code_start' => substr($pixCode, 0, 30),
-                'pix_code_end' => substr($pixCode, -10),
-                'pix_code_crc' => substr($pixCode, -4),
-                'is_valid_format' => str_starts_with($pixCode, '000201'),
-                'crc_validation_valid' => $crcValidation['valid'],
-                'pix_code_full' => $pixCode // Log completo para validação manual
+                'pix_code_full' => $pixCode,
+                'note' => 'Código usado EXATAMENTE como o Mercado Pago retornou - SEM NENHUMA MODIFICAÇÃO'
             ]);
 
             // CRÍTICO: Gera QR Code como imagem
@@ -674,194 +427,49 @@ class PaymentService
                 ]);
             }
 
-            // Validação CRC FINAL (apenas informativo - não modifica o código)
-            $finalValidation = $pixCrcService->validatePixCode($pixCode);
+            // VERIFICAÇÃO AUTOMÁTICA IMEDIATA: Verifica o status do pagamento imediatamente após criar
+            try {
+                $this->checkPaymentStatusImmediately($transaction, $gatewayConfig);
+            } catch (\Exception $e) {
+                Log::warning('Erro ao verificar status do pagamento imediatamente após criação', [
+                    'transaction_id' => $transaction->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
             
-            // Log final do código PIX que será retornado (EXATO do Mercado Pago)
-            Log::info('✅ Código PIX FINAL pronto para retornar (EXATO do Mercado Pago - SEM MODIFICAÇÕES)', [
-                'pix_code_length' => strlen($pixCode),
-                'pix_code_start' => substr($pixCode, 0, 30),
-                'pix_code_end' => substr($pixCode, -10),
-                'pix_code_crc' => substr($pixCode, -4),
-                'transaction_id' => $transactionId,
-                'has_qr_code_image' => !empty($qrCodeImage),
-                'using_mercado_pago_qr' => !empty($pixCodeBase64) && !empty($qrCodeImage),
-                'crc_validation_valid' => $finalValidation['valid'],
-                'crc_validation_crc_valid' => $finalValidation['crc_valid'],
-                'crc_validation_current_crc' => $finalValidation['current_crc'],
-                'crc_validation_calculated_crc' => $finalValidation['calculated_crc'],
-                'pix_code_full' => $pixCode, // Log completo para validação manual
-                'note' => 'Código EXATO do Mercado Pago - não foi modificado'
+            // Log final: código será retornado EXATAMENTE como recebido do Mercado Pago
+            Log::info('🔴🔴🔴 CÓDIGO PIX FINAL - COMPARE COM O ORIGINAL', [
+                'payment_id' => $payment->id ?? null,
+                'transaction_id' => $transaction->id ?? null,
+                'bot_id' => $bot->id ?? null,
+                'mercado_pago_code_original' => $pixCodeRaw, // CÓDIGO ORIGINAL DO MERCADO PAGO
+                'mercado_pago_code_original_length' => strlen($pixCodeRaw),
+                'code_to_return' => $pixCode, // Código que será retornado (EXATAMENTE como recebido)
+                'code_to_return_length' => strlen($pixCode),
+                'codes_are_identical' => ($pixCodeRaw === $pixCode), // TRUE - não foi modificado
+                'pix_code_full' => $pixCode, // Código completo
+                'note' => 'Código usado EXATAMENTE como recebido do Mercado Pago - SEM MODIFICAÇÕES'
             ]);
-            
-            // NÃO corrige o CRC - o código do Mercado Pago já está correto
-            // Se nossa validação indicar inválido, logamos mas continuamos usando o código do Mercado Pago
-            if (!$finalValidation['valid']) {
-                Log::warning('ATENÇÃO: Validação CRC final indicou código inválido, mas usando código do Mercado Pago mesmo assim', [
-                    'crc_validation_result' => $finalValidation,
-                    'pix_code_length' => strlen($pixCode),
-                    'pix_code_end' => substr($pixCode, -10),
-                    'note' => 'O código do Mercado Pago deve estar correto - pode ser problema na nossa validação'
-                ]);
-            }
-            
-            // CRÍTICO: Garante que o código PIX retornado tem CRC VÁLIDO
-            // Se o CRC foi corrigido, usa o código corrigido (não o original)
-            // O código usado no QR Code (se gerado localmente) DEVE ser idêntico ao código copia e cola
-            // Se o QR Code do Mercado Pago foi usado, o código copia e cola DEVE ser o mesmo que está no QR Code
-            $pixCodeForReturn = $pixCode; // Usa o código atual (pode ter sido corrigido)
-            
-            // Validação crítica: verifica se o código tem CRC válido antes de retornar
-            // Se o CRC foi corrigido, o código atual ($pixCode) é o correto
-            $finalCrcValidation = $pixCrcService->validatePixCode($pixCodeForReturn);
-            
-            if (!$finalCrcValidation['crc_valid']) {
-                Log::error('ERRO CRÍTICO: Código que será retornado ainda tem CRC inválido!', [
-                    'pix_code_length' => strlen($pixCodeForReturn),
-                    'pix_code_start' => substr($pixCodeForReturn, 0, 30),
-                    'pix_code_end' => substr($pixCodeForReturn, -10),
-                    'current_crc' => $finalCrcValidation['current_crc'],
-                    'calculated_crc' => $finalCrcValidation['calculated_crc'],
-                    'pix_code_full' => $pixCodeForReturn,
-                    'note' => 'CRC ainda inválido - corrigindo novamente...'
-                ]);
-                
-                // CORRIGE o CRC novamente (caso tenha sido corrompido)
-                $pixCodeForReturn = $pixCrcService->addCrc($pixCodeForReturn);
-                
-                // Valida novamente
-                $finalCrcValidation = $pixCrcService->validatePixCode($pixCodeForReturn);
-                
-                Log::info('✅ CRC do código PIX foi CORRIGIDO novamente antes de retornar', [
-                    'pix_code_length' => strlen($pixCodeForReturn),
-                    'pix_code_start' => substr($pixCodeForReturn, 0, 30),
-                    'pix_code_end' => substr($pixCodeForReturn, -10),
-                    'pix_code_crc' => substr($pixCodeForReturn, -4),
-                    'crc_validation_after' => $finalCrcValidation,
-                    'pix_code_full' => $pixCodeForReturn,
-                    'note' => 'CRC corrigido - código agora tem CRC válido'
-                ]);
-            }
-            
-            // Valida que o código usado no QR Code é o mesmo do copia e cola
-            // NOTA: Se o CRC foi corrigido, o código será diferente do original do Mercado Pago (isso é esperado)
-            if (!empty($pixCodeBase64) && !empty($qrCodeImage)) {
-                // QR Code do Mercado Pago foi usado - valida que o código copia e cola é o mesmo
-                Log::info('✅ QR Code do Mercado Pago usado - código copia e cola sincronizado', [
-                    'pix_code_length' => strlen($pixCodeForReturn),
-                    'pix_code_start' => substr($pixCodeForReturn, 0, 30),
-                    'pix_code_end' => substr($pixCodeForReturn, -10),
-                    'pix_code_crc' => substr($pixCodeForReturn, -4),
-                    'pix_code_full' => $pixCodeForReturn, // Log completo
-                    'crc_validation_valid' => $finalCrcValidation['valid'],
-                    'crc_validation_crc_valid' => $finalCrcValidation['crc_valid'],
-                    'note' => 'QR Code do Mercado Pago - código copia e cola tem CRC válido'
-                ]);
-            } else {
-                // QR Code foi gerado localmente - valida que o código usado é o mesmo
-                Log::info('⚠️ QR Code gerado localmente - validando sincronização código/QR Code', [
-                    'pix_code_length' => strlen($pixCodeForReturn),
-                    'pix_code_start' => substr($pixCodeForReturn, 0, 30),
-                    'pix_code_end' => substr($pixCodeForReturn, -10),
-                    'pix_code_crc' => substr($pixCodeForReturn, -4),
-                    'pix_code_full' => $pixCodeForReturn, // Log completo
-                    'crc_validation_valid' => $finalCrcValidation['valid'],
-                    'crc_validation_crc_valid' => $finalCrcValidation['crc_valid'],
-                    'note' => 'Código usado no QR Code tem CRC válido e é idêntico ao código copia e cola'
-                ]);
-            }
-            
-            // Validação crítica: verifica se o código está em formato válido antes de retornar
-            // O código PIX EMV deve começar com 000201 e terminar com CRC válido
-            if (!str_starts_with($pixCodeForReturn, '000201')) {
-                Log::error('ERRO CRÍTICO: Código PIX não começa com 000201 antes de retornar', [
-                    'pix_code_start' => substr($pixCodeForReturn, 0, 50),
-                    'pix_code_length' => strlen($pixCodeForReturn),
-                    'pix_code_hex_start' => bin2hex(substr($pixCodeForReturn, 0, 20))
-                ]);
-                throw new Exception('Código PIX em formato inválido - não começa com 000201');
-            }
-            
-            // Valida comprimento mínimo
-            if (strlen($pixCodeForReturn) < 100) {
-                Log::error('ERRO CRÍTICO: Código PIX muito curto antes de retornar', [
-                    'pix_code_length' => strlen($pixCodeForReturn),
-                    'pix_code_start' => substr($pixCodeForReturn, 0, 50),
-                    'pix_code_end' => substr($pixCodeForReturn, -10)
-                ]);
-                throw new Exception('Código PIX muito curto - formato inválido');
-            }
-            
-            // Valida que o código contém apenas caracteres válidos para PIX EMV
-            if (!preg_match('/^[0-9A-Za-z.\-@\/:]+$/', $pixCodeForReturn)) {
-                Log::error('ERRO CRÍTICO: Código PIX contém caracteres inválidos', [
-                    'pix_code_length' => strlen($pixCodeForReturn),
-                    'pix_code_start' => substr($pixCodeForReturn, 0, 50),
-                    'pix_code_hex_start' => bin2hex(substr($pixCodeForReturn, 0, 50)),
-                    'invalid_chars' => preg_replace('/[0-9A-Za-z.\-@\/:]/', '', $pixCodeForReturn)
-                ]);
-                throw new Exception('Código PIX contém caracteres inválidos');
-            }
-            
-            // Validação final crítica: garante que o código usado no QR Code é o mesmo do copia e cola
-            // Se o QR Code foi gerado localmente, o código usado DEVE ser idêntico ao código retornado
-            $codeUsedInQrCode = $pixCodeForReturn; // Mesmo código usado no QR Code
-            
-            // Log final confirmando que o código PIX tem CRC VÁLIDO
-            Log::info('✅✅✅ Retornando código PIX (CRC VÁLIDO - será reconhecido pelo banco)', [
-                'mercado_pago_code_original' => $pixCodeRaw, // Código ORIGINAL do Mercado Pago
-                'mercado_pago_code_length' => strlen($pixCodeRaw),
-                'code_to_return' => $pixCodeForReturn, // Código que será retornado (pode ter CRC corrigido)
-                'code_to_return_length' => strlen($pixCodeForReturn),
-                'pix_code_start' => substr($pixCodeForReturn, 0, 30),
-                'pix_code_end' => substr($pixCodeForReturn, -10),
-                'pix_code_crc' => substr($pixCodeForReturn, -4),
-                'crc_validation_valid' => $finalCrcValidation['valid'],
-                'crc_validation_crc_valid' => $finalCrcValidation['crc_valid'],
-                'crc_validation_current_crc' => $finalCrcValidation['current_crc'],
-                'crc_validation_calculated_crc' => $finalCrcValidation['calculated_crc'],
-                'has_qr_code_image' => !empty($qrCodeImage),
-                'using_mercado_pago_qr' => !empty($pixCodeBase64) && !empty($qrCodeImage),
-                'pix_code_full' => $pixCodeForReturn, // Log completo para validação manual
-                'pix_code_valid_format' => str_starts_with($pixCodeForReturn, '000201'),
-                'pix_code_valid_length' => strlen($pixCodeForReturn) >= 100,
-                'pix_code_valid_chars' => preg_match('/^[0-9A-Za-z.\-@\/:]+$/', $pixCodeForReturn),
-                'code_used_in_qr_code' => $codeUsedInQrCode, // Código usado no QR Code
-                'codes_match' => ($codeUsedInQrCode === $pixCodeForReturn), // Deve ser sempre true
-                'note' => 'Código PIX tem CRC VÁLIDO - será reconhecido pelo banco (CRC pode ter sido corrigido se estava incorreto)'
-            ]);
-            
-            
-            // Valida que o código usado no QR Code é o mesmo do copia e cola
-            if ($codeUsedInQrCode !== $pixCodeForReturn) {
-                Log::error('ERRO CRÍTICO: Código usado no QR Code é diferente do código copia e cola!', [
-                    'pix_code_for_return' => $pixCodeForReturn,
-                    'code_used_in_qr_code' => $codeUsedInQrCode,
-                    'pix_code_length' => strlen($pixCodeForReturn),
-                    'qr_code_length' => strlen($codeUsedInQrCode)
-                ]);
-                throw new Exception('ERRO: Código usado no QR Code é diferente do código copia e cola. Verifique os logs.');
-            }
             
             return [
                 'success' => true,
                 'transaction' => $transaction,
-                'pix_key' => null, // Mercado Pago não retorna chave PIX diretamente
-                'pix_code' => $pixCodeForReturn, // Código EXATO do Mercado Pago (validado)
-                'qr_code_image' => $qrCodeImage, // QR Code do Mercado Pago ou gerado com código EXATO
+                'pix_key' => null,
+                'pix_code' => $pixCode, // Código EXATAMENTE como recebido do Mercado Pago
+                'qr_code_image' => $qrCodeImage,
                 'qr_code_path' => $qrCodePath,
                 'ticket_url' => $ticketUrl,
                 'payment_id' => $payment->id
             ];
         } catch (MPApiException $e) {
-            $errorMessage = 'Erro na API do Mercado Pago: ';
+            $errorMessage = 'Erro ao gerar código PIX: ';
             if ($e->getApiResponse() && isset($e->getApiResponse()->getContent()['message'])) {
                 $errorMessage .= $e->getApiResponse()->getContent()['message'];
             } else {
                 $errorMessage .= $e->getMessage();
             }
 
-            Log::error('Erro ao gerar QR Code PIX via Mercado Pago', [
+            Log::error('Erro ao gerar código PIX via Mercado Pago', [
                 'bot_id' => $bot->id,
                 'plan_id' => $plan->id,
                 'contact_id' => $contact->id,
@@ -874,17 +482,19 @@ class PaymentService
                 'error' => $errorMessage
             ];
         } catch (Exception $e) {
-            Log::error('Erro ao gerar QR Code PIX', [
+            $errorMessage = 'Erro ao gerar código PIX: ' . $e->getMessage();
+            
+            Log::error('Erro ao gerar código PIX', [
                 'bot_id' => $bot->id,
                 'plan_id' => $plan->id,
                 'contact_id' => $contact->id,
-                'error' => $e->getMessage(),
+                'error' => $errorMessage,
                 'trace' => $e->getTraceAsString()
             ]);
 
             return [
                 'success' => false,
-                'error' => $e->getMessage()
+                'error' => $errorMessage
             ];
         }
     }
@@ -980,97 +590,18 @@ class PaymentService
     protected function generateQrCodeImage(string $pixCode): string
     {
         try {
-            // CRÍTICO: O código PIX já deve estar limpo antes de chegar aqui
-            // NÃO devemos limpar novamente - isso pode corromper o código
-            // Apenas valida que está no formato correto
+            // CRÍTICO: O código PIX deve ser usado EXATAMENTE como recebido
+            // NÃO devemos limpar, modificar ou alterar o código
+            // Usa o código EXATAMENTE como recebido do Mercado Pago
             
-            $pixCodeOriginal = $pixCode;
+            // CRÍTICO: O código PIX deve ser usado EXATAMENTE como recebido
+            // NÃO devemos limpar, modificar ou alterar o código
+            // Usa o código EXATAMENTE como recebido do Mercado Pago
             
-            // Verifica se há espaços/quebras que precisam ser removidos
-            $hasSpaces = strpos($pixCode, ' ') !== false;
-            $hasNewlines = strpos($pixCode, "\n") !== false || strpos($pixCode, "\r") !== false;
-            $hasTabs = strpos($pixCode, "\t") !== false;
-            
-            // Só limpa se realmente houver espaços/quebras
-            if ($hasSpaces || $hasNewlines || $hasTabs) {
-                Log::info('Código PIX contém espaços/quebras em generateQrCodeImage - removendo', [
-                    'has_spaces' => $hasSpaces,
-                    'has_newlines' => $hasNewlines,
-                    'has_tabs' => $hasTabs
-                ]);
-                
-                $pixCode = trim($pixCode);
-                $pixCode = str_replace(["\r\n", "\n", "\r", "\t"], '', $pixCode);
-                $pixCode = preg_replace('/\s+/', '', $pixCode);
-                
-                // Valida que não foi corrompido
-                if (!str_starts_with($pixCode, '000201') && str_starts_with($pixCodeOriginal, '000201')) {
-                    Log::error('ERRO: Código PIX corrompido em generateQrCodeImage!', [
-                        'original_start' => substr($pixCodeOriginal, 0, 30),
-                        'cleaned_start' => substr($pixCode, 0, 30)
-                    ]);
-                    $pixCode = $pixCodeOriginal; // Usa o original se corrompido
-                }
-            }
-            
-            // Valida o código antes de gerar o QR Code
-            if (!str_starts_with($pixCode, '000201')) {
-                Log::error('Código PIX inválido para geração de QR Code', [
-                    'pix_code_start' => substr($pixCode, 0, 30),
-                    'pix_code_length' => strlen($pixCode),
-                    'pix_code_hex_start' => bin2hex(substr($pixCode, 0, 20))
-                ]);
-                throw new Exception('Código PIX inválido para geração de QR Code: não começa com 000201');
-            }
-            
-            if (strlen($pixCode) < 100) {
-                Log::error('Código PIX muito curto para geração de QR Code', [
-                    'pix_code_length' => strlen($pixCode)
-                ]);
-                throw new Exception('Código PIX muito curto para geração de QR Code');
-            }
-            
-            // Valida CRC (apenas informativo - NÃO corrige)
-            $pixCrcService = new PixCrcService();
-            $crcValidation = $pixCrcService->validatePixCode($pixCode);
-            
-            Log::info('Gerando QR Code para código PIX do Mercado Pago (SEM MODIFICAÇÕES)', [
+            Log::info('Gerando QR Code para código PIX (EXATAMENTE como recebido)', [
                 'pix_code_length' => strlen($pixCode),
-                'pix_code_start' => substr($pixCode, 0, 30),
-                'pix_code_end' => substr($pixCode, -10),
-                'pix_code_crc' => substr($pixCode, -4),
-                'crc_validation_valid' => $crcValidation['valid'],
-                'crc_validation_crc_valid' => $crcValidation['crc_valid'],
-                'crc_validation_current_crc' => $crcValidation['current_crc'],
-                'crc_validation_calculated_crc' => $crcValidation['calculated_crc'],
-                'pix_code_full' => $pixCode, // Log completo para validação
-                'note' => 'Usando código EXATO do Mercado Pago - não será modificado'
-            ]);
-            
-            // NÃO corrige o CRC - usa o código EXATO do Mercado Pago
-            // Se nossa validação indicar inválido, logamos mas continuamos
-            if (!$crcValidation['valid']) {
-                Log::warning('ATENÇÃO: Validação CRC indicou código inválido, mas gerando QR Code com código do Mercado Pago mesmo assim', [
-                    'current_crc' => $crcValidation['current_crc'],
-                    'calculated_crc' => $crcValidation['calculated_crc'],
-                    'note' => 'O código do Mercado Pago deve estar correto'
-                ]);
-            }
-            
-            // CRÍTICO: Gera QR Code usando o código PIX EXATO
-            // Usa configurações otimizadas para garantir que o QR Code seja legível pelos bancos
-            // Error Correction Level 'H' (High) para máxima confiabilidade
-            // Margem adequada para melhor leitura
-            // Tamanho suficiente para garantir qualidade
-            
-            // Log do código que será usado para gerar o QR Code
-            Log::info('Gerando QR Code local - código PIX que será usado', [
-                'pix_code_length' => strlen($pixCode),
-                'pix_code_start' => substr($pixCode, 0, 30),
-                'pix_code_end' => substr($pixCode, -10),
-                'pix_code_crc' => substr($pixCode, -4),
-                'pix_code_full' => $pixCode, // Log completo para validação
-                'note' => 'Código EXATO que será codificado no QR Code'
+                'pix_code_full' => $pixCode,
+                'note' => 'Código usado EXATAMENTE como recebido - SEM MODIFICAÇÕES'
             ]);
             
             // Tenta gerar PNG (melhor qualidade para QR Codes)
@@ -1383,6 +914,583 @@ class PaymentService
                 'error' => $e->getMessage()
             ];
         }
+    }
+
+    /**
+     * Verifica o status do pagamento imediatamente após criar
+     * Isso garante que pagamentos já aprovados sejam processados imediatamente
+     *
+     * @param Transaction $transaction
+     * @param PaymentGatewayConfig $gatewayConfig
+     * @return void
+     */
+    protected function checkPaymentStatusImmediately(Transaction $transaction, PaymentGatewayConfig $gatewayConfig): void
+    {
+        try {
+            if ($transaction->gateway !== 'mercadopago') {
+                return;
+            }
+
+            // Recarrega a transação para garantir que temos os dados mais recentes
+            $transaction->refresh();
+            
+            $paymentId = $transaction->gateway_transaction_id ?? $transaction->metadata['mercadopago_payment_id'] ?? null;
+            
+            if (!$paymentId) {
+                Log::warning('Não é possível verificar status: transação sem payment_id', [
+                    'transaction_id' => $transaction->id
+                ]);
+                return;
+            }
+
+            // Configura o SDK do Mercado Pago
+            MercadoPagoConfig::setAccessToken($gatewayConfig->api_key);
+            $client = new PaymentClient();
+            
+            // Busca o status atual do pagamento
+            $payment = $client->get($paymentId);
+            
+            if ($payment) {
+                $status = $payment->status ?? 'pending';
+                
+                Log::info('Verificação imediata de status do pagamento', [
+                    'transaction_id' => $transaction->id,
+                    'payment_id' => $paymentId,
+                    'status' => $status
+                ]);
+                
+                // Se já está aprovado, processa imediatamente
+                if ($status === 'approved') {
+                    Log::info('Pagamento já aprovado imediatamente após criação - processando', [
+                        'transaction_id' => $transaction->id,
+                        'payment_id' => $paymentId
+                    ]);
+                    
+                    // Recarrega relacionamentos antes de processar
+                    $transaction->load(['bot', 'contact', 'paymentPlan']);
+                    
+                    // Processa a aprovação usando o mesmo código do webhook
+                    $this->processPaymentApproval($transaction, $payment, $gatewayConfig);
+                }
+            }
+        } catch (MPApiException $e) {
+            $errorMessage = $e->getMessage();
+            $apiResponse = $e->getApiResponse();
+            $statusCode = $apiResponse ? $apiResponse->getStatusCode() : null;
+            $responseContent = $apiResponse ? $apiResponse->getContent() : null;
+            
+            // Verifica se é o erro "Chave não localizada" (payment não encontrado)
+            $isKeyNotFound = stripos($errorMessage, 'chave não localizada') !== false 
+                || stripos($errorMessage, 'key not found') !== false
+                || stripos($errorMessage, 'not found') !== false
+                || ($statusCode === 404)
+                || (isset($responseContent['message']) && (
+                    stripos($responseContent['message'], 'chave não localizada') !== false ||
+                    stripos($responseContent['message'], 'not found') !== false
+                ));
+            
+            if ($isKeyNotFound) {
+                // Pagamento não encontrado - marca transação como inválida
+                Log::warning('⚠️ Pagamento não encontrado no Mercado Pago (Chave não localizada)', [
+                    'transaction_id' => $transaction->id,
+                    'payment_id' => $paymentId,
+                    'status_code' => $statusCode,
+                    'api_response' => $responseContent,
+                    'note' => 'O payment_id pode estar incorreto ou o pagamento foi deletado no Mercado Pago'
+                ]);
+                
+                // Atualiza metadata para indicar que o pagamento não foi encontrado
+                $metadata = $transaction->metadata ?? [];
+                $metadata['payment_not_found'] = true;
+                $metadata['payment_not_found_at'] = now()->toIso8601String();
+                $metadata['payment_not_found_error'] = $errorMessage;
+                $transaction->update(['metadata' => $metadata]);
+            } else {
+                Log::warning('Erro ao verificar status do pagamento imediatamente', [
+                    'transaction_id' => $transaction->id,
+                    'payment_id' => $paymentId,
+                    'error' => $errorMessage,
+                    'status_code' => $statusCode,
+                    'api_response' => $responseContent
+                ]);
+            }
+        } catch (Exception $e) {
+            Log::warning('Erro ao verificar status do pagamento imediatamente', [
+                'transaction_id' => $transaction->id,
+                'payment_id' => $paymentId ?? null,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+        }
+    }
+
+    /**
+     * Processa a aprovação de um pagamento (reutilizável)
+     *
+     * @param Transaction $transaction
+     * @param object $payment
+     * @param PaymentGatewayConfig $gatewayConfig
+     * @return void
+     */
+    public function processPaymentApproval(Transaction $transaction, $payment, PaymentGatewayConfig $gatewayConfig): void
+    {
+        try {
+            $status = $payment->status ?? 'pending';
+            $statusDetail = $payment->status_detail ?? null;
+            
+            // Salva o status anterior
+            $oldStatus = $transaction->status;
+            
+            // Mapeia status do Mercado Pago para status interno
+            $internalStatus = 'pending';
+            if ($status === 'approved') {
+                $internalStatus = 'completed';
+            } elseif ($status === 'rejected' || $status === 'cancelled') {
+                $internalStatus = 'failed';
+            } elseif ($status === 'refunded') {
+                $internalStatus = 'refunded';
+            } elseif ($status === 'charged_back') {
+                $internalStatus = 'charged_back';
+            }
+
+            // Atualiza transação
+            $metadata = $transaction->metadata ?? [];
+            $metadata['mercadopago_status'] = $status;
+            $metadata['mercadopago_status_detail'] = $statusDetail;
+            $metadata['last_status_check'] = now()->toIso8601String();
+
+            $transaction->update([
+                'status' => $internalStatus,
+                'metadata' => $metadata
+            ]);
+            
+            // Recarrega a transação com os relacionamentos
+            $transaction->refresh();
+            $transaction->load(['bot', 'contact', 'paymentPlan']);
+
+            // Se o pagamento foi aprovado, notifica o usuário
+            if ($status === 'approved' && $internalStatus === 'completed') {
+                $shouldNotify = !in_array($oldStatus, ['approved', 'paid', 'completed']);
+                
+                if ($shouldNotify && $transaction->contact && $transaction->bot && !empty($transaction->contact->telegram_id)) {
+                    $this->sendPaymentApprovalNotification($transaction);
+                }
+            }
+        } catch (Exception $e) {
+            Log::error('Erro ao processar aprovação de pagamento', [
+                'transaction_id' => $transaction->id,
+                'error' => $e->getMessage()
+            ]);
+        }
+    }
+
+    /**
+     * Envia notificação de pagamento aprovado
+     *
+     * @param Transaction $transaction
+     * @return void
+     */
+    public function sendPaymentApprovalNotification(Transaction $transaction): void
+    {
+        try {
+            $telegramService = app(\App\Services\TelegramService::class);
+            $paymentPlan = $transaction->paymentPlan;
+            $amount = number_format($transaction->amount, 2, ',', '.');
+            
+            $message = "✅ <b>Pagamento Confirmado!</b>\n\n";
+            $message .= "Olá " . ($transaction->contact->first_name ?? 'Cliente') . ",\n\n";
+            $message .= "Seu pagamento foi confirmado com sucesso!\n\n";
+            $message .= "📦 <b>Plano:</b> " . ($paymentPlan->title ?? 'N/A') . "\n";
+            $message .= "💰 <b>Valor:</b> R$ {$amount}\n\n";
+            
+            // Busca o link do grupo para enviar ao usuário - ESTRATÉGIA ROBUSTA
+            // Esta função garante que sempre tentará encontrar um link do grupo
+            $groupLink = $this->findGroupInviteLink($transaction, $telegramService);
+            
+            // CRÍTICO: O link do grupo é IMPRESCINDÍVEL
+            // Se não encontrou, tenta mais uma vez com estratégias alternativas
+            if (!$groupLink) {
+                Log::error('❌ Link do grupo NÃO encontrado - tentando estratégias alternativas', [
+                    'transaction_id' => $transaction->id,
+                    'bot_id' => $transaction->bot_id,
+                    'payment_plan_id' => $paymentPlan->id ?? null
+                ]);
+                
+                // Última tentativa: busca qualquer grupo do bot sem filtros
+                $lastResortGroup = \App\Models\TelegramGroup::where('bot_id', $transaction->bot_id)
+                    ->whereNotNull('invite_link')
+                    ->orderBy('updated_at', 'desc')
+                    ->first();
+                
+                if ($lastResortGroup && $lastResortGroup->invite_link) {
+                    $groupLink = $lastResortGroup->invite_link;
+                    Log::warning('⚠️ Usando link de grupo encontrado em última tentativa', [
+                        'transaction_id' => $transaction->id,
+                        'group_id' => $lastResortGroup->id,
+                        'invite_link' => $groupLink
+                    ]);
+                }
+            }
+            
+            // Adiciona o link do grupo na mensagem
+            if ($groupLink) {
+                $message .= "🔗 <b>Acesse nosso grupo exclusivo:</b>\n";
+                $message .= "{$groupLink}\n\n";
+                Log::info('✅ Link do grupo adicionado à mensagem', [
+                    'transaction_id' => $transaction->id,
+                    'group_link' => $groupLink
+                ]);
+            } else {
+                // Se ainda não tem link, adiciona uma mensagem de erro mas NÃO bloqueia o envio
+                // O pagamento foi confirmado, então a mensagem deve ser enviada mesmo sem link
+                Log::error('❌ CRÍTICO: Link do grupo NÃO encontrado após todas as tentativas', [
+                    'transaction_id' => $transaction->id,
+                    'bot_id' => $transaction->bot_id,
+                    'payment_plan_id' => $paymentPlan->id ?? null,
+                    'bot_telegram_group_id' => $transaction->bot->telegram_group_id ?? null,
+                    'action_required' => 'Verifique se há grupos configurados para este bot/plano'
+                ]);
+                
+                // Adiciona mensagem informando que o link será enviado posteriormente
+                $message .= "⚠️ <i>O link do grupo será enviado em breve. Entre em contato conosco se necessário.</i>\n\n";
+            }
+            
+            $message .= "Obrigado pela sua compra! 🎉";
+            
+            // Envia a mensagem
+            try {
+                $telegramService->sendMessage(
+                    $transaction->bot,
+                    $transaction->contact->telegram_id,
+                    $message
+                );
+                
+                Log::info('✅ Notificação de pagamento aprovado enviada', [
+                    'transaction_id' => $transaction->id,
+                    'contact_id' => $transaction->contact->id,
+                    'contact_telegram_id' => $transaction->contact->telegram_id,
+                    'group_link_sent' => !empty($groupLink),
+                    'group_link' => $groupLink,
+                    'message_length' => strlen($message),
+                    'message_preview' => substr($message, 0, 200)
+                ]);
+            } catch (\Exception $e) {
+                Log::error('❌ Erro ao enviar mensagem de notificação', [
+                    'transaction_id' => $transaction->id,
+                    'contact_telegram_id' => $transaction->contact->telegram_id,
+                    'error' => $e->getMessage()
+                ]);
+                throw $e; // Re-lança para que o erro seja tratado no nível superior
+            }
+        } catch (\Exception $e) {
+            Log::error('Erro ao enviar notificação de pagamento aprovado', [
+                'transaction_id' => $transaction->id,
+                'error' => $e->getMessage()
+            ]);
+        }
+    }
+
+    /**
+     * Busca o link de convite do grupo usando múltiplas estratégias
+     * Garante que sempre tenta encontrar um link antes de desistir
+     *
+     * @param Transaction $transaction
+     * @param \App\Services\TelegramService $telegramService
+     * @return string|null
+     */
+    protected function findGroupInviteLink(Transaction $transaction, \App\Services\TelegramService $telegramService): ?string
+    {
+        $groupLink = null;
+        $paymentPlan = $transaction->paymentPlan;
+        
+        Log::info('🔍 Iniciando busca ROBUSTA de link do grupo para notificação de pagamento', [
+            'transaction_id' => $transaction->id,
+            'bot_id' => $transaction->bot_id,
+            'payment_plan_id' => $paymentPlan->id ?? null,
+            'bot_telegram_group_id' => $transaction->bot->telegram_group_id ?? null
+        ]);
+        
+        // ESTRATÉGIA 1: Busca grupo associado ao plano de pagamento (com link salvo)
+        if ($paymentPlan) {
+            $telegramGroup = \App\Models\TelegramGroup::where('bot_id', $transaction->bot_id)
+                ->where('payment_plan_id', $paymentPlan->id)
+                ->where('active', true)
+                ->first();
+            
+            if ($telegramGroup) {
+                Log::info('✅ Grupo associado ao plano encontrado', [
+                    'transaction_id' => $transaction->id,
+                    'group_id' => $telegramGroup->id,
+                    'telegram_group_id' => $telegramGroup->telegram_group_id,
+                    'has_invite_link' => !empty($telegramGroup->invite_link)
+                ]);
+                
+                $groupLink = $this->getLinkFromGroup($telegramGroup, $transaction, $telegramService, 'plano de pagamento');
+                if ($groupLink) {
+                    return $groupLink;
+                }
+            } else {
+                Log::info('⚠️ Grupo associado ao plano não encontrado', [
+                    'transaction_id' => $transaction->id,
+                    'payment_plan_id' => $paymentPlan->id
+                ]);
+            }
+        }
+        
+        // ESTRATÉGIA 2: Busca qualquer grupo ativo do bot (prioriza grupos com link salvo)
+        // Primeiro tenta grupos com link salvo
+        $anyGroupWithLink = \App\Models\TelegramGroup::where('bot_id', $transaction->bot_id)
+            ->where('active', true)
+            ->whereNotNull('invite_link')
+            ->orderBy('updated_at', 'desc')
+            ->first();
+        
+        if ($anyGroupWithLink) {
+            Log::info('✅ Grupo ativo do bot com link salvo encontrado', [
+                'transaction_id' => $transaction->id,
+                'group_id' => $anyGroupWithLink->id,
+                'telegram_group_id' => $anyGroupWithLink->telegram_group_id,
+                'payment_plan_id' => $anyGroupWithLink->payment_plan_id
+            ]);
+            
+            $groupLink = $this->getLinkFromGroup($anyGroupWithLink, $transaction, $telegramService, 'grupo ativo com link salvo');
+            if ($groupLink) {
+                return $groupLink;
+            }
+        }
+        
+        // Se não encontrou com link, busca qualquer grupo ativo
+        $anyGroup = \App\Models\TelegramGroup::where('bot_id', $transaction->bot_id)
+            ->where('active', true)
+            ->whereNotNull('telegram_group_id')
+            ->orderBy('created_at', 'desc')
+            ->first();
+        
+        if ($anyGroup) {
+            Log::info('✅ Grupo ativo do bot encontrado (qualquer grupo)', [
+                'transaction_id' => $transaction->id,
+                'group_id' => $anyGroup->id,
+                'telegram_group_id' => $anyGroup->telegram_group_id,
+                'payment_plan_id' => $anyGroup->payment_plan_id
+            ]);
+            
+            $groupLink = $this->getLinkFromGroup($anyGroup, $transaction, $telegramService, 'qualquer grupo ativo do bot');
+            if ($groupLink) {
+                return $groupLink;
+            }
+        } else {
+            Log::info('⚠️ Nenhum grupo ativo encontrado no banco de dados', [
+                'transaction_id' => $transaction->id,
+                'bot_id' => $transaction->bot_id
+            ]);
+        }
+        
+        // ESTRATÉGIA 3: Usa o grupo do bot (telegram_group_id do modelo Bot)
+        if (!empty($transaction->bot->telegram_group_id)) {
+            Log::info('✅ Tentando usar grupo do bot (telegram_group_id)', [
+                'transaction_id' => $transaction->id,
+                'bot_telegram_group_id' => $transaction->bot->telegram_group_id
+            ]);
+            
+            $groupLink = $this->getLinkFromTelegramId(
+                $transaction->bot->telegram_group_id,
+                $transaction,
+                $telegramService,
+                'grupo do bot'
+            );
+            if ($groupLink) {
+                return $groupLink;
+            }
+        }
+        
+        // ESTRATÉGIA 4: Busca grupos inativos também (última tentativa)
+        $inactiveGroup = \App\Models\TelegramGroup::where('bot_id', $transaction->bot_id)
+            ->whereNotNull('telegram_group_id')
+            ->whereNotNull('invite_link')
+            ->orderBy('created_at', 'desc')
+            ->first();
+        
+        if ($inactiveGroup && $inactiveGroup->invite_link) {
+            Log::warning('⚠️ Usando grupo inativo com link salvo (última tentativa)', [
+                'transaction_id' => $transaction->id,
+                'group_id' => $inactiveGroup->id,
+                'active' => $inactiveGroup->active
+            ]);
+            return $inactiveGroup->invite_link;
+        }
+        
+        Log::error('❌ FALHA CRÍTICA: Nenhum link de grupo encontrado após todas as estratégias', [
+            'transaction_id' => $transaction->id,
+            'bot_id' => $transaction->bot_id,
+            'payment_plan_id' => $paymentPlan->id ?? null
+        ]);
+        
+        return null;
+    }
+
+    /**
+     * Obtém o link de um grupo Telegram usando múltiplas estratégias
+     *
+     * @param \App\Models\TelegramGroup $telegramGroup
+     * @param Transaction $transaction
+     * @param \App\Services\TelegramService $telegramService
+     * @param string $source
+     * @return string|null
+     */
+    protected function getLinkFromGroup(
+        \App\Models\TelegramGroup $telegramGroup,
+        Transaction $transaction,
+        \App\Services\TelegramService $telegramService,
+        string $source
+    ): ?string {
+        // Estratégia 1: Link salvo no banco
+        if ($telegramGroup->invite_link) {
+            Log::info("✅ Link encontrado no banco de dados ({$source})", [
+                'transaction_id' => $transaction->id,
+                'group_id' => $telegramGroup->id,
+                'invite_link' => $telegramGroup->invite_link
+            ]);
+            return $telegramGroup->invite_link;
+        }
+        
+        // Estratégia 2: Gerar link para grupos com username (@)
+        if ($telegramGroup->telegram_group_id && str_starts_with($telegramGroup->telegram_group_id, '@')) {
+            $generatedLink = $telegramGroup->generateInviteLink();
+            if ($generatedLink) {
+                Log::info("✅ Link gerado para grupo com username ({$source})", [
+                    'transaction_id' => $transaction->id,
+                    'group_id' => $telegramGroup->id,
+                    'invite_link' => $generatedLink
+                ]);
+                // Salva o link gerado
+                $telegramGroup->update(['invite_link' => $generatedLink]);
+                return $generatedLink;
+            }
+        }
+        
+        // Estratégia 3: Obter link via API do Telegram
+        if ($telegramGroup->telegram_group_id) {
+            try {
+                Log::info("🔄 Tentando obter link via API do Telegram ({$source})", [
+                    'transaction_id' => $transaction->id,
+                    'group_id' => $telegramGroup->id,
+                    'telegram_group_id' => $telegramGroup->telegram_group_id
+                ]);
+                
+                $botInfo = $telegramService->validateToken($transaction->bot->token);
+                $botIdForLink = $botInfo['valid'] && isset($botInfo['bot']['id']) ? $botInfo['bot']['id'] : null;
+                
+                $linkResult = $telegramService->getChatInviteLink(
+                    $transaction->bot->token,
+                    $telegramGroup->telegram_group_id,
+                    $botIdForLink
+                );
+                
+                if ($linkResult['success'] && $linkResult['invite_link']) {
+                    $link = $linkResult['invite_link'];
+                    // Salva o link no banco para uso futuro
+                    $telegramGroup->update(['invite_link' => $link]);
+                    Log::info("✅ Link obtido via API e salvo no banco ({$source})", [
+                        'transaction_id' => $transaction->id,
+                        'group_id' => $telegramGroup->id,
+                        'invite_link' => $link
+                    ]);
+                    return $link;
+                } else {
+                    Log::warning("⚠️ Falha ao obter link via API ({$source})", [
+                        'transaction_id' => $transaction->id,
+                        'group_id' => $telegramGroup->id,
+                        'error' => $linkResult['error'] ?? 'Erro desconhecido',
+                        'details' => $linkResult['details'] ?? null
+                    ]);
+                }
+            } catch (\Exception $e) {
+                Log::error("❌ Exceção ao obter link via API ({$source})", [
+                    'transaction_id' => $transaction->id,
+                    'group_id' => $telegramGroup->id,
+                    'error' => $e->getMessage()
+                ]);
+            }
+        }
+        
+        return null;
+    }
+
+    /**
+     * Obtém o link diretamente de um telegram_group_id (sem modelo TelegramGroup)
+     *
+     * @param string $telegramGroupId
+     * @param Transaction $transaction
+     * @param \App\Services\TelegramService $telegramService
+     * @param string $source
+     * @return string|null
+     */
+    protected function getLinkFromTelegramId(
+        string $telegramGroupId,
+        Transaction $transaction,
+        \App\Services\TelegramService $telegramService,
+        string $source
+    ): ?string {
+        try {
+            // Se começa com @, gera link direto
+            if (str_starts_with($telegramGroupId, '@')) {
+                $link = 'https://t.me/' . ltrim($telegramGroupId, '@');
+                Log::info("✅ Link gerado para grupo com username ({$source})", [
+                    'transaction_id' => $transaction->id,
+                    'telegram_group_id' => $telegramGroupId,
+                    'invite_link' => $link
+                ]);
+                return $link;
+            }
+            
+            // Tenta obter via API
+            Log::info("🔄 Tentando obter link via API do Telegram ({$source})", [
+                'transaction_id' => $transaction->id,
+                'telegram_group_id' => $telegramGroupId
+            ]);
+            
+            $botInfo = $telegramService->validateToken($transaction->bot->token);
+            $botIdForLink = $botInfo['valid'] && isset($botInfo['bot']['id']) ? $botInfo['bot']['id'] : null;
+            
+            $linkResult = $telegramService->getChatInviteLink(
+                $transaction->bot->token,
+                $telegramGroupId,
+                $botIdForLink
+            );
+            
+            if ($linkResult['success'] && $linkResult['invite_link']) {
+                $link = $linkResult['invite_link'];
+                Log::info("✅ Link obtido via API ({$source})", [
+                    'transaction_id' => $transaction->id,
+                    'telegram_group_id' => $telegramGroupId,
+                    'invite_link' => $link
+                ]);
+                
+                // Tenta salvar no banco se encontrar o grupo
+                $telegramGroup = \App\Models\TelegramGroup::where('bot_id', $transaction->bot_id)
+                    ->where('telegram_group_id', $telegramGroupId)
+                    ->first();
+                if ($telegramGroup) {
+                    $telegramGroup->update(['invite_link' => $link]);
+                }
+                
+                return $link;
+            } else {
+                Log::warning("⚠️ Falha ao obter link via API ({$source})", [
+                    'transaction_id' => $transaction->id,
+                    'telegram_group_id' => $telegramGroupId,
+                    'error' => $linkResult['error'] ?? 'Erro desconhecido'
+                ]);
+            }
+        } catch (\Exception $e) {
+            Log::error("❌ Exceção ao obter link ({$source})", [
+                'transaction_id' => $transaction->id,
+                'telegram_group_id' => $telegramGroupId,
+                'error' => $e->getMessage()
+            ]);
+        }
+        
+        return null;
     }
 }
 

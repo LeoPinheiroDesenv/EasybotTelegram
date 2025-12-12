@@ -25,6 +25,10 @@ export const useConfirm = () => {
           setDialog((prev) => ({ ...prev, isOpen: false }));
           resolve(true);
         },
+        onCancel: () => {
+          setDialog((prev) => ({ ...prev, isOpen: false }));
+          resolve(false);
+        },
       });
     });
   }, []);
@@ -38,6 +42,7 @@ export const useConfirm = () => {
       isOpen={dialog.isOpen}
       onClose={close}
       onConfirm={dialog.onConfirm}
+      onCancel={dialog.onCancel}
       title={dialog.title}
       message={dialog.message}
       type={dialog.type}

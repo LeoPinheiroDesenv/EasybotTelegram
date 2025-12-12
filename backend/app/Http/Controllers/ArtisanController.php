@@ -18,6 +18,8 @@ class ArtisanController extends Controller
         'route:clear' => 'Limpar cache de rotas',
         'view:clear' => 'Limpar cache de views',
         'pix:crc-diagnostic-report' => 'Gerar relatório de diagnóstico de CRC PIX',
+        'pix:check-expiration' => 'Verificar expiração de PIX pendentes e notificar usuários',
+        'payments:check-pending' => 'Verificar pagamentos pendentes e processar aprovações automaticamente',
     ];
 
     /**
@@ -56,6 +58,28 @@ class ArtisanController extends Controller
                     '--days' => (int) $days,
                     '--output' => $output,
                 ];
+            }
+            
+            // Comando pix:check-expiration com parâmetros
+            if ($command === 'pix:check-expiration') {
+                if (isset($parameters['bot_id']) && $parameters['bot_id'] !== '') {
+                    $commandParameters['--bot-id'] = (int) $parameters['bot_id'];
+                }
+                
+                if (isset($parameters['dry_run']) && $parameters['dry_run'] === true) {
+                    $commandParameters['--dry-run'] = true;
+                }
+            }
+            
+            // Comando payments:check-pending com parâmetros
+            if ($command === 'payments:check-pending') {
+                if (isset($parameters['bot_id']) && $parameters['bot_id'] !== '') {
+                    $commandParameters['--bot-id'] = (int) $parameters['bot_id'];
+                }
+                
+                if (isset($parameters['interval']) && $parameters['interval'] !== '') {
+                    $commandParameters['--interval'] = (int) $parameters['interval'];
+                }
             }
 
             // Executa o comando com parâmetros
@@ -183,6 +207,40 @@ class ArtisanController extends Controller
                         'description' => 'Formato de saída (console, json, file)',
                         'required' => false,
                         'options' => ['console', 'json', 'file'],
+                    ],
+                ];
+            }
+            
+            if ($command === 'pix:check-expiration') {
+                $commandInfo['parameters'] = [
+                    'bot_id' => [
+                        'type' => 'integer',
+                        'default' => null,
+                        'description' => 'ID do bot específico (opcional - deixe vazio para verificar todos)',
+                        'required' => false,
+                    ],
+                    'dry_run' => [
+                        'type' => 'boolean',
+                        'default' => false,
+                        'description' => 'Simular sem enviar notificações',
+                        'required' => false,
+                    ],
+                ];
+            }
+            
+            if ($command === 'payments:check-pending') {
+                $commandInfo['parameters'] = [
+                    'bot_id' => [
+                        'type' => 'integer',
+                        'default' => null,
+                        'description' => 'ID do bot específico (opcional - deixe vazio para verificar todos)',
+                        'required' => false,
+                    ],
+                    'interval' => [
+                        'type' => 'integer',
+                        'default' => 30,
+                        'description' => 'Intervalo em segundos desde a última verificação (padrão: 30)',
+                        'required' => false,
                     ],
                 ];
             }

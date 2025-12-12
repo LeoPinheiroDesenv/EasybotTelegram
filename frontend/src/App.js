@@ -32,6 +32,8 @@ import FtpManager from './pages/FtpManager';
 import CardPayment from './pages/CardPayment';
 import StorageSettings from './pages/StorageSettings';
 import ArtisanCommands from './pages/ArtisanCommands';
+import CronJobs from './pages/CronJobs';
+import LaravelLogs from './pages/LaravelLogs';
 import ManageBot from './pages/ManageBot';
 import BotList from './pages/BotList';
 import PaymentStatus from './pages/PaymentStatus';
@@ -308,6 +310,22 @@ function App() {
               element={
                 <ProtectedRoute>
                   <ArtisanCommands />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/settings/cron-jobs"
+              element={
+                <ProtectedRoute>
+                  <CronJobs />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/settings/laravel-logs"
+              element={
+                <ProtectedRoute>
+                  <LaravelLogs />
                 </ProtectedRoute>
               }
             />

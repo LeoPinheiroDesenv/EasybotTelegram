@@ -41,6 +41,14 @@ const paymentStatusService = {
       params: { days }
     });
     return response.data;
+  },
+
+  /**
+   * Obtém detalhes completos da transação incluindo metadata do gateway
+   */
+  async getTransactionDetails(transactionId) {
+    const response = await api.get(`/payment-status/transaction/${transactionId}`);
+    return response.data;
   }
 };
 

@@ -1,0 +1,425 @@
+.laravel-logs-container {
+  padding: 20px;
+  max-width: 100%;
+  min-height: calc(100vh - 80px);
+  display: flex;
+  flex-direction: column;
+}
+
+.laravel-logs-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding-bottom: 15px;
+  border-bottom: 2px solid #e0e0e0;
+}
+
+.laravel-logs-header h1 {
+  margin: 0;
+  color: #333;
+  font-size: 24px;
+}
+
+.laravel-logs-header h1 svg {
+  margin-right: 10px;
+  color: #007bff;
+}
+
+.header-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.laravel-logs-layout {
+  display: flex;
+  gap: 20px;
+  flex: 1;
+  min-height: 0;
+}
+
+/* Sidebar de arquivos */
+.log-files-sidebar {
+  width: 350px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  padding: 15px;
+  overflow-y: auto;
+  border: 1px solid #dee2e6;
+}
+
+.log-files-sidebar h3 {
+  margin: 0 0 15px 0;
+  color: #333;
+  font-size: 18px;
+}
+
+.log-files-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.log-file-item {
+  background: white;
+  border: 1px solid #dee2e6;
+  border-radius: 6px;
+  padding: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+  position: relative;
+}
+
+.log-file-item:hover {
+  border-color: #007bff;
+  box-shadow: 0 2px 4px rgba(0, 123, 255, 0.1);
+}
+
+.log-file-item.active {
+  border-color: #007bff;
+  background: #e7f3ff;
+}
+
+.log-file-name {
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.log-file-name svg {
+  color: #007bff;
+}
+
+.log-file-info {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: #666;
+  margin-bottom: 8px;
+}
+
+.log-file-actions {
+  display: flex;
+  gap: 5px;
+  justify-content: flex-end;
+  margin-top: 8px;
+}
+
+.btn-icon {
+  background: transparent;
+  border: 1px solid #dee2e6;
+  border-radius: 4px;
+  padding: 4px 8px;
+  cursor: pointer;
+  color: #666;
+  transition: all 0.2s;
+}
+
+.btn-icon:hover {
+  background: #f8f9fa;
+  border-color: #adb5bd;
+}
+
+.btn-icon.btn-danger {
+  color: #dc3545;
+  border-color: #dc3545;
+}
+
+.btn-icon.btn-danger:hover {
+  background: #dc3545;
+  color: white;
+}
+
+/* Área de conteúdo */
+.log-content-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: white;
+  border-radius: 8px;
+  border: 1px solid #dee2e6;
+  overflow: hidden;
+  min-width: 0;
+}
+
+.log-content-header {
+  padding: 15px;
+  border-bottom: 1px solid #dee2e6;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 15px;
+}
+
+.log-file-details h3 {
+  margin: 0 0 5px 0;
+  color: #333;
+  font-size: 18px;
+}
+
+.file-info {
+  display: flex;
+  gap: 15px;
+  font-size: 12px;
+  color: #666;
+}
+
+.log-content-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.log-filters {
+  padding: 15px;
+  background: #f8f9fa;
+  border-bottom: 1px solid #dee2e6;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 15px;
+  align-items: center;
+}
+
+.filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.filter-group label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #333;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.filter-group input[type="text"],
+.filter-group input[type="number"],
+.filter-group select {
+  padding: 6px 10px;
+  border: 1px solid #dee2e6;
+  border-radius: 4px;
+  font-size: 14px;
+  width: 150px;
+}
+
+.filter-group input[type="checkbox"] {
+  margin-right: 5px;
+}
+
+.refresh-interval {
+  margin-left: 10px;
+}
+
+.refresh-interval input {
+  width: 80px;
+  margin-left: 5px;
+}
+
+.log-content-wrapper {
+  flex: 1;
+  overflow-y: auto;
+  padding: 15px;
+  background: #ffffff;
+  color: #333333;
+  font-family: 'Courier New', monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+}
+
+.log-content {
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+.log-line {
+  margin-bottom: 2px;
+  padding: 2px 0;
+  position: relative;
+}
+
+.log-line-empty {
+  height: 4px;
+}
+
+.log-line-toggle {
+  background: transparent;
+  border: none;
+  color: #666;
+  cursor: pointer;
+  padding: 2px 5px;
+  margin-right: 5px;
+  font-size: 10px;
+}
+
+.log-line-toggle:hover {
+  color: #333;
+}
+
+.log-line-content {
+  display: inline;
+}
+
+/* Cores por nível */
+.log-level-emergency,
+.log-level-alert,
+.log-level-critical,
+.log-level-error {
+  font-weight: 600;
+}
+
+.log-level-warning {
+  font-weight: 500;
+}
+
+/* Resultado teste cPanel */
+.cpanel-test-result {
+  padding: 12px 15px;
+  border-radius: 6px;
+  margin-bottom: 15px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.cpanel-test-result.success {
+  background: #d4edda;
+  color: #155724;
+  border: 1px solid #c3e6cb;
+}
+
+.cpanel-test-result.error {
+  background: #f8d7da;
+  color: #721c24;
+  border: 1px solid #f5c6cb;
+}
+
+.cron-jobs-count {
+  font-weight: 600;
+}
+
+/* Estados vazios e loading */
+.empty-state,
+.loading {
+  text-align: center;
+  padding: 40px;
+  color: #666;
+  font-size: 16px;
+}
+
+.loading {
+  color: #007bff;
+}
+
+/* Botões */
+.btn {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: #007bff;
+  color: white;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: #0056b3;
+}
+
+.btn-secondary {
+  background: #6c757d;
+  color: white;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: #545b62;
+}
+
+.btn-success {
+  background: #28a745;
+  color: white;
+}
+
+.btn-success:hover:not(:disabled) {
+  background: #218838;
+}
+
+.btn-danger {
+  background: #dc3545;
+  color: white;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: #c82333;
+}
+
+/* Responsivo */
+@media (max-width: 1200px) {
+  .laravel-logs-layout {
+    flex-direction: column;
+  }
+
+  .log-files-sidebar {
+    width: 100%;
+    max-height: 300px;
+  }
+}
+
+@media (max-width: 768px) {
+  .laravel-logs-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 15px;
+  }
+
+  .header-actions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .log-content-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .log-content-actions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .log-filters {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .filter-group {
+    width: 100%;
+  }
+
+  .filter-group input[type="text"],
+  .filter-group input[type="number"],
+  .filter-group select {
+    width: 100%;
+  }
+}

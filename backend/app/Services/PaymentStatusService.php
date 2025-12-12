@@ -70,6 +70,8 @@ class PaymentStatusService
                 'status' => $lastApprovedTransaction->status,
                 'created_at' => $lastApprovedTransaction->created_at,
                 'payment_method' => $lastApprovedTransaction->payment_method,
+                'gateway' => $lastApprovedTransaction->gateway,
+                'gateway_transaction_id' => $lastApprovedTransaction->gateway_transaction_id,
             ],
             'payment_plan' => [
                 'id' => $paymentPlan->id,

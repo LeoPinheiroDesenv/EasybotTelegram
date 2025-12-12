@@ -35,6 +35,8 @@ const Sidebar = ({ isOpen, onClose }) => {
     location.pathname === '/logs' ||
     location.pathname === '/ftp' ||
     location.pathname === '/settings/artisan' ||
+    location.pathname === '/settings/cron-jobs' ||
+    location.pathname === '/settings/laravel-logs' ||
     location.pathname === '/settings/profile' ||
     location.pathname.includes('/botfather')
   );
@@ -427,13 +429,29 @@ const Sidebar = ({ isOpen, onClose }) => {
                     </>
                   )}
                   {user?.user_type === 'super_admin' && (
-                    <Link
-                      to="/settings/artisan"
-                      className={`sidebar-submenu-item ${location.pathname === '/settings/artisan' ? 'active' : ''}`}
-                      onClick={onClose}
-                    >
-                      Comandos Artisan
-                    </Link>
+                    <>
+                      <Link
+                        to="/settings/artisan"
+                        className={`sidebar-submenu-item ${location.pathname === '/settings/artisan' ? 'active' : ''}`}
+                        onClick={onClose}
+                      >
+                        Comandos Artisan
+                      </Link>
+                      <Link
+                        to="/settings/cron-jobs"
+                        className={`sidebar-submenu-item ${location.pathname === '/settings/cron-jobs' ? 'active' : ''}`}
+                        onClick={onClose}
+                      >
+                        Cron Jobs
+                      </Link>
+                      <Link
+                        to="/settings/laravel-logs"
+                        className={`sidebar-submenu-item ${location.pathname === '/settings/laravel-logs' ? 'active' : ''}`}
+                        onClick={onClose}
+                      >
+                        Logs do Laravel
+                      </Link>
+                    </>
                   )}
                   {/* Admins e super_admin podem ver Usuários */}
                   {isAdmin && (

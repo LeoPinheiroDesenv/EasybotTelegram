@@ -3,6 +3,7 @@
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Console\Scheduling\Schedule;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -11,6 +12,19 @@ return Application::configure(basePath: dirname(__DIR__))
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
     )
+    ->withSchedule(function (Schedule $schedule): void {
+        // Verifica expiração de PIX a cada 5 minutos
+        $schedule->command('pix:check-expiration')
+            ->everyFiveMinutes()
+            ->withoutOverlapping()
+            ->runInBackground();
+        
+        // NOTA: O scheduler do Laravel requer acesso ao terminal do servidor para funcionar
+        // Como não temos acesso ao terminal em produção, o polling de pagamentos pendentes
+        // deve ser feito via chamadas HTTP periódicas ao endpoint /api/payments/check-pending
+        // Use um serviço externo de cron (como EasyCron, cron-job.org, etc.) para chamar o endpoint
+        // O endpoint retorna 'next_check_in_seconds' indicando quando deve ser chamado novamente
+    })
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
             'admin' => \App\Http\Middleware\AdminMiddleware::class,
