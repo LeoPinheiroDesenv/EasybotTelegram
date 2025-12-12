@@ -374,25 +374,67 @@ class BotFatherController extends Controller
                 $finalRights[$key] = (bool)$value;
             }
             
+            // IMPORTANTE: O Telegram requer que pelo menos uma permissão seja true
+            // Se todas forem false, o Telegram pode ignorar ou rejeitar a requisição
+            $hasAtLeastOneTrue = false;
+            foreach ($finalRights as $value) {
+                if ($value === true) {
+                    $hasAtLeastOneTrue = true;
+                    break;
+                }
+            }
+            
+            if (!$hasAtLeastOneTrue) {
+                Log::warning('BotFather: Todas as permissões estão como false. O Telegram pode não aplicar os direitos padrão.', [
+                    'bot_id' => $botId,
+                    'rights' => $finalRights
+                ]);
+            }
+            
             Log::info('BotFather: Direitos finais preparados para envio', [
                 'bot_id' => $botId,
                 'final_rights' => $finalRights,
-                'rights_count' => count($finalRights)
+                'rights_count' => count($finalRights),
+                'has_at_least_one_true' => $hasAtLeastOneTrue,
+                'true_permissions' => array_keys(array_filter($finalRights, fn($v) => $v === true))
             ]);
 
             // Prepara os dados para envio ao Telegram
-            // O Telegram aceita todas as permissões explicitamente (true e false)
-            $data = ['rights' => $finalRights];
+            // IMPORTANTE: Segundo a documentação do Telegram, o método setMyDefaultAdministratorRights
+            // aceita um objeto ChatAdministratorRights com todas as permissões como propriedades booleanas.
+            // O Telegram aceita todas as permissões explicitamente (true e false).
+            // 
+            // ESTRATÉGIA: Enviamos todas as permissões explicitamente quando houver pelo menos uma true.
+            // Se todas forem false, enviamos um objeto vazio para limpar os direitos padrão.
+            
+            if (!$hasAtLeastOneTrue) {
+                // Se todas as permissões são false, envia um objeto vazio para limpar direitos padrão
+                Log::warning('BotFather: Todas as permissões estão como false. Enviando objeto vazio para limpar direitos padrão.', [
+                    'bot_id' => $botId,
+                    'all_rights' => $finalRights
+                ]);
+                $rightsToSend = [];
+            } else {
+                // Envia todas as permissões explicitamente (true e false)
+                // Isso garante que o Telegram aplique corretamente todas as permissões
+                $rightsToSend = $finalRights;
+            }
+            
+            $data = ['rights' => $rightsToSend];
             // Sempre envia for_channels para garantir que está configurado corretamente
             $data['for_channels'] = $forChannels;
-
-            Log::info('BotFather: Enviando direitos de administrador', [
+            
+            Log::info('BotFather: Direitos preparados para envio', [
                 'bot_id' => $botId,
-                'rights' => $finalRights,
+                'rights_to_send' => $rightsToSend,
+                'rights_count' => count($rightsToSend),
+                'all_rights' => $finalRights,
                 'for_channels' => $forChannels,
                 'data' => $data
             ]);
 
+            // Envia a requisição ao Telegram
+            // O Telegram espera um objeto ChatAdministratorRights com todas as permissões
             $result = $this->http()
                 ->asJson()
                 ->post("https://api.telegram.org/bot{$bot->token}/setMyDefaultAdministratorRights", $data);
@@ -403,20 +445,48 @@ class BotFatherController extends Controller
                 'bot_id' => $botId,
                 'successful' => $result->successful(),
                 'status' => $result->status(),
-                'response' => $responseData
+                'status_code' => $result->status(),
+                'response' => $responseData,
+                'response_body' => $result->body()
             ]);
             
             if ($result->successful() && ($responseData['ok'] ?? false)) {
+                // Verifica se o resultado contém os direitos aplicados
+                $appliedRights = $responseData['result'] ?? null;
+                
                 Log::info('BotFather: Direitos de administrador atualizados com sucesso', [
                     'bot_id' => $botId,
                     'response' => $responseData,
-                    'sent_rights' => $finalRights
+                    'sent_rights' => $rightsToSend,
+                    'all_rights' => $finalRights,
+                    'applied_rights' => $appliedRights
                 ]);
+                
+                if ($appliedRights) {
+                    Log::info('BotFather: Direitos aplicados pelo Telegram confirmados', [
+                        'bot_id' => $botId,
+                        'applied_rights' => $appliedRights,
+                        'applied_rights_keys' => array_keys($appliedRights ?? [])
+                    ]);
+                } else {
+                    Log::warning('BotFather: Resposta do Telegram não contém direitos aplicados', [
+                        'bot_id' => $botId,
+                        'response' => $responseData
+                    ]);
+                }
+                
+                // IMPORTANTE: Os direitos padrão são apenas sugestões quando o bot é adicionado a um grupo
+                // Eles não são aplicados automaticamente a grupos onde o bot já é administrador
+                // Para aplicar os direitos a um grupo existente, é necessário usar promoteChatMember
+                
                 return response()->json([
                     'success' => true, 
-                    'message' => 'Direitos padrão de administrador atualizados com sucesso',
+                    'message' => 'Direitos padrão de administrador atualizados com sucesso. Estes direitos serão sugeridos quando o bot for adicionado a novos grupos.',
                     'rights' => $finalRights,
-                    'telegram_response' => $responseData
+                    'rights_sent' => $rightsToSend,
+                    'telegram_response' => $responseData,
+                    'applied_rights' => $appliedRights,
+                    'note' => 'Os direitos padrão são aplicados apenas quando o bot é adicionado a novos grupos. Para grupos existentes, é necessário promover o bot novamente.'
                 ]);
             }
 

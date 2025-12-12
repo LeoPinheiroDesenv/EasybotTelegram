@@ -742,7 +742,7 @@ class CpanelService
         $minute = $parts[0] ?? '*';
         
         // Converte */1 para * (a cada minuto)
-        if ($minute === '*/1' || $minute === '*/1 * * * *') {
+        if ($minute === '*/1') {
             return '*';
         }
         

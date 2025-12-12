@@ -265,11 +265,15 @@ const BotFather = () => {
       console.log('Resposta do servidor:', response);
       
       if (response.success) {
-        setSuccess('Direitos padrão de administrador atualizados com sucesso!');
+        let successMessage = 'Direitos padrão de administrador atualizados com sucesso!';
+        if (response.note) {
+          successMessage += '\n\n' + response.note;
+        }
+        setSuccess(successMessage);
         // Aguarda um pouco para garantir que o Telegram processou a requisição
         await new Promise(resolve => setTimeout(resolve, 1500));
         await loadBotInfo();
-        setTimeout(() => setSuccess(''), 3000);
+        setTimeout(() => setSuccess(''), 5000);
       } else {
         const errorMsg = response.error || 'Erro ao atualizar direitos de administrador';
         setError(errorMsg);
@@ -523,6 +527,9 @@ const BotFather = () => {
                 <h2 className="section-title">Direitos Padrão de Administrador</h2>
                 <p className="section-description">
                   Configure os direitos padrão que o bot terá quando for adicionado como administrador de um grupo.
+                  <br />
+                  <strong>Importante:</strong> Estes direitos são sugeridos quando o bot é adicionado a <strong>novos grupos</strong>. 
+                  Para grupos onde o bot já é administrador, os direitos serão aplicados automaticamente na próxima vez que o bot for promovido.
                 </p>
                 <form onSubmit={handleSetAdminRights} className="bot-father-form">
                   <div className="admin-rights-grid">

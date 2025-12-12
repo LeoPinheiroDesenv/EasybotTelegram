@@ -558,6 +558,229 @@
   color: #666;
 }
 
+/* cPanel Warning Styles */
+.cpanel-warning-container {
+  background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
+  border: 2px solid #ffc107;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  box-shadow: 0 4px 12px rgba(255, 193, 7, 0.2);
+  overflow: hidden;
+}
+
+.cpanel-warning-header {
+  display: flex;
+  align-items: flex-start;
+  padding: 20px;
+  background: rgba(255, 255, 255, 0.5);
+  border-bottom: 1px solid rgba(255, 193, 7, 0.3);
+  gap: 15px;
+}
+
+.cpanel-warning-icon {
+  font-size: 2rem;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.cpanel-warning-title {
+  flex: 1;
+}
+
+.cpanel-warning-title h3 {
+  margin: 0 0 8px 0;
+  color: #856404;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.cpanel-warning-subtitle {
+  margin: 0;
+  color: #856404;
+  font-size: 0.9rem;
+  opacity: 0.9;
+}
+
+.cpanel-warning-close {
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  color: #856404;
+  padding: 0;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: background 0.2s;
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+
+.cpanel-warning-close:hover {
+  background: rgba(133, 100, 4, 0.1);
+  opacity: 1;
+}
+
+.cpanel-warning-body {
+  padding: 20px;
+}
+
+.cpanel-warning-message {
+  background: rgba(255, 255, 255, 0.7);
+  padding: 15px;
+  border-radius: 6px;
+  margin-bottom: 20px;
+  border-left: 4px solid #ffc107;
+}
+
+.cpanel-warning-message p {
+  margin: 0;
+  color: #856404;
+  line-height: 1.6;
+}
+
+.cpanel-commands-section {
+  background: rgba(255, 255, 255, 0.8);
+  padding: 20px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 193, 7, 0.3);
+}
+
+.cpanel-commands-section h4 {
+  margin: 0 0 15px 0;
+  color: #856404;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.command-block {
+  margin-bottom: 20px;
+  background: #f8f9fa;
+  border: 1px solid #dee2e6;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.command-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 15px;
+  background: #e9ecef;
+  border-bottom: 1px solid #dee2e6;
+}
+
+.command-label {
+  font-weight: 600;
+  color: #495057;
+  font-size: 0.9rem;
+}
+
+.btn-copy {
+  background: #007bff;
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 500;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.btn-copy:hover {
+  background: #0056b3;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 123, 255, 0.3);
+}
+
+.btn-copy.copied {
+  background: #28a745;
+  animation: pulse 0.3s;
+}
+
+@keyframes pulse {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.command-code {
+  margin: 0;
+  padding: 15px;
+  background: #2d2d2d;
+  color: #f8f8f2;
+  font-family: 'Courier New', 'Monaco', 'Menlo', monospace;
+  font-size: 0.85rem;
+  line-height: 1.6;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.command-code::-webkit-scrollbar {
+  height: 8px;
+}
+
+.command-code::-webkit-scrollbar-track {
+  background: #1e1e1e;
+}
+
+.command-code::-webkit-scrollbar-thumb {
+  background: #555;
+  border-radius: 4px;
+}
+
+.command-code::-webkit-scrollbar-thumb:hover {
+  background: #777;
+}
+
+.cpanel-instructions {
+  margin-top: 20px;
+  padding: 15px;
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 6px;
+  border-left: 4px solid #007bff;
+}
+
+.cpanel-instructions p {
+  margin: 0 0 10px 0;
+  color: #495057;
+  font-weight: 600;
+}
+
+.cpanel-instructions ol {
+  margin: 0;
+  padding-left: 20px;
+  color: #495057;
+  line-height: 1.8;
+}
+
+.cpanel-instructions ol li {
+  margin-bottom: 8px;
+}
+
+.cpanel-instructions code {
+  background: #f4f4f4;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 0.9rem;
+  color: #d63384;
+  font-family: 'Courier New', monospace;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
   .cron-jobs-grid {
@@ -580,5 +803,29 @@
 
   .cron-job-actions .btn {
     width: 100%;
+  }
+
+  .cpanel-warning-header {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .cpanel-warning-icon {
+    font-size: 1.5rem;
+  }
+
+  .command-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .btn-copy {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .command-code {
+    font-size: 0.75rem;
   }
 }

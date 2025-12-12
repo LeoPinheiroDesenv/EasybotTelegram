@@ -647,88 +647,71 @@ class PaymentController extends Controller
                         
                         // Valida se temos os dados necessários
                         if (!$dataId || !$requestId) {
-                            \Illuminate\Support\Facades\Log::warning('Webhook Mercado Pago faltando dados para validação', [
+                            \Illuminate\Support\Facades\Log::warning('Webhook Mercado Pago faltando dados para validação de assinatura (processando mesmo assim)', [
                                 'has_data_id' => !empty($dataId),
                                 'has_request_id' => !empty($requestId),
+                                'data_id' => $dataId,
+                                'request_id' => $requestId,
                                 'query_params' => $queryParams,
                                 'query_string' => $request->getQueryString(),
-                                'body_keys' => array_keys($request->all()),
+                                'body' => $request->all(),
                                 'headers' => [
                                     'x-request-id' => $request->header('x-request-id'),
                                     'x-signature' => $request->header('x-signature')
-                                ]
+                                ],
+                                'note' => 'Webhook será processado sem validação de assinatura - alguns formatos do Mercado Pago não incluem todos os campos necessários'
+                            ]);
+                            // Não rejeita - permite processar mesmo sem validação completa
+                            // Isso garante compatibilidade com diferentes formatos de webhook do Mercado Pago
+                        } else {
+                            // Temos todos os dados necessários - valida a assinatura
+                            
+                            // Constrói o manifest string no formato correto
+                            // IMPORTANTE: O formato deve ser exatamente: id:{data.id};request-id:{x-request-id};ts:{ts};
+                            // Segundo a documentação do Mercado Pago:
+                            // - Se data.id for alfanumérico, deve estar em minúsculas (já convertido acima)
+                            // - O formato é: id:[data.id];request-id:[x-request-id];ts:[ts];
+                            $manifest = "id:{$dataId};request-id:{$requestId};ts:{$timestamp};";
+                            
+                            // Log detalhado para debug da validação
+                            \Illuminate\Support\Facades\Log::debug('Webhook Mercado Pago - Validação de assinatura', [
+                                'manifest' => $manifest,
+                                'data_id' => $dataId,
+                                'data_id_original' => $request->query('data.id') ?? $request->query('id') ?? $request->input('data.id') ?? $request->input('id'),
+                                'request_id' => $requestId,
+                                'timestamp' => $timestamp,
+                                'timestamp_seconds' => $timestampSeconds ?? null,
+                                'webhook_secret_length' => strlen($webhookSecret),
+                                'webhook_secret_preview' => substr($webhookSecret, 0, 10) . '...'
                             ]);
                             
-                            // Se não tiver os dados necessários para validação, mas tiver webhook_secret configurado,
-                            // tenta processar mesmo assim (alguns webhooks do Mercado Pago não enviam todos os campos)
-                            // Mas loga como warning para monitoramento
-                            if (!$dataId || !$requestId) {
-                                \Illuminate\Support\Facades\Log::warning('Webhook Mercado Pago faltando dados para validação de assinatura (processando mesmo assim)', [
-                                    'data_id' => $dataId,
-                                    'request_id' => $requestId,
-                                    'query_params' => $queryParams,
-                                    'query_string' => $request->getQueryString(),
-                                    'body' => $request->all(),
-                                    'note' => 'Webhook será processado sem validação de assinatura - alguns formatos do Mercado Pago não incluem todos os campos necessários'
-                                ]);
-                                // Não rejeita - permite processar mesmo sem validação completa
-                                // Isso garante compatibilidade com diferentes formatos de webhook do Mercado Pago
-                            } else {
-                                // Temos todos os dados necessários - valida a assinatura
-                                
-                                // Constrói o manifest string no formato correto
-                                // IMPORTANTE: O formato deve ser exatamente: id:{data.id};request-id:{x-request-id};ts:{ts};
-                                // Segundo a documentação do Mercado Pago:
-                                // - Se data.id for alfanumérico, deve estar em minúsculas (já convertido acima)
-                                // - O formato é: id:[data.id];request-id:[x-request-id];ts:[ts];
-                                $manifest = "id:{$dataId};request-id:{$requestId};ts:{$timestamp};";
-                                
-                                // Log detalhado para debug da validação
-                                \Illuminate\Support\Facades\Log::debug('Webhook Mercado Pago - Validação de assinatura', [
+                            // Calcula o HMAC SHA256 do manifest
+                            $calculatedHash = hash_hmac('sha256', $manifest, $webhookSecret);
+                            
+                            // Compara hash usando comparação segura (timing-safe)
+                            if (!hash_equals($hash, $calculatedHash)) {
+                                \Illuminate\Support\Facades\Log::warning('Webhook Mercado Pago com assinatura inválida (processando mesmo assim)', [
+                                    'received_hash' => substr($hash, 0, 20) . '...',
+                                    'calculated_hash' => substr($calculatedHash, 0, 20) . '...',
                                     'manifest' => $manifest,
                                     'data_id' => $dataId,
-                                    'data_id_original' => $request->query('data.id') ?? $request->query('id') ?? $request->input('data.id') ?? $request->input('id'),
                                     'request_id' => $requestId,
                                     'timestamp' => $timestamp,
-                                    'timestamp_seconds' => $timestampSeconds ?? null,
                                     'webhook_secret_length' => strlen($webhookSecret),
-                                    'webhook_secret_preview' => substr($webhookSecret, 0, 10) . '...'
+                                    'webhook_secret_preview' => substr($webhookSecret, 0, 10) . '...',
+                                    'note' => 'Assinatura não corresponde, mas webhook será processado. Verifique se o webhook_secret está correto ou se o formato do webhook mudou.'
                                 ]);
-                                
-                                // Calcula o HMAC SHA256 do manifest
-                                $calculatedHash = hash_hmac('sha256', $manifest, $webhookSecret);
-                                
-                                // Compara hash usando comparação segura (timing-safe)
-                                if (!hash_equals($hash, $calculatedHash)) {
-                                    \Illuminate\Support\Facades\Log::warning('Webhook Mercado Pago com assinatura inválida (processando mesmo assim)', [
-                                        'received_hash' => substr($hash, 0, 20) . '...',
-                                        'calculated_hash' => substr($calculatedHash, 0, 20) . '...',
-                                        'manifest' => $manifest,
-                                        'data_id' => $dataId,
-                                        'request_id' => $requestId,
-                                        'timestamp' => $timestamp,
-                                        'webhook_secret_length' => strlen($webhookSecret),
-                                        'webhook_secret_preview' => substr($webhookSecret, 0, 10) . '...',
-                                        'note' => 'Assinatura não corresponde, mas webhook será processado. Verifique se o webhook_secret está correto ou se o formato do webhook mudou.'
-                                    ]);
-                                    // Não rejeita - permite processar mesmo com assinatura inválida
-                                    // Isso garante que webhooks legítimos não sejam perdidos devido a problemas de configuração
-                                    // Em produção, você pode querer rejeitar aqui por segurança, mas isso pode causar perda de notificações
-                                } else {
-                                    \Illuminate\Support\Facades\Log::debug('Webhook Mercado Pago com assinatura válida', [
-                                        'data_id' => $dataId,
-                                        'request_id' => $requestId,
-                                        'timestamp' => $timestamp
-                                    ]);
-                                }
+                                // Não rejeita - permite processar mesmo com assinatura inválida
+                                // Isso garante que webhooks legítimos não sejam perdidos devido a problemas de configuração
+                                // Em produção, você pode querer rejeitar aqui por segurança, mas isso pode causar perda de notificações
+                            } else {
+                                \Illuminate\Support\Facades\Log::debug('Webhook Mercado Pago com assinatura válida', [
+                                    'data_id' => $dataId,
+                                    'request_id' => $requestId,
+                                    'timestamp' => $timestamp
+                                ]);
                             }
                         }
-                        
-                        \Illuminate\Support\Facades\Log::debug('Webhook Mercado Pago com assinatura válida', [
-                            'data_id' => $dataId,
-                            'request_id' => $requestId,
-                            'timestamp' => $timestamp
-                        ]);
                     } else {
                         \Illuminate\Support\Facades\Log::warning('Webhook Mercado Pago com formato de assinatura inválido', [
                             'signature' => $signature

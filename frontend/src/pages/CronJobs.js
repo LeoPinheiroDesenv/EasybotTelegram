@@ -17,6 +17,10 @@ const CronJobs = () => {
   const [editingCronJob, setEditingCronJob] = useState(null);
   const [testResult, setTestResult] = useState(null);
   const [testing, setTesting] = useState(false);
+  const [cpanelWarning, setCpanelWarning] = useState(null);
+  const [cronJobCommands, setCronJobCommands] = useState(null);
+  const [cronJobFrequency, setCronJobFrequency] = useState(null);
+  const [copiedCommand, setCopiedCommand] = useState(null);
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -226,10 +230,28 @@ const CronJobs = () => {
       
       if (data.success) {
         setSuccess(`Cron job "${defaultJob.name}" criado com sucesso!`);
+        
+        // Verifica se há aviso do cPanel
+        if (data.cpanel_message) {
+          setCpanelWarning(data.cpanel_message);
+          // Gera comandos se o cron job foi retornado
+          if (data.cron_job) {
+            setCronJobCommands(generateCommands(data.cron_job));
+            setCronJobFrequency(data.cron_job.frequency);
+          }
+        } else {
+          setCpanelWarning(null);
+          setCronJobCommands(null);
+          setCronJobFrequency(null);
+        }
+        
         await loadCronJobs();
         setTimeout(() => setSuccess(''), 5000);
       } else {
         setError(data.error || 'Erro ao criar cron job padrão');
+        setCpanelWarning(null);
+        setCronJobCommands(null);
+        setCronJobFrequency(null);
       }
     } catch (err) {
       setError(err.response?.data?.error || err.message || 'Erro ao criar cron job padrão');
@@ -252,6 +274,9 @@ const CronJobs = () => {
       body: null,
       is_active: true,
     });
+    setCpanelWarning(null);
+    setCronJobCommands(null);
+    setCronJobFrequency(null);
     setShowModal(true);
   };
 
@@ -356,6 +381,21 @@ const CronJobs = () => {
       
       if (data.success) {
         setSuccess(editingCronJob ? 'Cron job atualizado com sucesso!' : 'Cron job criado com sucesso!');
+        
+        // Verifica se há aviso do cPanel
+        if (data.cpanel_message) {
+          setCpanelWarning(data.cpanel_message);
+          // Gera comandos se o cron job foi retornado
+          if (data.cron_job) {
+            setCronJobCommands(generateCommands(data.cron_job));
+            setCronJobFrequency(data.cron_job.frequency);
+          }
+        } else {
+          setCpanelWarning(null);
+          setCronJobCommands(null);
+          setCronJobFrequency(null);
+        }
+        
         setShowModal(false);
         await loadCronJobs();
         setTimeout(() => setSuccess(''), 5000);
@@ -364,6 +404,9 @@ const CronJobs = () => {
           ? JSON.stringify(data.errors) 
           : (data.error || 'Erro ao salvar cron job');
         setError(errorMsg);
+        setCpanelWarning(null);
+        setCronJobCommands(null);
+        setCronJobFrequency(null);
       }
     } catch (err) {
       const errorMsg = err.response?.data?.errors 
@@ -469,6 +512,61 @@ const CronJobs = () => {
     return desc;
   };
 
+  // Função para gerar comandos curl/wget a partir de um cron job
+  const generateCommands = (cronJob) => {
+    if (!cronJob) return null;
+
+    let curlCommand = `curl -X ${cronJob.method}`;
+    let wgetCommand = `wget --quiet --method=${cronJob.method}`;
+
+    // Adiciona headers
+    if (cronJob.headers && Object.keys(cronJob.headers).length > 0) {
+      Object.entries(cronJob.headers).forEach(([key, value]) => {
+        if (value) {
+          curlCommand += ` -H "${key}: ${value}"`;
+          wgetCommand += ` --header="${key}: ${value}"`;
+        }
+      });
+    }
+
+    // Adiciona body se for POST/PUT
+    if (['POST', 'PUT'].includes(cronJob.method) && cronJob.body) {
+      const bodyJson = JSON.stringify(cronJob.body);
+      curlCommand += ` -d '${bodyJson.replace(/'/g, "'\\''")}'`;
+      wgetCommand += ` --body-data='${bodyJson.replace(/'/g, "'\\''")}'`;
+    }
+
+    curlCommand += ` --silent --output /dev/null "${cronJob.endpoint}"`;
+    wgetCommand += ` --output-document=- "${cronJob.endpoint}" > /dev/null 2>&1`;
+
+    return { curl: curlCommand, wget: wgetCommand };
+  };
+
+  // Função para copiar comando para a área de transferência
+  const copyToClipboard = async (text, commandType) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedCommand(commandType);
+      setTimeout(() => setCopiedCommand(null), 2000);
+    } catch (err) {
+      // Fallback para navegadores mais antigos
+      const textArea = document.createElement('textarea');
+      textArea.value = text;
+      textArea.style.position = 'fixed';
+      textArea.style.opacity = '0';
+      document.body.appendChild(textArea);
+      textArea.select();
+      try {
+        document.execCommand('copy');
+        setCopiedCommand(commandType);
+        setTimeout(() => setCopiedCommand(null), 2000);
+      } catch (e) {
+        setError('Erro ao copiar comando');
+      }
+      document.body.removeChild(textArea);
+    }
+  };
+
   return (
     <Layout>
       <div className="cron-jobs-container">
@@ -490,6 +588,78 @@ const CronJobs = () => {
           <div className="alert alert-success">
             {success}
             <button onClick={() => setSuccess('')}>×</button>
+          </div>
+        )}
+
+        {/* Aviso do cPanel com comandos */}
+        {cpanelWarning && (
+          <div className="cpanel-warning-container">
+            <div className="cpanel-warning-header">
+              <div className="cpanel-warning-icon">⚠️</div>
+              <div className="cpanel-warning-title">
+                <h3>Aviso: cPanel não disponível</h3>
+                <p className="cpanel-warning-subtitle">O cron job foi criado no banco de dados, mas não foi possível criar automaticamente no cPanel.</p>
+              </div>
+              <button 
+                className="cpanel-warning-close" 
+                onClick={() => {
+                  setCpanelWarning(null);
+                  setCronJobCommands(null);
+                }}
+              >
+                ×
+              </button>
+            </div>
+            <div className="cpanel-warning-body">
+              <div className="cpanel-warning-message">
+                <p>{cpanelWarning}</p>
+              </div>
+              {cronJobCommands && (
+                <div className="cpanel-commands-section">
+                  <h4>Comandos para criar manualmente no cPanel:</h4>
+                  
+                  <div className="command-block">
+                    <div className="command-header">
+                      <span className="command-label">Comando cURL:</span>
+                      <button
+                        className={`btn-copy ${copiedCommand === 'curl' ? 'copied' : ''}`}
+                        onClick={() => copyToClipboard(cronJobCommands.curl, 'curl')}
+                        title="Copiar comando cURL"
+                      >
+                        {copiedCommand === 'curl' ? '✓ Copiado!' : '📋 Copiar'}
+                      </button>
+                    </div>
+                    <pre className="command-code">{cronJobCommands.curl}</pre>
+                  </div>
+
+                  <div className="command-block">
+                    <div className="command-header">
+                      <span className="command-label">Comando wget:</span>
+                      <button
+                        className={`btn-copy ${copiedCommand === 'wget' ? 'copied' : ''}`}
+                        onClick={() => copyToClipboard(cronJobCommands.wget, 'wget')}
+                        title="Copiar comando wget"
+                      >
+                        {copiedCommand === 'wget' ? '✓ Copiado!' : '📋 Copiar'}
+                      </button>
+                    </div>
+                    <pre className="command-code">{cronJobCommands.wget}</pre>
+                  </div>
+
+                  <div className="cpanel-instructions">
+                    <p><strong>Como usar:</strong></p>
+                    <ol>
+                      <li>Acesse seu cPanel</li>
+                      <li>Vá em <strong>Cron Jobs</strong> ou <strong>Tarefas Agendadas</strong></li>
+                      <li>Copie um dos comandos acima (curl ou wget)</li>
+                      <li>Configure a frequência: <code>{cronJobFrequency || formData.frequency || '* * * * *'}</code></li>
+                      <li>Cole o comando no campo de comando</li>
+                      <li>Salve o cron job</li>
+                    </ol>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         )}
 
@@ -627,11 +797,19 @@ const CronJobs = () => {
 
         {/* Modal de Criar/Editar */}
         {showModal && (
-          <div className="modal-overlay" onClick={() => setShowModal(false)}>
+          <div className="modal-overlay" onClick={() => {
+            setShowModal(false);
+            setCpanelWarning(null);
+            setCronJobCommands(null);
+          }}>
             <div className="modal-content large" onClick={(e) => e.stopPropagation()}>
               <div className="modal-header">
                 <h2>{editingCronJob ? 'Editar Cron Job' : 'Novo Cron Job'}</h2>
-                <button className="modal-close" onClick={() => setShowModal(false)}>×</button>
+                <button className="modal-close" onClick={() => {
+                  setShowModal(false);
+                  setCpanelWarning(null);
+                  setCronJobCommands(null);
+                }}>×</button>
               </div>
               <div className="modal-body">
                 {/* Seletor de Template */}

@@ -1179,6 +1179,11 @@ class TelegramService
             if (isset($update['inline_query'])) {
                 $this->processInlineQuery($bot, $update['inline_query']);
             }
+
+            // Processa my_chat_member (quando o status do bot em um chat muda)
+            if (isset($update['my_chat_member'])) {
+                $this->processMyChatMember($bot, $update['my_chat_member']);
+            }
         } catch (\Exception $e) {
             $this->logBotAction($bot, 'Erro ao processar atualização: ' . $e->getMessage(), 'error', [
                 'update' => $update,
@@ -3596,6 +3601,157 @@ class TelegramService
             } catch (\Exception $e2) {
                 // Ignora erro ao listar planos
             }
+        }
+    }
+
+    /**
+     * Processa evento my_chat_member (quando o status do bot em um chat muda)
+     * Aplica os direitos padrão quando o bot é promovido a administrador
+     *
+     * @param Bot $bot
+     * @param array $myChatMember
+     * @return void
+     */
+    protected function processMyChatMember(Bot $bot, array $myChatMember): void
+    {
+        try {
+            $chat = $myChatMember['chat'] ?? null;
+            $newChatMember = $myChatMember['new_chat_member'] ?? null;
+            $oldChatMember = $myChatMember['old_chat_member'] ?? null;
+            
+            if (!$chat || !$newChatMember) {
+                return;
+            }
+            
+            $chatId = $chat['id'];
+            $chatType = $chat['type'] ?? 'unknown';
+            $newStatus = $newChatMember['status'] ?? 'unknown';
+            $oldStatus = $oldChatMember['status'] ?? 'unknown';
+            
+            $this->logBotAction($bot, "Evento my_chat_member recebido", 'info', [
+                'chat_id' => $chatId,
+                'chat_type' => $chatType,
+                'old_status' => $oldStatus,
+                'new_status' => $newStatus
+            ]);
+            
+            // Verifica se o bot foi promovido a administrador
+            if ($newStatus === 'administrator' && $oldStatus !== 'administrator') {
+                $this->logBotAction($bot, "Bot foi promovido a administrador", 'info', [
+                    'chat_id' => $chatId,
+                    'chat_type' => $chatType
+                ]);
+                
+                // Busca os direitos padrão configurados
+                $defaultRights = $this->getMyDefaultAdministratorRights($bot->token, $chatType === 'channel');
+                
+                if ($defaultRights && is_array($defaultRights)) {
+                    // Aplica os direitos padrão usando promoteChatMember
+                    $this->applyAdministratorRights($bot, $chatId, $defaultRights);
+                } else {
+                    $this->logBotAction($bot, "Nenhum direito padrão configurado para aplicar", 'info', [
+                        'chat_id' => $chatId
+                    ]);
+                }
+            }
+        } catch (\Exception $e) {
+            $this->logBotAction($bot, 'Erro ao processar my_chat_member: ' . $e->getMessage(), 'error', [
+                'my_chat_member' => $myChatMember,
+                'trace' => $e->getTraceAsString()
+            ]);
+        }
+    }
+
+    /**
+     * Obtém os direitos padrão de administrador do bot
+     *
+     * @param string $token
+     * @param bool $forChannels
+     * @return array|null
+     */
+    protected function getMyDefaultAdministratorRights(string $token, bool $forChannels = false): ?array
+    {
+        try {
+            $data = [];
+            if ($forChannels) {
+                $data['for_channels'] = true;
+            }
+            
+            $result = $this->http()
+                ->post("https://api.telegram.org/bot{$token}/getMyDefaultAdministratorRights", $data);
+            
+            $responseData = $result->json();
+            
+            if ($result->successful() && ($responseData['ok'] ?? false)) {
+                return $responseData['result'] ?? null;
+            }
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Erro ao obter direitos padrão de administrador', [
+                'error' => $e->getMessage()
+            ]);
+        }
+        return null;
+    }
+
+    /**
+     * Aplica direitos de administrador a um bot em um chat usando promoteChatMember
+     *
+     * @param Bot $bot
+     * @param string $chatId
+     * @param array $rights
+     * @return void
+     */
+    protected function applyAdministratorRights(Bot $bot, string $chatId, array $rights): void
+    {
+        try {
+            $botId = $this->getBotIdFromToken($bot->token);
+            
+            // Prepara os dados para promoteChatMember
+            $data = [
+                'chat_id' => $chatId,
+                'user_id' => $botId,
+                'is_anonymous' => $rights['is_anonymous'] ?? false,
+            ];
+            
+            // Adiciona apenas as permissões que são true
+            // O Telegram interpreta a ausência de uma permissão como false
+            foreach ($rights as $key => $value) {
+                if ($key !== 'is_anonymous' && $value === true) {
+                    $data[$key] = true;
+                }
+            }
+            
+            $this->logBotAction($bot, "Aplicando direitos de administrador", 'info', [
+                'chat_id' => $chatId,
+                'rights' => $data,
+                'rights_count' => count($data)
+            ]);
+            
+            $result = $this->http()
+                ->asJson()
+                ->post("https://api.telegram.org/bot{$bot->token}/promoteChatMember", $data);
+            
+            $responseData = $result->json();
+            
+            if ($result->successful() && ($responseData['ok'] ?? false)) {
+                $this->logBotAction($bot, "Direitos de administrador aplicados com sucesso", 'info', [
+                    'chat_id' => $chatId,
+                    'response' => $responseData
+                ]);
+            } else {
+                $errorDescription = $responseData['description'] ?? 'Erro desconhecido';
+                $this->logBotAction($bot, "Erro ao aplicar direitos de administrador: {$errorDescription}", 'error', [
+                    'chat_id' => $chatId,
+                    'response' => $responseData,
+                    'sent_data' => $data
+                ]);
+            }
+        } catch (\Exception $e) {
+            $this->logBotAction($bot, 'Erro ao aplicar direitos de administrador: ' . $e->getMessage(), 'error', [
+                'chat_id' => $chatId,
+                'rights' => $rights,
+                'trace' => $e->getTraceAsString()
+            ]);
         }
     }
 
