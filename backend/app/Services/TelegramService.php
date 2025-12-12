@@ -752,6 +752,32 @@ class TelegramService
                 }
             }
             
+            // Se o status retornado é 'member', tenta verificar novamente para garantir que não há cache
+            // Às vezes a API pode retornar status desatualizado
+            $initialStatus = $botMemberInfo['status'] ?? 'unknown';
+            if ($initialStatus === 'member') {
+                LogFacade::info('Status inicial é "member", verificando novamente para garantir precisão', [
+                    'chat_id' => $normalizedChatId,
+                    'bot_id' => $botId
+                ]);
+                
+                // Aguarda um pouco e verifica novamente (pode ser um problema de sincronização)
+                usleep(500000); // 0.5 segundos
+                $botMemberInfoRetry = $this->getChatMember($token, $normalizedChatId, $botId);
+                
+                // Se o novo status for diferente (especialmente se for admin), usa o novo
+                $retryStatus = $botMemberInfoRetry['status'] ?? 'unknown';
+                if (in_array($retryStatus, ['administrator', 'creator']) && $retryStatus !== $initialStatus) {
+                    LogFacade::info('Status atualizado após retry: de "member" para "' . $retryStatus . '"', [
+                        'chat_id' => $normalizedChatId,
+                        'bot_id' => $botId,
+                        'old_status' => $initialStatus,
+                        'new_status' => $retryStatus
+                    ]);
+                    $botMemberInfo = $botMemberInfoRetry;
+                }
+            }
+            
             if (!$botMemberInfo['is_member']) {
                 return [
                     'success' => false,
@@ -766,7 +792,8 @@ class TelegramService
 
             $status = $botMemberInfo['status'] ?? 'unknown';
             $isAdmin = in_array($status, ['administrator', 'creator']);
-            $canInviteUsers = $botMemberInfo['can_invite_users'] ?? false;
+            // Usa o valor do getChatMember que já trata o caso de admin sem can_invite_users explícito
+            $canInviteUsers = $botMemberInfo['can_invite_users'] ?? ($isAdmin ? true : false);
 
             // Log para debug
             LogFacade::info('Verificando permissões do bot para obter link de convite', [
@@ -775,23 +802,44 @@ class TelegramService
                 'status' => $status,
                 'is_admin' => $isAdmin,
                 'can_invite_users' => $canInviteUsers,
+                'raw_status' => $botMemberInfo['raw_member_data']['status'] ?? null,
                 'bot_member_info' => $botMemberInfo
             ]);
 
-            // Se não é admin e não tem permissão de convidar, retorna erro
-            // Mas se for admin, tenta mesmo assim (alguns admins podem ter permissões implícitas)
+            // IMPORTANTE: Se for administrador, sempre tenta obter o link, mesmo que can_invite_users não esteja explícito
+            // Isso porque alguns administradores podem ter permissões implícitas ou a API pode funcionar mesmo assim
+            // Também tenta se for member mas tiver can_invite_users = true (caso raro mas possível)
             if (!$isAdmin && !$canInviteUsers) {
-                return [
-                    'success' => false,
-                    'invite_link' => null,
-                    'error' => 'O bot precisa ser administrador ou ter permissão para convidar usuários. Status atual: ' . $status,
-                    'details' => [
-                        'status' => $status,
-                        'is_admin' => $isAdmin,
-                        'can_invite_users' => $canInviteUsers,
-                        'bot_member_info' => $botMemberInfo
-                    ]
-                ];
+                // Se for member, ainda tenta obter o link pois pode ser que a API funcione
+                // (alguns bots podem ter permissões especiais mesmo como member)
+                if ($status === 'member') {
+                    LogFacade::warning('Bot é member sem can_invite_users explícito, mas tentando obter link mesmo assim', [
+                        'chat_id' => $normalizedChatId,
+                        'bot_id' => $botId,
+                        'status' => $status
+                    ]);
+                } else {
+                    return [
+                        'success' => false,
+                        'invite_link' => null,
+                        'error' => 'O bot precisa ser administrador ou ter permissão para convidar usuários. Status atual: ' . $status,
+                        'details' => [
+                            'status' => $status,
+                            'is_admin' => $isAdmin,
+                            'can_invite_users' => $canInviteUsers,
+                            'bot_member_info' => $botMemberInfo
+                        ]
+                    ];
+                }
+            }
+
+            // Se é administrador mas can_invite_users está explicitamente false, loga um aviso mas continua
+            if ($isAdmin && $canInviteUsers === false) {
+                LogFacade::warning('Bot é administrador mas can_invite_users está false. Tentando obter link mesmo assim.', [
+                    'chat_id' => $normalizedChatId,
+                    'bot_id' => $botId,
+                    'status' => $status
+                ]);
             }
 
             // Tenta exportChatInviteLink primeiro (retorna link existente se houver)
@@ -837,11 +885,24 @@ class TelegramService
 
                 // Se exportChatInviteLink falhou, tenta createChatInviteLink
                 $errorMessage = $responseData['description'] ?? 'Erro desconhecido';
+                $errorCode = $responseData['error_code'] ?? null;
                 
-                LogFacade::info('exportChatInviteLink falhou, tentando createChatInviteLink', [
-                    'chat_id' => $normalizedChatId,
-                    'error' => $errorMessage
-                ]);
+                // Se o bot é administrador mas exportChatInviteLink falhou, loga informação adicional
+                if ($isAdmin) {
+                    LogFacade::warning('exportChatInviteLink falhou para administrador, tentando createChatInviteLink', [
+                        'chat_id' => $normalizedChatId,
+                        'bot_id' => $botId,
+                        'status' => $status,
+                        'can_invite_users' => $canInviteUsers,
+                        'error' => $errorMessage,
+                        'error_code' => $errorCode
+                    ]);
+                } else {
+                    LogFacade::info('exportChatInviteLink falhou, tentando createChatInviteLink', [
+                        'chat_id' => $normalizedChatId,
+                        'error' => $errorMessage
+                    ]);
+                }
 
             } catch (Exception $e) {
                 LogFacade::info('exportChatInviteLink lançou exceção, tentando createChatInviteLink', [
@@ -894,6 +955,58 @@ class TelegramService
                 }
 
                 $errorMessage = $responseData['description'] ?? 'Erro ao criar link de convite';
+                $errorCode = $responseData['error_code'] ?? null;
+                $errorDescription = $responseData['description'] ?? '';
+                
+                // Se o bot é administrador mas ainda assim falhou, fornece mensagem mais específica
+                if ($isAdmin || $status === 'member') {
+                    // Verifica se o erro é relacionado a permissões
+                    $isPermissionError = stripos($errorDescription, 'not enough rights') !== false || 
+                                        stripos($errorDescription, 'permission') !== false ||
+                                        stripos($errorDescription, 'can_invite_users') !== false ||
+                                        stripos($errorDescription, 'not an admin') !== false ||
+                                        stripos($errorDescription, 'not administrator') !== false;
+                    
+                    if ($isPermissionError) {
+                        if ($isAdmin) {
+                            $errorMessage = 'O bot é administrador, mas não tem a permissão "Convidar usuários" habilitada. ' .
+                                           'Por favor, vá nas configurações do grupo no Telegram, edite as permissões do bot e ' .
+                                           'habilite a permissão "Convidar usuários". Erro da API: ' . $errorDescription;
+                        } else {
+                            $errorMessage = 'O bot precisa ser administrador do grupo/canal para obter o link de convite. ' .
+                                           'Status atual: ' . $status . '. Por favor, promova o bot a administrador no Telegram. ' .
+                                           'Erro da API: ' . $errorDescription;
+                        }
+                    } else {
+                        // Tenta uma última vez com getChat para verificar se o grupo existe e obter informações
+                        try {
+                            $chatInfo = $this->http()->get("https://api.telegram.org/bot{$token}/getChat", [
+                                'chat_id' => $normalizedChatId
+                            ]);
+                            
+                            $chatData = $chatInfo->json() ?? [];
+                            if ($chatInfo->successful() && ($chatData['ok'] ?? false)) {
+                                LogFacade::info('Grupo existe e é acessível, mas não foi possível obter link', [
+                                    'chat_id' => $normalizedChatId,
+                                    'chat_type' => $chatData['result']['type'] ?? 'unknown',
+                                    'error' => $errorDescription
+                                ]);
+                            }
+                        } catch (Exception $e) {
+                            // Ignora erro ao verificar chat
+                        }
+                        
+                        if ($isAdmin) {
+                            $errorMessage = 'O bot é administrador, mas não conseguiu obter o link de convite. ' .
+                                           'Verifique se o bot tem a permissão "Convidar usuários" habilitada nas configurações do grupo. ' .
+                                           'Erro: ' . $errorDescription;
+                        } else {
+                            $errorMessage = 'Não foi possível obter o link de convite. ' .
+                                           'Status do bot: ' . $status . '. ' .
+                                           'Erro: ' . $errorDescription;
+                        }
+                    }
+                }
 
                 return [
                     'success' => false,
@@ -903,7 +1016,8 @@ class TelegramService
                         'status' => $status,
                         'is_admin' => $isAdmin,
                         'can_invite_users' => $canInviteUsers,
-                        'response' => $errorData
+                        'error_code' => $errorCode ?? null,
+                        'response' => $responseData
                     ]
                 ];
 

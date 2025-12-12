@@ -49,6 +49,22 @@ const paymentStatusService = {
   async getTransactionDetails(transactionId) {
     const response = await api.get(`/payment-status/transaction/${transactionId}`);
     return response.data;
+  },
+
+  /**
+   * Reenvia o link do grupo para o usuário de uma transação
+   */
+  async resendGroupLink(transactionId) {
+    const response = await api.post(`/payments/${transactionId}/resend-group-link`);
+    return response.data;
+  },
+
+  /**
+   * Renova o link do grupo (força criação de novo link)
+   */
+  async renewGroupLink(transactionId) {
+    const response = await api.post(`/payments/${transactionId}/renew-group-link`);
+    return response.data;
   }
 };
 

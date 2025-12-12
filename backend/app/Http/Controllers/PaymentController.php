@@ -1289,4 +1289,322 @@ class PaymentController extends Controller
             ]);
         }
     }
+
+    /**
+     * Reenvia o link do grupo para o usuário de uma transação
+     *
+     * @param Request $request
+     * @param int $transactionId
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function resendGroupLink(Request $request, int $transactionId): \Illuminate\Http\JsonResponse
+    {
+        try {
+            // Busca a transação
+            $transaction = Transaction::with(['bot', 'contact', 'paymentPlan', 'paymentCycle'])
+                ->find($transactionId);
+
+            if (!$transaction) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Transação não encontrada'
+                ], 404);
+            }
+
+            // Verifica se a transação está aprovada
+            if (!in_array($transaction->status, ['approved', 'paid', 'completed'])) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Apenas transações aprovadas podem ter o link reenviado'
+                ], 400);
+            }
+
+            // Verifica se o contato tem telegram_id
+            if (!$transaction->contact || empty($transaction->contact->telegram_id)) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Contato não possui telegram_id válido'
+                ], 400);
+            }
+
+            // Verifica se o bot está configurado
+            if (!$transaction->bot || empty($transaction->bot->token)) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Bot não configurado ou sem token válido'
+                ], 400);
+            }
+
+            // Usa o PaymentService para buscar e enviar o link
+            $paymentService = app(PaymentService::class);
+            $telegramService = app(\App\Services\TelegramService::class);
+
+            // CRÍTICO: Verifica se há link salvo e se está expirado
+            $metadata = $transaction->metadata ?? [];
+            $savedLink = $metadata['group_invite_link'] ?? null;
+            $expiresAt = $metadata['group_invite_link_expires_at'] ?? null;
+            $linkExpired = false;
+            
+            if ($savedLink && $expiresAt) {
+                try {
+                    $expireDate = \Carbon\Carbon::parse($expiresAt);
+                    $linkExpired = now()->greaterThan($expireDate);
+                    
+                    if ($linkExpired) {
+                        Log::info('Link salvo está expirado, buscando novo link', [
+                            'transaction_id' => $transaction->id,
+                            'expires_at' => $expireDate->toDateTimeString()
+                        ]);
+                    }
+                } catch (\Exception $e) {
+                    Log::warning('Erro ao verificar expiração do link salvo', [
+                        'transaction_id' => $transaction->id,
+                        'error' => $e->getMessage()
+                    ]);
+                }
+            }
+            
+            // CRÍTICO: Busca o link do grupo (sempre busca um link fresco com expiração correta)
+            // O método findGroupInviteLink já calcula a expiração baseada no ciclo do plano
+            // Se o link está expirado ou não existe, busca novo
+            if ($linkExpired || !$savedLink) {
+                $groupLink = $paymentService->findGroupInviteLink($transaction, $telegramService);
+            } else {
+                // Usa link salvo se ainda não expirou, mas recarrega para garantir que está válido
+                $groupLink = $savedLink;
+                Log::info('Usando link salvo que ainda não expirou', [
+                    'transaction_id' => $transaction->id
+                ]);
+            }
+
+            if (!$groupLink) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Não foi possível obter o link do grupo. Verifique se há grupos configurados para este bot/plano.'
+                ], 400);
+            }
+            
+            // CRÍTICO: Calcula data de expiração para salvar no metadata
+            $expireDate = null;
+            if ($transaction->paymentCycle) {
+                $days = $transaction->paymentCycle->days ?? 30;
+                $expireDate = \Carbon\Carbon::now()->addDays($days);
+            }
+
+            // Prepara a mensagem
+            $paymentPlan = $transaction->paymentPlan;
+            $amount = number_format($transaction->amount, 2, ',', '.');
+
+            $message = "🔄 <b>Link do Grupo Reenviado</b>\n\n";
+            $message .= "Olá " . ($transaction->contact->first_name ?? 'Cliente') . ",\n\n";
+            $message .= "Estamos reenviando o link do grupo conforme solicitado.\n\n";
+            $message .= "📦 <b>Plano:</b> " . ($paymentPlan->title ?? 'N/A') . "\n";
+            $message .= "💰 <b>Valor:</b> R$ {$amount}\n\n";
+            $message .= "🔗 <b>Link do grupo:</b>\n";
+            $message .= "{$groupLink}\n\n";
+            $message .= "Obrigado! 🎉";
+
+            // Envia a mensagem
+            $telegramService->sendMessage(
+                $transaction->bot,
+                $transaction->contact->telegram_id,
+                $message
+            );
+
+            // Atualiza metadata com informações do reenvio
+            $metadata = $transaction->metadata ?? [];
+            $metadata['group_link_resent_at'] = now()->toIso8601String();
+            $metadata['group_link_resent_by'] = auth()->id();
+            $metadata['group_invite_link'] = $groupLink;
+            
+            // CRÍTICO: Atualiza data de expiração baseada no ciclo do plano
+            if ($expireDate) {
+                $metadata['group_invite_link_expires_at'] = $expireDate->toIso8601String();
+                Log::info('Link reenviado com data de expiração', [
+                    'transaction_id' => $transaction->id,
+                    'expire_date' => $expireDate->toDateTimeString(),
+                    'cycle_days' => $transaction->paymentCycle->days ?? null
+                ]);
+            } else {
+                Log::warning('Link reenviado SEM data de expiração (sem ciclo definido)', [
+                    'transaction_id' => $transaction->id
+                ]);
+            }
+            
+            $transaction->update(['metadata' => $metadata]);
+
+            Log::info('Link do grupo reenviado manualmente', [
+                'transaction_id' => $transaction->id,
+                'contact_id' => $transaction->contact->id,
+                'contact_telegram_id' => $transaction->contact->telegram_id,
+                'bot_id' => $transaction->bot_id,
+                'resent_by' => auth()->id(),
+                'group_link' => $groupLink
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Link do grupo reenviado com sucesso',
+                'data' => [
+                    'transaction_id' => $transaction->id,
+                    'contact_id' => $transaction->contact->id,
+                    'group_link' => $groupLink
+                ]
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Erro ao reenviar link do grupo', [
+                'transaction_id' => $transactionId,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'error' => 'Erro ao reenviar link do grupo: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Renova o link do grupo (força criação de novo link)
+     */
+    public function renewGroupLink(Request $request, int $transactionId): \Illuminate\Http\JsonResponse
+    {
+        try {
+            // Busca a transação
+            $transaction = Transaction::with(['bot', 'contact', 'paymentPlan', 'paymentCycle'])
+                ->find($transactionId);
+
+            if (!$transaction) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Transação não encontrada'
+                ], 404);
+            }
+
+            // Verifica se a transação está aprovada
+            if (!in_array($transaction->status, ['approved', 'paid', 'completed'])) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Apenas transações aprovadas podem ter o link renovado'
+                ], 400);
+            }
+
+            // Verifica se o contato tem telegram_id
+            if (!$transaction->contact || empty($transaction->contact->telegram_id)) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Contato não possui telegram_id válido'
+                ], 400);
+            }
+
+            // Verifica se o bot está configurado
+            if (!$transaction->bot || empty($transaction->bot->token)) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Bot não configurado ou sem token válido'
+                ], 400);
+            }
+
+            // Usa o PaymentService para buscar e enviar o link
+            $paymentService = app(PaymentService::class);
+            $telegramService = app(\App\Services\TelegramService::class);
+
+            // CRÍTICO: Força criação de novo link (ignora link salvo)
+            $groupLink = $paymentService->findGroupInviteLink($transaction, $telegramService);
+
+            if (!$groupLink) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Não foi possível obter o link do grupo. Verifique se há grupos configurados para este bot/plano.'
+                ], 400);
+            }
+            
+            // CRÍTICO: Calcula data de expiração para salvar no metadata
+            $expireDate = null;
+            if ($transaction->paymentCycle) {
+                $days = $transaction->paymentCycle->days ?? 30;
+                $expireDate = \Carbon\Carbon::now()->addDays($days);
+            }
+
+            // Prepara a mensagem
+            $paymentPlan = $transaction->paymentPlan;
+            $amount = number_format($transaction->amount, 2, ',', '.');
+
+            $message = "🔄 <b>Link do Grupo Renovado</b>\n\n";
+            $message .= "Olá " . ($transaction->contact->first_name ?? 'Cliente') . ",\n\n";
+            $message .= "O link do seu grupo foi renovado com sucesso!\n\n";
+            $message .= "📦 <b>Plano:</b> " . ($paymentPlan->title ?? 'N/A') . "\n";
+            $message .= "💰 <b>Valor:</b> R$ {$amount}\n\n";
+            $message .= "🔗 <b>Novo link do grupo:</b>\n";
+            $message .= "{$groupLink}\n\n";
+            if ($expireDate) {
+                $message .= "⏰ <b>Válido até:</b> " . $expireDate->format('d/m/Y H:i') . "\n\n";
+            }
+            $message .= "Obrigado! 🎉";
+
+            // Envia a mensagem
+            $telegramService->sendMessage(
+                $transaction->bot,
+                $transaction->contact->telegram_id,
+                $message
+            );
+
+            // Atualiza metadata com informações da renovação
+            $metadata = $transaction->metadata ?? [];
+            $metadata['group_link_renewed_at'] = now()->toIso8601String();
+            $metadata['group_link_renewed_by'] = auth()->id();
+            $metadata['group_invite_link'] = $groupLink;
+            
+            // CRÍTICO: Atualiza data de expiração baseada no ciclo do plano
+            if ($expireDate) {
+                $metadata['group_invite_link_expires_at'] = $expireDate->toIso8601String();
+                $metadata['group_invite_link_created_at'] = now()->toIso8601String();
+                Log::info('Link renovado com data de expiração', [
+                    'transaction_id' => $transaction->id,
+                    'expire_date' => $expireDate->toDateTimeString(),
+                    'cycle_days' => $transaction->paymentCycle->days ?? null
+                ]);
+            } else {
+                Log::warning('Link renovado SEM data de expiração (sem ciclo definido)', [
+                    'transaction_id' => $transaction->id
+                ]);
+            }
+            
+            $transaction->update(['metadata' => $metadata]);
+
+            Log::info('Link do grupo renovado manualmente', [
+                'transaction_id' => $transaction->id,
+                'contact_id' => $transaction->contact->id,
+                'contact_telegram_id' => $transaction->contact->telegram_id,
+                'bot_id' => $transaction->bot_id,
+                'renewed_by' => auth()->id(),
+                'group_link' => $groupLink
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Link do grupo renovado com sucesso',
+                'data' => [
+                    'transaction_id' => $transaction->id,
+                    'contact_id' => $transaction->contact->id,
+                    'group_link' => $groupLink,
+                    'expires_at' => $expireDate ? $expireDate->toIso8601String() : null
+                ]
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Erro ao renovar link do grupo', [
+                'transaction_id' => $transactionId,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'error' => 'Erro ao renovar link do grupo: ' . $e->getMessage()
+            ], 500);
+        }
+    }
 }

@@ -135,6 +135,10 @@ Route::middleware('auth:api')->group(function () {
     Route::post('/payment-status/check-expired/{botId?}', [PaymentStatusController::class, 'checkExpiredPayments']);
     Route::post('/payment-status/check-expiring/{botId?}', [PaymentStatusController::class, 'checkExpiringPayments']);
     Route::get('/payment-status/transaction/{transactionId}', [PaymentStatusController::class, 'getTransactionDetails']);
+    
+    // Payment routes - reenviar link do grupo
+    Route::post('/payments/{transactionId}/resend-group-link', [PaymentController::class, 'resendGroupLink']);
+    Route::post('/payments/{transactionId}/renew-group-link', [PaymentController::class, 'renewGroupLink']);
 
     // Payment Gateway Config routes
     Route::get('/payment-gateway-configs/config', [PaymentGatewayConfigController::class, 'getConfig']);

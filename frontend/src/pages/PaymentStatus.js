@@ -13,7 +13,9 @@ import {
   faBell,
   faUserMinus,
   faInfoCircle,
-  faTimes
+  faTimes,
+  faPaperPlane,
+  faSync
 } from '@fortawesome/free-solid-svg-icons';
 import './PaymentStatus.css';
 
@@ -40,6 +42,8 @@ const PaymentStatus = () => {
   const [selectedTransaction, setSelectedTransaction] = useState(null);
   const [transactionDetails, setTransactionDetails] = useState(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
+  const [resendingLink, setResendingLink] = useState({});
+  const [renewingLink, setRenewingLink] = useState({});
 
   useEffect(() => {
     if (botId) {
@@ -223,6 +227,54 @@ const PaymentStatus = () => {
     setTransactionDetails(null);
   };
 
+  const handleResendGroupLink = async (transactionId) => {
+    try {
+      setResendingLink(prev => ({ ...prev, [transactionId]: true }));
+      setError('');
+      setSuccess('');
+      
+      const response = await paymentStatusService.resendGroupLink(transactionId);
+      
+      if (response.success) {
+        setSuccess('Link do grupo reenviado com sucesso!');
+        setTimeout(() => setSuccess(''), 5000);
+      } else {
+        setError(response.error || 'Erro ao reenviar link do grupo');
+        setTimeout(() => setError(''), 5000);
+      }
+    } catch (err) {
+      setError(err.response?.data?.error || 'Erro ao reenviar link do grupo');
+      setTimeout(() => setError(''), 5000);
+    } finally {
+      setResendingLink(prev => ({ ...prev, [transactionId]: false }));
+    }
+  };
+
+  const handleRenewGroupLink = async (transactionId) => {
+    try {
+      setRenewingLink(prev => ({ ...prev, [transactionId]: true }));
+      setError('');
+      setSuccess('');
+      
+      const response = await paymentStatusService.renewGroupLink(transactionId);
+      
+      if (response.success) {
+        setSuccess('Link do grupo renovado com sucesso!');
+        setTimeout(() => setSuccess(''), 5000);
+        // Recarrega os status para atualizar a interface
+        loadStatuses();
+      } else {
+        setError(response.error || 'Erro ao renovar link do grupo');
+        setTimeout(() => setError(''), 5000);
+      }
+    } catch (err) {
+      setError(err.response?.data?.error || 'Erro ao renovar link do grupo');
+      setTimeout(() => setError(''), 5000);
+    } finally {
+      setRenewingLink(prev => ({ ...prev, [transactionId]: false }));
+    }
+  };
+
   if (loading && statuses.length === 0) {
     return (
       <Layout>
@@ -398,15 +450,41 @@ const PaymentStatus = () => {
                         )}
                       </td>
                       <td>
-                        {status.transaction?.id && (
-                          <button
-                            className="btn btn-sm btn-info"
-                            onClick={() => handleShowDetails(status)}
-                            title="Ver detalhes da confirmação do pagamento"
-                          >
-                            <FontAwesomeIcon icon={faInfoCircle} /> Detalhes
-                          </button>
-                        )}
+                        <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
+                          {status.transaction?.id && (
+                            <>
+                              <button
+                                className="btn btn-sm btn-info"
+                                onClick={() => handleShowDetails(status)}
+                                title="Ver detalhes da confirmação do pagamento"
+                              >
+                                <FontAwesomeIcon icon={faInfoCircle} /> Detalhes
+                              </button>
+                              {(status.status === 'active' || status.transaction?.status === 'approved' || status.transaction?.status === 'paid' || status.transaction?.status === 'completed') && (
+                                <>
+                                  <button
+                                    className="btn btn-sm btn-success"
+                                    onClick={() => handleResendGroupLink(status.transaction.id)}
+                                    disabled={resendingLink[status.transaction.id] || renewingLink[status.transaction.id]}
+                                    title="Reenviar link do grupo para o usuário"
+                                  >
+                                    <FontAwesomeIcon icon={faPaperPlane} spin={resendingLink[status.transaction.id]} /> 
+                                    {resendingLink[status.transaction.id] ? ' Enviando...' : ' Reenviar'}
+                                  </button>
+                                  <button
+                                    className="btn btn-sm btn-primary"
+                                    onClick={() => handleRenewGroupLink(status.transaction.id)}
+                                    disabled={resendingLink[status.transaction.id] || renewingLink[status.transaction.id]}
+                                    title="Renovar link do grupo (criar novo link)"
+                                  >
+                                    <FontAwesomeIcon icon={faSync} spin={renewingLink[status.transaction.id]} /> 
+                                    {renewingLink[status.transaction.id] ? ' Renovando...' : ' Renovar'}
+                                  </button>
+                                </>
+                              )}
+                            </>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );
@@ -596,6 +674,20 @@ const PaymentStatus = () => {
                 )}
               </div>
               <div className="modal-footer">
+                {transactionDetails?.transaction?.id && 
+                 (transactionDetails.transaction.status === 'approved' || 
+                  transactionDetails.transaction.status === 'paid' || 
+                  transactionDetails.transaction.status === 'completed') && (
+                  <button
+                    className="btn btn-success"
+                    onClick={() => handleResendGroupLink(transactionDetails.transaction.id)}
+                    disabled={resendingLink[transactionDetails.transaction.id]}
+                    title="Reenviar link do grupo para o usuário"
+                  >
+                    <FontAwesomeIcon icon={faPaperPlane} spin={resendingLink[transactionDetails.transaction.id]} /> 
+                    {resendingLink[transactionDetails.transaction.id] ? ' Enviando...' : ' Reenviar Link do Grupo'}
+                  </button>
+                )}
                 <button className="btn btn-secondary" onClick={handleCloseModal}>
                   Fechar
                 </button>

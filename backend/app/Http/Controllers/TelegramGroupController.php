@@ -200,16 +200,9 @@ class TelegramGroupController extends Controller
                         $request->merge(['invite_link' => $result['invite_link']]);
                     } else {
                         // Se falhou, retorna erro detalhado
+                        // O TelegramService já fornece mensagens de erro detalhadas e específicas
                         $errorMessage = $result['error'] ?? 'Não foi possível obter o link de convite.';
                         $details = $result['details'] ?? [];
-                        
-                        // Adiciona informações úteis ao erro
-                        if (isset($details['status'])) {
-                            $errorMessage .= ' Status do bot: ' . $details['status'];
-                        }
-                        if (isset($details['is_admin']) && !$details['is_admin']) {
-                            $errorMessage .= ' O bot não é administrador do grupo/canal.';
-                        }
                         
                         return response()->json([
                             'error' => $errorMessage,

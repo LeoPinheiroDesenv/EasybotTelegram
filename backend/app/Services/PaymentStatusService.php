@@ -301,10 +301,19 @@ class PaymentStatusService
     protected function notifyPaymentExpired(Bot $bot, Contact $contact, Transaction $transaction): void
     {
         $paymentPlan = $transaction->paymentPlan;
-        $message = "⚠️ <b>Pagamento Expirado</b>\n\n";
-        $message .= "Olá {$contact->first_name},\n\n";
-        $message .= "Seu pagamento do plano <b>{$paymentPlan->title}</b> expirou.\n\n";
-        $message .= "Para continuar tendo acesso, por favor, efetue um novo pagamento.\n\n";
+        $paymentCycle = $transaction->paymentCycle;
+        $days = $paymentCycle->days ?? 30;
+        
+        // Calcula quando expirou
+        $expiresAt = Carbon::parse($transaction->created_at)->addDays($days);
+        
+        $message = "⚠️ <b>Plano Expirado</b>\n\n";
+        $message .= "Olá " . ($contact->first_name ?? 'Cliente') . ",\n\n";
+        $message .= "Seu plano <b>" . ($paymentPlan->title ?? 'N/A') . "</b> expirou.\n\n";
+        $message .= "📅 <b>Duração do plano:</b> {$days} dia(s)\n";
+        $message .= "⏰ <b>Data de expiração:</b> " . $expiresAt->format('d/m/Y H:i') . "\n\n";
+        $message .= "O link do grupo que você recebeu não é mais válido.\n\n";
+        $message .= "Para continuar tendo acesso ao grupo, por favor, efetue um novo pagamento.\n\n";
         $message .= "Use o comando /start para ver os planos disponíveis.";
 
         $this->telegramService->sendMessage($bot, $contact->telegram_id, $message);

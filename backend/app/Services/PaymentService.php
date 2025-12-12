@@ -18,6 +18,7 @@ use Exception;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use App\Services\PixCrcService;
+use Carbon\Carbon;
 
 class PaymentService
 {
@@ -1069,10 +1070,69 @@ class PaymentService
             $transaction->load(['bot', 'contact', 'paymentPlan']);
 
             // Se o pagamento foi aprovado, notifica o usuário
+            // CRÍTICO: Sempre envia notificação quando pagamento é aprovado
+            // Isso garante que o link do grupo seja sempre enviado/renovado
             if ($status === 'approved' && $internalStatus === 'completed') {
-                $shouldNotify = !in_array($oldStatus, ['approved', 'paid', 'completed']);
+                // Verifica se deve notificar
+                // Se é uma NOVA transação (status anterior era pending), sempre notifica
+                // Se é uma atualização (já estava aprovado), verifica se foi notificado recentemente
+                $shouldNotify = true;
+                
+                // Se já estava aprovado, verifica se foi notificado recentemente (últimas 2 minutos)
+                // Isso evita notificações duplicadas em caso de webhooks repetidos do mesmo pagamento
+                // Mas permite notificações em renovações (novos pagamentos)
+                if (in_array($oldStatus, ['approved', 'paid', 'completed'])) {
+                    $lastNotification = $metadata['payment_approval_notified_at'] ?? null;
+                    if ($lastNotification) {
+                        try {
+                            $lastNotificationDate = Carbon::parse($lastNotification);
+                            $minutesSinceNotification = now()->diffInMinutes($lastNotificationDate);
+                            
+                            // Se foi notificado há menos de 2 minutos, não notifica novamente (webhook duplicado)
+                            // Se foi há mais de 2 minutos, pode ser uma renovação ou atualização, então notifica
+                            if ($minutesSinceNotification < 2) {
+                                $shouldNotify = false;
+                                Log::info('Pagamento já estava aprovado e foi notificado recentemente (webhook duplicado) - pulando notificação', [
+                                    'transaction_id' => $transaction->id,
+                                    'old_status' => $oldStatus,
+                                    'minutes_since_notification' => $minutesSinceNotification
+                                ]);
+                            } else {
+                                // Foi notificado há mais de 2 minutos - pode ser renovação, então notifica
+                                Log::info('Pagamento já estava aprovado mas notificação foi há mais de 2 minutos - enviando novamente (possível renovação)', [
+                                    'transaction_id' => $transaction->id,
+                                    'old_status' => $oldStatus,
+                                    'minutes_since_notification' => $minutesSinceNotification
+                                ]);
+                            }
+                        } catch (\Exception $e) {
+                            // Se houver erro ao parsear data, notifica mesmo assim
+                            Log::warning('Erro ao verificar última notificação - notificando mesmo assim', [
+                                'transaction_id' => $transaction->id,
+                                'error' => $e->getMessage()
+                            ]);
+                        }
+                    } else {
+                        // Não tem registro de notificação - pode ser renovação ou primeira notificação, então notifica
+                        Log::info('Pagamento já estava aprovado mas sem registro de notificação - enviando (possível renovação ou primeira notificação)', [
+                            'transaction_id' => $transaction->id,
+                            'old_status' => $oldStatus
+                        ]);
+                    }
+                } else {
+                    // Nova transação (status anterior era pending) - sempre notifica
+                    Log::info('Nova transação aprovada - enviando notificação com link do grupo', [
+                        'transaction_id' => $transaction->id,
+                        'old_status' => $oldStatus,
+                        'new_status' => $internalStatus
+                    ]);
+                }
                 
                 if ($shouldNotify && $transaction->contact && $transaction->bot && !empty($transaction->contact->telegram_id)) {
+                    // Marca timestamp da notificação antes de enviar
+                    $metadata['payment_approval_notified_at'] = now()->toIso8601String();
+                    $transaction->update(['metadata' => $metadata]);
+                    
                     $this->sendPaymentApprovalNotification($transaction);
                 }
             }
@@ -1093,6 +1153,34 @@ class PaymentService
     public function sendPaymentApprovalNotification(Transaction $transaction): void
     {
         try {
+            // CRÍTICO: Garante que todos os relacionamentos estão carregados
+            if (!$transaction->relationLoaded('bot')) {
+                $transaction->load('bot');
+            }
+            if (!$transaction->relationLoaded('contact')) {
+                $transaction->load('contact');
+            }
+            if (!$transaction->relationLoaded('paymentPlan')) {
+                $transaction->load('paymentPlan');
+            }
+            
+            // Validações essenciais
+            if (!$transaction->bot) {
+                Log::error('❌ Bot não encontrado na transação', [
+                    'transaction_id' => $transaction->id,
+                    'bot_id' => $transaction->bot_id
+                ]);
+                return;
+            }
+            
+            if (!$transaction->contact || empty($transaction->contact->telegram_id)) {
+                Log::error('❌ Contact não encontrado ou sem telegram_id', [
+                    'transaction_id' => $transaction->id,
+                    'contact_id' => $transaction->contact_id
+                ]);
+                return;
+            }
+            
             $telegramService = app(\App\Services\TelegramService::class);
             $paymentPlan = $transaction->paymentPlan;
             $amount = number_format($transaction->amount, 2, ',', '.');
@@ -1103,20 +1191,96 @@ class PaymentService
             $message .= "📦 <b>Plano:</b> " . ($paymentPlan->title ?? 'N/A') . "\n";
             $message .= "💰 <b>Valor:</b> R$ {$amount}\n\n";
             
-            // Busca o link do grupo para enviar ao usuário - ESTRATÉGIA ROBUSTA
+            // CRÍTICO: Garante que paymentCycle está carregado para calcular expiração
+            if (!$transaction->relationLoaded('paymentCycle')) {
+                $transaction->load('paymentCycle');
+            }
+            
+            // CRÍTICO: Busca o link do grupo para enviar ao usuário - ESTRATÉGIA ROBUSTA
             // Esta função garante que sempre tentará encontrar um link do grupo
+            // O link será criado com expiração baseada no ciclo do plano
             $groupLink = $this->findGroupInviteLink($transaction, $telegramService);
             
-            // CRÍTICO: O link do grupo é IMPRESCINDÍVEL
-            // Se não encontrou, tenta mais uma vez com estratégias alternativas
+            // CRÍTICO: Verifica se o link está expirado antes de enviar
+            if ($groupLink) {
+                $metadata = $transaction->metadata ?? [];
+                $savedLink = $metadata['group_invite_link'] ?? null;
+                $expiresAt = $metadata['group_invite_link_expires_at'] ?? null;
+                
+                // Se o link retornado é diferente do salvo, ou se não há metadata, atualiza
+                if ($savedLink !== $groupLink || !$expiresAt) {
+                    // Calcula data de expiração
+                    $expireDate = null;
+                    if ($transaction->paymentCycle) {
+                        $days = $transaction->paymentCycle->days ?? 30;
+                        $expireDate = \Carbon\Carbon::now()->addDays($days);
+                    }
+                    
+                    // Atualiza metadata com link e expiração
+                    $metadata['group_invite_link'] = $groupLink;
+                    if ($expireDate) {
+                        $metadata['group_invite_link_expires_at'] = $expireDate->toIso8601String();
+                        $metadata['group_invite_link_created_at'] = now()->toIso8601String();
+                    }
+                    $transaction->update(['metadata' => $metadata]);
+                    
+                    Log::info('✅ Metadata atualizado com link e expiração após findGroupInviteLink', [
+                        'transaction_id' => $transaction->id,
+                        'expires_at' => $expireDate ? $expireDate->toDateTimeString() : null
+                    ]);
+                } else if ($expiresAt) {
+                    // Verifica se o link salvo está expirado
+                    try {
+                        $expireDate = \Carbon\Carbon::parse($expiresAt);
+                        if (now()->greaterThan($expireDate)) {
+                            Log::warning('⚠️ Link salvo está expirado, buscando novo link', [
+                                'transaction_id' => $transaction->id,
+                                'expires_at' => $expireDate->toDateTimeString()
+                            ]);
+                            
+                            // Link expirado, busca novo
+                            $groupLink = $this->findGroupInviteLink($transaction, $telegramService);
+                            
+                            // Atualiza metadata com novo link
+                            if ($groupLink) {
+                                $expireDate = null;
+                                if ($transaction->paymentCycle) {
+                                    $days = $transaction->paymentCycle->days ?? 30;
+                                    $expireDate = \Carbon\Carbon::now()->addDays($days);
+                                }
+                                
+                                $metadata['group_invite_link'] = $groupLink;
+                                if ($expireDate) {
+                                    $metadata['group_invite_link_expires_at'] = $expireDate->toIso8601String();
+                                    $metadata['group_invite_link_created_at'] = now()->toIso8601String();
+                                    $metadata['group_invite_link_renewed_at'] = now()->toIso8601String();
+                                }
+                                $transaction->update(['metadata' => $metadata]);
+                                
+                                Log::info('✅ Link expirado renovado e metadata atualizado', [
+                                    'transaction_id' => $transaction->id,
+                                    'expires_at' => $expireDate ? $expireDate->toDateTimeString() : null
+                                ]);
+                            }
+                        }
+                    } catch (\Exception $e) {
+                        Log::warning('Erro ao verificar expiração do link salvo', [
+                            'transaction_id' => $transaction->id,
+                            'error' => $e->getMessage()
+                        ]);
+                    }
+                }
+            }
+            
+            // Se não encontrou, tenta estratégias adicionais mais agressivas
             if (!$groupLink) {
-                Log::error('❌ Link do grupo NÃO encontrado - tentando estratégias alternativas', [
+                Log::warning('⚠️ Link do grupo NÃO encontrado na primeira tentativa - tentando estratégias alternativas', [
                     'transaction_id' => $transaction->id,
                     'bot_id' => $transaction->bot_id,
                     'payment_plan_id' => $paymentPlan->id ?? null
                 ]);
                 
-                // Última tentativa: busca qualquer grupo do bot sem filtros
+                // ESTRATÉGIA EXTRA 1: Busca qualquer grupo do bot sem filtros (incluindo inativos)
                 $lastResortGroup = \App\Models\TelegramGroup::where('bot_id', $transaction->bot_id)
                     ->whereNotNull('invite_link')
                     ->orderBy('updated_at', 'desc')
@@ -1124,31 +1288,55 @@ class PaymentService
                 
                 if ($lastResortGroup && $lastResortGroup->invite_link) {
                     $groupLink = $lastResortGroup->invite_link;
-                    Log::warning('⚠️ Usando link de grupo encontrado em última tentativa', [
+                    Log::info('✅ Link encontrado em grupo sem filtros (estratégia extra)', [
                         'transaction_id' => $transaction->id,
                         'group_id' => $lastResortGroup->id,
                         'invite_link' => $groupLink
                     ]);
                 }
+                
+                // ESTRATÉGIA EXTRA 2: Se ainda não encontrou, tenta obter via API do grupo do bot
+                if (!$groupLink && !empty($transaction->bot->telegram_group_id)) {
+                    try {
+                        $linkResult = $telegramService->getChatInviteLink(
+                            $transaction->bot->token,
+                            $transaction->bot->telegram_group_id,
+                            null
+                        );
+                        
+                        if ($linkResult['success'] && !empty($linkResult['invite_link'])) {
+                            $groupLink = $linkResult['invite_link'];
+                            Log::info('✅ Link obtido via API direta do grupo do bot', [
+                                'transaction_id' => $transaction->id,
+                                'group_link' => $groupLink
+                            ]);
+                        }
+                    } catch (\Exception $e) {
+                        Log::warning('⚠️ Erro ao tentar obter link via API direta', [
+                            'transaction_id' => $transaction->id,
+                            'error' => $e->getMessage()
+                        ]);
+                    }
+                }
             }
             
-            // Adiciona o link do grupo na mensagem
+            // CRÍTICO: Adiciona o link do grupo na mensagem - IMPRESCINDÍVEL
             if ($groupLink) {
                 $message .= "🔗 <b>Acesse nosso grupo exclusivo:</b>\n";
                 $message .= "{$groupLink}\n\n";
-                Log::info('✅ Link do grupo adicionado à mensagem', [
+                Log::info('✅ Link do grupo adicionado à mensagem de confirmação de pagamento', [
                     'transaction_id' => $transaction->id,
-                    'group_link' => $groupLink
+                    'group_link' => $groupLink,
+                    'contact_telegram_id' => $transaction->contact->telegram_id
                 ]);
             } else {
-                // Se ainda não tem link, adiciona uma mensagem de erro mas NÃO bloqueia o envio
-                // O pagamento foi confirmado, então a mensagem deve ser enviada mesmo sem link
-                Log::error('❌ CRÍTICO: Link do grupo NÃO encontrado após todas as tentativas', [
+                // Se ainda não tem link, adiciona uma mensagem informativa mas NÃO bloqueia o envio
+                Log::error('❌ CRÍTICO: Link do grupo NÃO encontrado após TODAS as tentativas', [
                     'transaction_id' => $transaction->id,
                     'bot_id' => $transaction->bot_id,
                     'payment_plan_id' => $paymentPlan->id ?? null,
                     'bot_telegram_group_id' => $transaction->bot->telegram_group_id ?? null,
-                    'action_required' => 'Verifique se há grupos configurados para este bot/plano'
+                    'action_required' => 'Verifique se há grupos configurados para este bot/plano e se o bot tem permissões'
                 ]);
                 
                 // Adiciona mensagem informando que o link será enviado posteriormente
@@ -1156,6 +1344,19 @@ class PaymentService
             }
             
             $message .= "Obrigado pela sua compra! 🎉";
+            
+            // CRÍTICO: Verifica se o link está na mensagem antes de enviar
+            $linkInMessage = !empty($groupLink) && strpos($message, $groupLink) !== false;
+            
+            Log::info('📤 Preparando envio de notificação de pagamento aprovado', [
+                'transaction_id' => $transaction->id,
+                'contact_telegram_id' => $transaction->contact->telegram_id,
+                'group_link_found' => !empty($groupLink),
+                'group_link' => $groupLink,
+                'link_in_message' => $linkInMessage,
+                'message_length' => strlen($message),
+                'message_preview' => substr($message, 0, 300)
+            ]);
             
             // Envia a mensagem
             try {
@@ -1165,14 +1366,15 @@ class PaymentService
                     $message
                 );
                 
-                Log::info('✅ Notificação de pagamento aprovado enviada', [
+                Log::info('✅ Notificação de pagamento aprovado enviada com SUCESSO', [
                     'transaction_id' => $transaction->id,
                     'contact_id' => $transaction->contact->id,
                     'contact_telegram_id' => $transaction->contact->telegram_id,
                     'group_link_sent' => !empty($groupLink),
                     'group_link' => $groupLink,
+                    'link_in_message' => $linkInMessage,
                     'message_length' => strlen($message),
-                    'message_preview' => substr($message, 0, 200)
+                    'message_preview' => substr($message, 0, 300)
                 ]);
             } catch (\Exception $e) {
                 Log::error('❌ Erro ao enviar mensagem de notificação', [
@@ -1198,43 +1400,143 @@ class PaymentService
      * @param \App\Services\TelegramService $telegramService
      * @return string|null
      */
-    protected function findGroupInviteLink(Transaction $transaction, \App\Services\TelegramService $telegramService): ?string
+    public function findGroupInviteLink(Transaction $transaction, \App\Services\TelegramService $telegramService): ?string
     {
         $groupLink = null;
+        
+        // CRÍTICO: Garante que os relacionamentos estão carregados
+        if (!$transaction->relationLoaded('paymentPlan')) {
+            $transaction->load('paymentPlan');
+        }
+        if (!$transaction->relationLoaded('bot')) {
+            $transaction->load('bot');
+        }
+        if (!$transaction->relationLoaded('paymentCycle')) {
+            $transaction->load('paymentCycle');
+        }
+        
         $paymentPlan = $transaction->paymentPlan;
+        
+        // CRÍTICO: Calcula data de expiração baseada no ciclo do plano ANTES de buscar links
+        // Isso garante que TODOS os links criados terão a expiração correta
+        $expireDate = null;
+        if ($transaction->paymentCycle) {
+            $days = $transaction->paymentCycle->days ?? 30;
+            $expireDate = \Carbon\Carbon::now()->addDays($days);
+            Log::info('📅 Data de expiração calculada para link do grupo', [
+                'transaction_id' => $transaction->id,
+                'cycle_days' => $days,
+                'expire_date' => $expireDate->toDateTimeString()
+            ]);
+        } else {
+            Log::warning('⚠️ Transação sem ciclo de pagamento - link será criado sem expiração', [
+                'transaction_id' => $transaction->id
+            ]);
+        }
+        
+        // CRÍTICO: Primeiro verifica quantos grupos existem no banco para este bot
+        $totalGroups = \App\Models\TelegramGroup::where('bot_id', $transaction->bot_id)->count();
+        $activeGroups = \App\Models\TelegramGroup::where('bot_id', $transaction->bot_id)
+            ->where('active', true)
+            ->count();
+        
+        // Lista todos os grupos do bot para debug
+        $allBotGroups = \App\Models\TelegramGroup::where('bot_id', $transaction->bot_id)
+            ->get(['id', 'title', 'telegram_group_id', 'payment_plan_id', 'active', 'type']);
         
         Log::info('🔍 Iniciando busca ROBUSTA de link do grupo para notificação de pagamento', [
             'transaction_id' => $transaction->id,
             'bot_id' => $transaction->bot_id,
             'payment_plan_id' => $paymentPlan->id ?? null,
-            'bot_telegram_group_id' => $transaction->bot->telegram_group_id ?? null
+            'payment_plan_title' => $paymentPlan->title ?? null,
+            'bot_telegram_group_id' => $transaction->bot->telegram_group_id ?? null,
+            'has_expire_date' => !is_null($expireDate),
+            'expire_date' => $expireDate ? $expireDate->toDateTimeString() : null,
+            'total_groups_for_bot' => $totalGroups,
+            'active_groups_for_bot' => $activeGroups,
+            'all_bot_groups' => $allBotGroups->map(function($g) {
+                return [
+                    'id' => $g->id,
+                    'title' => $g->title,
+                    'telegram_group_id' => $g->telegram_group_id,
+                    'payment_plan_id' => $g->payment_plan_id,
+                    'active' => $g->active,
+                    'type' => $g->type
+                ];
+            })->toArray()
         ]);
         
         // ESTRATÉGIA 1: Busca grupo associado ao plano de pagamento (com link salvo)
         if ($paymentPlan) {
+            // Primeiro tenta buscar grupo ativo associado ao plano
             $telegramGroup = \App\Models\TelegramGroup::where('bot_id', $transaction->bot_id)
                 ->where('payment_plan_id', $paymentPlan->id)
                 ->where('active', true)
                 ->first();
+            
+            // Se não encontrou grupo ativo, tenta buscar qualquer grupo (ativo ou inativo) associado ao plano
+            if (!$telegramGroup) {
+                $telegramGroup = \App\Models\TelegramGroup::where('bot_id', $transaction->bot_id)
+                    ->where('payment_plan_id', $paymentPlan->id)
+                    ->first();
+                
+                if ($telegramGroup) {
+                    Log::warning('⚠️ Grupo encontrado mas está inativo - tentando usar mesmo assim', [
+                        'transaction_id' => $transaction->id,
+                        'group_id' => $telegramGroup->id,
+                        'active' => $telegramGroup->active
+                    ]);
+                }
+            }
             
             if ($telegramGroup) {
                 Log::info('✅ Grupo associado ao plano encontrado', [
                     'transaction_id' => $transaction->id,
                     'group_id' => $telegramGroup->id,
                     'telegram_group_id' => $telegramGroup->telegram_group_id,
-                    'has_invite_link' => !empty($telegramGroup->invite_link)
+                    'has_invite_link' => !empty($telegramGroup->invite_link),
+                    'group_title' => $telegramGroup->title
                 ]);
                 
-                $groupLink = $this->getLinkFromGroup($telegramGroup, $transaction, $telegramService, 'plano de pagamento');
+                $groupLink = $this->getLinkFromGroup($telegramGroup, $transaction, $telegramService, 'plano de pagamento', $expireDate);
                 if ($groupLink) {
+                    Log::info('✅ Link encontrado via grupo do plano de pagamento', [
+                        'transaction_id' => $transaction->id,
+                        'group_link' => $groupLink,
+                        'has_expire_date' => !is_null($expireDate)
+                    ]);
                     return $groupLink;
+                } else {
+                    Log::warning('⚠️ Grupo encontrado mas getLinkFromGroup retornou null', [
+                        'transaction_id' => $transaction->id,
+                        'group_id' => $telegramGroup->id,
+                        'telegram_group_id' => $telegramGroup->telegram_group_id
+                    ]);
                 }
             } else {
+                // Log detalhado sobre por que não encontrou
+                $groupsForPlan = \App\Models\TelegramGroup::where('bot_id', $transaction->bot_id)
+                    ->where('payment_plan_id', $paymentPlan->id)
+                    ->get();
+                
                 Log::info('⚠️ Grupo associado ao plano não encontrado', [
                     'transaction_id' => $transaction->id,
-                    'payment_plan_id' => $paymentPlan->id
+                    'payment_plan_id' => $paymentPlan->id,
+                    'groups_found_for_plan' => $groupsForPlan->count(),
+                    'groups_details' => $groupsForPlan->map(function($g) {
+                        return [
+                            'id' => $g->id,
+                            'title' => $g->title,
+                            'active' => $g->active,
+                            'telegram_group_id' => $g->telegram_group_id
+                        ];
+                    })->toArray()
                 ]);
             }
+        } else {
+            Log::warning('⚠️ Transação sem plano de pagamento associado', [
+                'transaction_id' => $transaction->id
+            ]);
         }
         
         // ESTRATÉGIA 2: Busca qualquer grupo ativo do bot (prioriza grupos com link salvo)
@@ -1253,10 +1555,25 @@ class PaymentService
                 'payment_plan_id' => $anyGroupWithLink->payment_plan_id
             ]);
             
-            $groupLink = $this->getLinkFromGroup($anyGroupWithLink, $transaction, $telegramService, 'grupo ativo com link salvo');
+            $groupLink = $this->getLinkFromGroup($anyGroupWithLink, $transaction, $telegramService, 'grupo ativo com link salvo', $expireDate);
             if ($groupLink) {
+                Log::info('✅ Link encontrado via grupo ativo com link salvo', [
+                    'transaction_id' => $transaction->id,
+                    'group_id' => $anyGroupWithLink->id
+                ]);
                 return $groupLink;
+            } else {
+                Log::warning('⚠️ Grupo ativo com link salvo encontrado mas getLinkFromGroup retornou null', [
+                    'transaction_id' => $transaction->id,
+                    'group_id' => $anyGroupWithLink->id,
+                    'telegram_group_id' => $anyGroupWithLink->telegram_group_id
+                ]);
             }
+        } else {
+            Log::info('⚠️ Nenhum grupo ativo com link salvo encontrado', [
+                'transaction_id' => $transaction->id,
+                'bot_id' => $transaction->bot_id
+            ]);
         }
         
         // Se não encontrou com link, busca qualquer grupo ativo
@@ -1274,14 +1591,56 @@ class PaymentService
                 'payment_plan_id' => $anyGroup->payment_plan_id
             ]);
             
-            $groupLink = $this->getLinkFromGroup($anyGroup, $transaction, $telegramService, 'qualquer grupo ativo do bot');
+            $groupLink = $this->getLinkFromGroup($anyGroup, $transaction, $telegramService, 'qualquer grupo ativo do bot', $expireDate);
             if ($groupLink) {
+                Log::info('✅ Link encontrado via qualquer grupo ativo do bot', [
+                    'transaction_id' => $transaction->id,
+                    'group_id' => $anyGroup->id
+                ]);
                 return $groupLink;
+            } else {
+                Log::warning('⚠️ Grupo ativo encontrado mas getLinkFromGroup retornou null', [
+                    'transaction_id' => $transaction->id,
+                    'group_id' => $anyGroup->id,
+                    'telegram_group_id' => $anyGroup->telegram_group_id
+                ]);
             }
         } else {
-            Log::info('⚠️ Nenhum grupo ativo encontrado no banco de dados', [
+            // Última tentativa: busca qualquer grupo (mesmo inativo) do bot
+            $anyGroupInactive = \App\Models\TelegramGroup::where('bot_id', $transaction->bot_id)
+                ->whereNotNull('telegram_group_id')
+                ->orderBy('created_at', 'desc')
+                ->first();
+            
+            if ($anyGroupInactive) {
+                Log::warning('⚠️ Usando grupo inativo como última tentativa', [
+                    'transaction_id' => $transaction->id,
+                    'group_id' => $anyGroupInactive->id,
+                    'active' => $anyGroupInactive->active
+                ]);
+                
+                $groupLink = $this->getLinkFromGroup($anyGroupInactive, $transaction, $telegramService, 'grupo inativo (última tentativa)', $expireDate);
+                if ($groupLink) {
+                    return $groupLink;
+                }
+            }
+            
+            // Log detalhado sobre grupos disponíveis
+            $allGroups = \App\Models\TelegramGroup::where('bot_id', $transaction->bot_id)->get();
+            Log::error('❌ Nenhum grupo encontrado no banco de dados para este bot', [
                 'transaction_id' => $transaction->id,
-                'bot_id' => $transaction->bot_id
+                'bot_id' => $transaction->bot_id,
+                'total_groups' => $allGroups->count(),
+                'groups_details' => $allGroups->map(function($g) {
+                    return [
+                        'id' => $g->id,
+                        'title' => $g->title,
+                        'active' => $g->active,
+                        'telegram_group_id' => $g->telegram_group_id,
+                        'payment_plan_id' => $g->payment_plan_id,
+                        'has_invite_link' => !empty($g->invite_link)
+                    ];
+                })->toArray()
             ]);
         }
         
@@ -1289,14 +1648,16 @@ class PaymentService
         if (!empty($transaction->bot->telegram_group_id)) {
             Log::info('✅ Tentando usar grupo do bot (telegram_group_id)', [
                 'transaction_id' => $transaction->id,
-                'bot_telegram_group_id' => $transaction->bot->telegram_group_id
+                'bot_telegram_group_id' => $transaction->bot->telegram_group_id,
+                'has_expire_date' => !is_null($expireDate)
             ]);
             
             $groupLink = $this->getLinkFromTelegramId(
                 $transaction->bot->telegram_group_id,
                 $transaction,
                 $telegramService,
-                'grupo do bot'
+                'grupo do bot',
+                $expireDate
             );
             if ($groupLink) {
                 return $groupLink;
@@ -1304,19 +1665,42 @@ class PaymentService
         }
         
         // ESTRATÉGIA 4: Busca grupos inativos também (última tentativa)
+        // CRÍTICO: NÃO usa links salvos - sempre cria link novo para evitar links expirados
         $inactiveGroup = \App\Models\TelegramGroup::where('bot_id', $transaction->bot_id)
             ->whereNotNull('telegram_group_id')
-            ->whereNotNull('invite_link')
             ->orderBy('created_at', 'desc')
             ->first();
         
-        if ($inactiveGroup && $inactiveGroup->invite_link) {
-            Log::warning('⚠️ Usando grupo inativo com link salvo (última tentativa)', [
+        if ($inactiveGroup && $inactiveGroup->telegram_group_id) {
+            Log::warning('⚠️ Tentando criar link novo para grupo inativo (última tentativa)', [
                 'transaction_id' => $transaction->id,
                 'group_id' => $inactiveGroup->id,
                 'active' => $inactiveGroup->active
             ]);
-            return $inactiveGroup->invite_link;
+            
+            // Tenta criar link novo ao invés de usar link salvo
+            $groupLink = $this->getLinkFromGroup($inactiveGroup, $transaction, $telegramService, 'grupo inativo (última tentativa)', $expireDate);
+            if ($groupLink) {
+                return $groupLink;
+            }
+        }
+        
+        // CRÍTICO: Garante que o metadata é atualizado mesmo se não encontrou link
+        // Isso permite que o sistema saiba que tentou buscar o link
+        try {
+            $metadata = $transaction->metadata ?? [];
+            if ($expireDate) {
+                // Se encontrou link mas não retornou (erro interno), salva a data de expiração esperada
+                if (!isset($metadata['group_invite_link_expires_at'])) {
+                    $metadata['group_invite_link_expires_at'] = $expireDate->toIso8601String();
+                    $transaction->update(['metadata' => $metadata]);
+                }
+            }
+        } catch (\Exception $e) {
+            Log::warning('Erro ao atualizar metadata após busca de link', [
+                'transaction_id' => $transaction->id,
+                'error' => $e->getMessage()
+            ]);
         }
         
         Log::error('❌ FALHA CRÍTICA: Nenhum link de grupo encontrado após todas as estratégias', [
@@ -1341,79 +1725,446 @@ class PaymentService
         \App\Models\TelegramGroup $telegramGroup,
         Transaction $transaction,
         \App\Services\TelegramService $telegramService,
-        string $source
+        string $source,
+        ?\Carbon\Carbon $expireDate = null
     ): ?string {
-        // Estratégia 1: Link salvo no banco
-        if ($telegramGroup->invite_link) {
-            Log::info("✅ Link encontrado no banco de dados ({$source})", [
-                'transaction_id' => $transaction->id,
-                'group_id' => $telegramGroup->id,
-                'invite_link' => $telegramGroup->invite_link
-            ]);
-            return $telegramGroup->invite_link;
+        // CRÍTICO: Garante que o bot está carregado
+        if (!$transaction->relationLoaded('bot')) {
+            $transaction->load('bot');
         }
         
-        // Estratégia 2: Gerar link para grupos com username (@)
+        if (!$transaction->bot || empty($transaction->bot->token)) {
+            Log::error("❌ Bot não encontrado ou sem token ({$source})", [
+                'transaction_id' => $transaction->id,
+                'group_id' => $telegramGroup->id
+            ]);
+            return null;
+        }
+        
+        // CRÍTICO: Sempre obtém um link FRESCO via API para evitar links expirados
+        // Prioriza obter um link novo ao invés de usar links salvos que podem estar expirados
+        
+        // Estratégia 1: Para grupos com username (@), criar link temporário com expiração
+        // Links de username são permanentes, mas podemos criar um link temporário via API
+        // que terá a expiração baseada no ciclo do plano
         if ($telegramGroup->telegram_group_id && str_starts_with($telegramGroup->telegram_group_id, '@')) {
-            $generatedLink = $telegramGroup->generateInviteLink();
-            if ($generatedLink) {
-                Log::info("✅ Link gerado para grupo com username ({$source})", [
+            // CRÍTICO: Mesmo para grupos com username, cria um link temporário com expiração
+            // Isso garante que o link expira conforme o ciclo do plano
+            if ($expireDate) {
+                Log::info("🔄 Criando link temporário com expiração para grupo com username ({$source})", [
                     'transaction_id' => $transaction->id,
                     'group_id' => $telegramGroup->id,
-                    'invite_link' => $generatedLink
+                    'telegram_group_id' => $telegramGroup->telegram_group_id,
+                    'expire_date' => $expireDate->toDateTimeString()
                 ]);
-                // Salva o link gerado
-                $telegramGroup->update(['invite_link' => $generatedLink]);
-                return $generatedLink;
+                
+                // Tenta criar link temporário via API (mesmo para grupos com username)
+                $botInfo = $telegramService->validateToken($transaction->bot->token);
+                $botIdForLink = $botInfo['valid'] && isset($botInfo['bot']['id']) ? $botInfo['bot']['id'] : null;
+                
+                $tempLink = $this->getFreshInviteLink(
+                    $telegramService,
+                    $transaction->bot->token,
+                    $telegramGroup->telegram_group_id,
+                    $botIdForLink,
+                    $transaction->id,
+                    $telegramGroup->id,
+                    $source . ' (grupo com username)',
+                    $expireDate
+                );
+                
+                if ($tempLink) {
+                    Log::info("✅ Link temporário criado para grupo com username ({$source})", [
+                        'transaction_id' => $transaction->id,
+                        'group_id' => $telegramGroup->id,
+                        'invite_link' => $tempLink,
+                        'expire_date' => $expireDate->toDateTimeString()
+                    ]);
+                    return $tempLink;
+                } else {
+                    Log::warning("⚠️ Não foi possível criar link temporário para grupo com username, usando link permanente", [
+                        'transaction_id' => $transaction->id,
+                        'group_id' => $telegramGroup->id
+                    ]);
+                    // Fallback: usa link permanente (mas isso não é ideal)
+                    $generatedLink = $telegramGroup->generateInviteLink();
+                    if ($generatedLink) {
+                        Log::warning("⚠️ Usando link permanente para grupo com username - NÃO TERÁ EXPIRAÇÃO", [
+                            'transaction_id' => $transaction->id,
+                            'group_id' => $telegramGroup->id
+                        ]);
+                        return $generatedLink;
+                    }
+                }
+            } else {
+                // Se não há data de expiração, usa link permanente (fallback)
+                $generatedLink = $telegramGroup->generateInviteLink();
+                if ($generatedLink) {
+                    Log::warning("⚠️ Link gerado para grupo com username SEM expiração (sem ciclo definido)", [
+                        'transaction_id' => $transaction->id,
+                        'group_id' => $telegramGroup->id,
+                        'invite_link' => $generatedLink
+                    ]);
+                    return $generatedLink;
+                }
             }
         }
         
-        // Estratégia 3: Obter link via API do Telegram
+        // Estratégia 2: Obter link FRESCO via API do Telegram - CRÍTICO: Sempre tenta obter novo link
         if ($telegramGroup->telegram_group_id) {
             try {
                 Log::info("🔄 Tentando obter link via API do Telegram ({$source})", [
                     'transaction_id' => $transaction->id,
                     'group_id' => $telegramGroup->id,
-                    'telegram_group_id' => $telegramGroup->telegram_group_id
+                    'telegram_group_id' => $telegramGroup->telegram_group_id,
+                    'bot_id' => $transaction->bot_id
                 ]);
                 
                 $botInfo = $telegramService->validateToken($transaction->bot->token);
                 $botIdForLink = $botInfo['valid'] && isset($botInfo['bot']['id']) ? $botInfo['bot']['id'] : null;
                 
-                $linkResult = $telegramService->getChatInviteLink(
+                if (!$botIdForLink) {
+                    Log::warning("⚠️ Não foi possível obter bot_id do token ({$source})", [
+                        'transaction_id' => $transaction->id,
+                        'group_id' => $telegramGroup->id
+                    ]);
+                }
+                
+                // CRÍTICO: Usa a data de expiração passada como parâmetro (já calculada baseada no ciclo)
+                // Se não foi passada, calcula aqui como fallback
+                if (!$expireDate) {
+                    if (!$transaction->relationLoaded('paymentCycle')) {
+                        $transaction->load('paymentCycle');
+                    }
+                    if ($transaction->paymentCycle) {
+                        $days = $transaction->paymentCycle->days ?? 30;
+                        $expireDate = \Carbon\Carbon::now()->addDays($days);
+                        Log::info("📅 Data de expiração calculada baseada no ciclo (fallback)", [
+                            'transaction_id' => $transaction->id,
+                            'cycle_days' => $days,
+                            'expire_date' => $expireDate->toDateTimeString()
+                        ]);
+                    }
+                }
+                
+                // CRÍTICO: Sempre tenta obter um link NOVO via createChatInviteLink primeiro
+                // Isso garante que o link não está expirado e tem a data de expiração correta
+                $linkResult = $this->getFreshInviteLink(
+                    $telegramService,
                     $transaction->bot->token,
                     $telegramGroup->telegram_group_id,
-                    $botIdForLink
+                    $botIdForLink,
+                    $transaction->id,
+                    $telegramGroup->id,
+                    $source,
+                    $expireDate
                 );
                 
-                if ($linkResult['success'] && $linkResult['invite_link']) {
-                    $link = $linkResult['invite_link'];
-                    // Salva o link no banco para uso futuro
-                    $telegramGroup->update(['invite_link' => $link]);
-                    Log::info("✅ Link obtido via API e salvo no banco ({$source})", [
+                if ($linkResult && !empty($linkResult)) {
+                    // Salva o link novo no banco
+                    try {
+                        $telegramGroup->update(['invite_link' => $linkResult]);
+                    } catch (\Exception $e) {
+                        Log::warning("⚠️ Erro ao salvar link obtido via API, mas retornando mesmo assim", [
+                            'transaction_id' => $transaction->id,
+                            'group_id' => $telegramGroup->id,
+                            'error' => $e->getMessage()
+                        ]);
+                    }
+                    
+                    // CRÍTICO: Salva informações do link no metadata da transação
+                    if ($expireDate) {
+                        try {
+                            $metadata = $transaction->metadata ?? [];
+                            $metadata['group_invite_link'] = $linkResult;
+                            $metadata['group_invite_link_expires_at'] = $expireDate->toIso8601String();
+                            $metadata['group_invite_link_created_at'] = now()->toIso8601String();
+                            $transaction->update(['metadata' => $metadata]);
+                            
+                            Log::info("✅ Informações do link salvas no metadata da transação", [
+                                'transaction_id' => $transaction->id,
+                                'expires_at' => $expireDate->toDateTimeString()
+                            ]);
+                        } catch (\Exception $e) {
+                            Log::warning("⚠️ Erro ao salvar informações do link no metadata", [
+                                'transaction_id' => $transaction->id,
+                                'error' => $e->getMessage()
+                            ]);
+                        }
+                    }
+                    
+                    Log::info("✅ Link FRESCO obtido via API e salvo no banco ({$source})", [
                         'transaction_id' => $transaction->id,
                         'group_id' => $telegramGroup->id,
-                        'invite_link' => $link
+                        'invite_link' => $linkResult,
+                        'expires_at' => $expireDate ? $expireDate->toDateTimeString() : null
                     ]);
-                    return $link;
+                    return $linkResult;
                 } else {
-                    Log::warning("⚠️ Falha ao obter link via API ({$source})", [
+                    Log::warning("⚠️ Falha ao obter link fresco via API ({$source})", [
                         'transaction_id' => $transaction->id,
-                        'group_id' => $telegramGroup->id,
-                        'error' => $linkResult['error'] ?? 'Erro desconhecido',
-                        'details' => $linkResult['details'] ?? null
+                        'group_id' => $telegramGroup->id
                     ]);
                 }
             } catch (\Exception $e) {
                 Log::error("❌ Exceção ao obter link via API ({$source})", [
                     'transaction_id' => $transaction->id,
                     'group_id' => $telegramGroup->id,
+                    'error' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString()
+                ]);
+            }
+        } else {
+            Log::warning("⚠️ Grupo sem telegram_group_id ({$source})", [
+                'transaction_id' => $transaction->id,
+                'group_id' => $telegramGroup->id
+            ]);
+        }
+        
+        // NUNCA usa link salvo no banco - sempre obtém link novo para evitar links expirados
+        Log::warning("⚠️ Não foi possível obter link novo via API ({$source})", [
+            'transaction_id' => $transaction->id,
+            'group_id' => $telegramGroup->id
+        ]);
+        
+        return null;
+    }
+
+    /**
+     * Obtém um link FRESCO de convite via API do Telegram
+     * Prioriza createChatInviteLink (cria novo link) ao invés de exportChatInviteLink (pode retornar link expirado)
+     *
+     * @param \App\Services\TelegramService $telegramService
+     * @param string $token
+     * @param string $chatId
+     * @param int|null $botId
+     * @param int $transactionId
+     * @param int $groupId
+     * @param string $source
+     * @return string|null
+     */
+    protected function getFreshInviteLink(
+        \App\Services\TelegramService $telegramService,
+        string $token,
+        string $chatId,
+        ?int $botId,
+        int $transactionId,
+        int $groupId,
+        string $source,
+        ?\Carbon\Carbon $expireDate = null
+    ): ?string {
+        try {
+            // CRÍTICO: Estratégia 1 - SEMPRE tenta criar um link NOVO via createChatInviteLink
+            // Isso garante que o link não está expirado e é válido
+            // Se expireDate for fornecido, usa essa data; caso contrário, cria link sem expiração
+            try {
+                $requestData = [
+                    'chat_id' => $chatId,
+                    'creates_join_request' => false,
+                    'name' => 'Link automático - ' . now()->format('Y-m-d H:i:s'),
+                    'member_limit' => null // Sem limite de membros
+                ];
+                
+                // CRÍTICO: Se expireDate foi fornecido, adiciona ao request
+                if ($expireDate) {
+                    $requestData['expire_date'] = $expireDate->timestamp;
+                    Log::info("📅 Criando link com data de expiração", [
+                        'transaction_id' => $transactionId,
+                        'expire_date' => $expireDate->toDateTimeString(),
+                        'expire_timestamp' => $expireDate->timestamp
+                    ]);
+                } else {
+                    $requestData['expire_date'] = null; // Sem data de expiração
+                }
+                
+                $response = \Illuminate\Support\Facades\Http::timeout(30)
+                    ->retry(2, 1000)
+                    ->post("https://api.telegram.org/bot{$token}/createChatInviteLink", $requestData);
+
+                $responseData = $response->json() ?? [];
+                
+                if ($response->successful() && ($responseData['ok'] ?? false) && isset($responseData['result']['invite_link'])) {
+                    $freshLink = $responseData['result']['invite_link'];
+                    
+                    // Valida o link antes de retornar
+                    if ($this->validateInviteLink($freshLink, $token, $chatId)) {
+                        Log::info("✅ Link FRESCO criado e VALIDADO via createChatInviteLink ({$source})", [
+                            'transaction_id' => $transactionId,
+                            'group_id' => $groupId,
+                            'invite_link' => $freshLink
+                        ]);
+                        return $freshLink;
+                    } else {
+                        Log::warning("⚠️ Link criado mas falhou na validação, tentando novamente", [
+                            'transaction_id' => $transactionId,
+                            'group_id' => $groupId
+                        ]);
+                    }
+                } else {
+                    $errorMsg = $responseData['description'] ?? 'Erro desconhecido';
+                    $errorCode = $responseData['error_code'] ?? null;
+                    Log::warning("⚠️ Falha ao criar link novo via createChatInviteLink, tentando exportChatInviteLink", [
+                        'transaction_id' => $transactionId,
+                        'group_id' => $groupId,
+                        'error' => $errorMsg,
+                        'error_code' => $errorCode
+                    ]);
+                }
+            } catch (\Exception $e) {
+                Log::warning("⚠️ Exceção ao criar link novo via createChatInviteLink, tentando exportChatInviteLink", [
+                    'transaction_id' => $transactionId,
+                    'group_id' => $groupId,
                     'error' => $e->getMessage()
                 ]);
             }
+            
+            // Estratégia 2: Se não conseguiu criar novo, tenta obter link existente via exportChatInviteLink
+            // Mas ainda valida antes de retornar
+            try {
+                $linkResult = $telegramService->getChatInviteLink($token, $chatId, $botId);
+                
+                if ($linkResult['success'] && !empty($linkResult['invite_link'])) {
+                    $link = $linkResult['invite_link'];
+                    
+                    // Valida o link antes de retornar
+                    if ($this->validateInviteLink($link, $token, $chatId)) {
+                        Log::info("✅ Link obtido e VALIDADO via exportChatInviteLink ({$source})", [
+                            'transaction_id' => $transactionId,
+                            'group_id' => $groupId,
+                            'invite_link' => $link,
+                            'method' => $linkResult['details']['method'] ?? 'unknown'
+                        ]);
+                        return $link;
+                    } else {
+                        Log::warning("⚠️ Link obtido via exportChatInviteLink mas falhou na validação", [
+                            'transaction_id' => $transactionId,
+                            'group_id' => $groupId
+                        ]);
+                    }
+                }
+            } catch (\Exception $e) {
+                Log::error("❌ Erro ao obter link via exportChatInviteLink", [
+                    'transaction_id' => $transactionId,
+                    'group_id' => $groupId,
+                    'error' => $e->getMessage()
+                ]);
+            }
+            
+            return null;
+        } catch (\Exception $e) {
+            Log::error("❌ Exceção ao obter link fresco", [
+                'transaction_id' => $transactionId,
+                'group_id' => $groupId,
+                'error' => $e->getMessage()
+            ]);
+            return null;
         }
-        
-        return null;
+    }
+
+    /**
+     * Valida se um link de convite está válido e não expirado
+     * Tenta obter informações do link via API do Telegram
+     *
+     * @param string $inviteLink
+     * @param string $token
+     * @param string $chatId
+     * @return bool
+     */
+    protected function validateInviteLink(string $inviteLink, string $token, string $chatId): bool
+    {
+        try {
+            // Extrai o invite_hash do link
+            // Formato: https://t.me/joinchat/INVITE_HASH ou https://t.me/+INVITE_HASH
+            $inviteHash = null;
+            
+            if (preg_match('/joinchat\/([a-zA-Z0-9_-]+)/', $inviteLink, $matches)) {
+                $inviteHash = $matches[1];
+            } elseif (preg_match('/\+([a-zA-Z0-9_-]+)/', $inviteLink, $matches)) {
+                $inviteHash = $matches[1];
+            }
+            
+            if (!$inviteHash) {
+                // Se não tem hash, pode ser um link de username (@grupo) que sempre é válido
+                if (str_contains($inviteLink, 't.me/') && !str_contains($inviteLink, 'joinchat') && !str_contains($inviteLink, '+')) {
+                    return true; // Links de username são sempre válidos
+                }
+                Log::warning('Não foi possível extrair invite_hash do link', [
+                    'invite_link' => $inviteLink
+                ]);
+                return false;
+            }
+            
+            // Tenta obter informações do link via getChatInviteLink
+            // Se conseguir, o link é válido
+            try {
+                $response = \Illuminate\Support\Facades\Http::timeout(10)
+                    ->get("https://api.telegram.org/bot{$token}/getChatInviteLink", [
+                        'chat_id' => $chatId,
+                        'invite_link' => $inviteLink
+                    ]);
+                
+                $responseData = $response->json() ?? [];
+                
+                if ($response->successful() && ($responseData['ok'] ?? false)) {
+                    $inviteLinkInfo = $responseData['result'] ?? [];
+                    
+                    // Verifica se o link está expirado
+                    if (isset($inviteLinkInfo['expire_date']) && $inviteLinkInfo['expire_date']) {
+                        $expireDate = \Carbon\Carbon::createFromTimestamp($inviteLinkInfo['expire_date']);
+                        if (now()->greaterThan($expireDate)) {
+                            Log::warning('Link está expirado', [
+                                'invite_link' => $inviteLink,
+                                'expire_date' => $expireDate->toDateTimeString()
+                            ]);
+                            return false;
+                        }
+                    }
+                    
+                    // Verifica se atingiu o limite de membros
+                    if (isset($inviteLinkInfo['member_limit']) && $inviteLinkInfo['member_limit']) {
+                        $memberCount = $inviteLinkInfo['member_count'] ?? 0;
+                        if ($memberCount >= $inviteLinkInfo['member_limit']) {
+                            Log::warning('Link atingiu limite de membros', [
+                                'invite_link' => $inviteLink,
+                                'member_count' => $memberCount,
+                                'member_limit' => $inviteLinkInfo['member_limit']
+                            ]);
+                            return false;
+                        }
+                    }
+                    
+                    // Se chegou aqui, o link é válido
+                    Log::info('Link validado com sucesso', [
+                        'invite_link' => $inviteLink,
+                        'is_creates_join_request' => $inviteLinkInfo['creates_join_request'] ?? false,
+                        'is_primary' => $inviteLinkInfo['is_primary'] ?? false
+                    ]);
+                    return true;
+                } else {
+                    $errorMsg = $responseData['description'] ?? 'Erro desconhecido';
+                    Log::warning('Falha ao validar link - pode estar expirado ou inválido', [
+                        'invite_link' => $inviteLink,
+                        'error' => $errorMsg
+                    ]);
+                    return false;
+                }
+            } catch (\Exception $e) {
+                Log::warning('Exceção ao validar link, assumindo que é válido', [
+                    'invite_link' => $inviteLink,
+                    'error' => $e->getMessage()
+                ]);
+                // Em caso de erro na validação, assume que o link é válido
+                // (melhor enviar um link que pode estar válido do que não enviar nada)
+                return true;
+            }
+        } catch (\Exception $e) {
+            Log::error('Erro ao validar link de convite', [
+                'invite_link' => $inviteLink,
+                'error' => $e->getMessage()
+            ]);
+            // Em caso de erro, assume que o link é válido
+            return true;
+        }
     }
 
     /**
@@ -1429,42 +2180,107 @@ class PaymentService
         string $telegramGroupId,
         Transaction $transaction,
         \App\Services\TelegramService $telegramService,
-        string $source
+        string $source,
+        ?\Carbon\Carbon $expireDate = null
     ): ?string {
         try {
-            // Se começa com @, gera link direto
+            // CRÍTICO: Para grupos com username (@), criar link temporário com expiração
+            // Links de username são permanentes, mas podemos criar um link temporário via API
+            // que terá a expiração baseada no ciclo do plano
             if (str_starts_with($telegramGroupId, '@')) {
-                $link = 'https://t.me/' . ltrim($telegramGroupId, '@');
-                Log::info("✅ Link gerado para grupo com username ({$source})", [
-                    'transaction_id' => $transaction->id,
-                    'telegram_group_id' => $telegramGroupId,
-                    'invite_link' => $link
-                ]);
-                return $link;
+                if ($expireDate) {
+                    Log::info("🔄 Criando link temporário com expiração para grupo com username ({$source})", [
+                        'transaction_id' => $transaction->id,
+                        'telegram_group_id' => $telegramGroupId,
+                        'expire_date' => $expireDate->toDateTimeString()
+                    ]);
+                    
+                    // Tenta criar link temporário via API (mesmo para grupos com username)
+                    $botInfo = $telegramService->validateToken($transaction->bot->token);
+                    $botIdForLink = $botInfo['valid'] && isset($botInfo['bot']['id']) ? $botInfo['bot']['id'] : null;
+                    
+                    $tempLink = $this->getFreshInviteLink(
+                        $telegramService,
+                        $transaction->bot->token,
+                        $telegramGroupId,
+                        $botIdForLink,
+                        $transaction->id,
+                        0,
+                        $source . ' (grupo com username)',
+                        $expireDate
+                    );
+                    
+                    if ($tempLink) {
+                        Log::info("✅ Link temporário criado para grupo com username ({$source})", [
+                            'transaction_id' => $transaction->id,
+                            'telegram_group_id' => $telegramGroupId,
+                            'invite_link' => $tempLink,
+                            'expire_date' => $expireDate->toDateTimeString()
+                        ]);
+                        return $tempLink;
+                    } else {
+                        Log::warning("⚠️ Não foi possível criar link temporário para grupo com username, usando link permanente", [
+                            'transaction_id' => $transaction->id,
+                            'telegram_group_id' => $telegramGroupId
+                        ]);
+                        // Fallback: usa link permanente (mas isso não é ideal)
+                        $link = 'https://t.me/' . ltrim($telegramGroupId, '@');
+                        Log::warning("⚠️ Usando link permanente para grupo com username - NÃO TERÁ EXPIRAÇÃO", [
+                            'transaction_id' => $transaction->id,
+                            'telegram_group_id' => $telegramGroupId
+                        ]);
+                        return $link;
+                    }
+                } else {
+                    // Se não há data de expiração, usa link permanente (fallback)
+                    $link = 'https://t.me/' . ltrim($telegramGroupId, '@');
+                    Log::warning("⚠️ Link gerado para grupo com username SEM expiração (sem ciclo definido)", [
+                        'transaction_id' => $transaction->id,
+                        'telegram_group_id' => $telegramGroupId,
+                        'invite_link' => $link
+                    ]);
+                    return $link;
+                }
             }
             
-            // Tenta obter via API
+            // Para grupos sem username, usa getFreshInviteLink para criar link com expiração
             Log::info("🔄 Tentando obter link via API do Telegram ({$source})", [
                 'transaction_id' => $transaction->id,
-                'telegram_group_id' => $telegramGroupId
+                'telegram_group_id' => $telegramGroupId,
+                'has_expire_date' => !is_null($expireDate)
             ]);
             
             $botInfo = $telegramService->validateToken($transaction->bot->token);
             $botIdForLink = $botInfo['valid'] && isset($botInfo['bot']['id']) ? $botInfo['bot']['id'] : null;
             
-            $linkResult = $telegramService->getChatInviteLink(
+            // Usa getFreshInviteLink para criar link novo com expiração
+            $link = $this->getFreshInviteLink(
+                $telegramService,
                 $transaction->bot->token,
                 $telegramGroupId,
-                $botIdForLink
+                $botIdForLink,
+                $transaction->id,
+                0, // Não temos group_id aqui, usa 0
+                $source,
+                $expireDate
             );
             
-            if ($linkResult['success'] && $linkResult['invite_link']) {
-                $link = $linkResult['invite_link'];
-                Log::info("✅ Link obtido via API ({$source})", [
-                    'transaction_id' => $transaction->id,
-                    'telegram_group_id' => $telegramGroupId,
-                    'invite_link' => $link
-                ]);
+            if ($link) {
+                // Salva informações do link no metadata da transação
+                if ($expireDate) {
+                    try {
+                        $metadata = $transaction->metadata ?? [];
+                        $metadata['group_invite_link'] = $link;
+                        $metadata['group_invite_link_expires_at'] = $expireDate->toIso8601String();
+                        $metadata['group_invite_link_created_at'] = now()->toIso8601String();
+                        $transaction->update(['metadata' => $metadata]);
+                    } catch (\Exception $e) {
+                        Log::warning("⚠️ Erro ao salvar informações do link no metadata", [
+                            'transaction_id' => $transaction->id,
+                            'error' => $e->getMessage()
+                        ]);
+                    }
+                }
                 
                 // Tenta salvar no banco se encontrar o grupo
                 $telegramGroup = \App\Models\TelegramGroup::where('bot_id', $transaction->bot_id)
@@ -1478,8 +2294,7 @@ class PaymentService
             } else {
                 Log::warning("⚠️ Falha ao obter link via API ({$source})", [
                     'transaction_id' => $transaction->id,
-                    'telegram_group_id' => $telegramGroupId,
-                    'error' => $linkResult['error'] ?? 'Erro desconhecido'
+                    'telegram_group_id' => $telegramGroupId
                 ]);
             }
         } catch (\Exception $e) {

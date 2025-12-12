@@ -702,33 +702,34 @@ class BotController extends Controller
             $result = $telegramService->getChatInviteLink($bot->token, $bot->telegram_group_id, $botId);
 
             if (!$result['success']) {
+                // O TelegramService já fornece mensagens de erro detalhadas e específicas
                 $errorMessage = $result['error'] ?? 'Erro ao obter link de convite';
                 $details = $result['details'] ?? [];
                 
-                // Adiciona informações detalhadas se disponíveis
-                $fullErrorMessage = $errorMessage;
-                if (isset($details['status'])) {
-                    $fullErrorMessage .= ' Status do bot: ' . $details['status'];
-                }
-                if (isset($details['is_admin']) && $details['is_admin'] === false) {
-                    $fullErrorMessage .= ' O bot não é administrador do grupo.';
-                } elseif (isset($details['can_invite_users']) && $details['can_invite_users'] === false) {
-                    $fullErrorMessage .= ' O bot não tem permissão para convidar usuários.';
-                }
-
                 return response()->json([
                     'success' => false,
-                    'error' => $fullErrorMessage,
+                    'error' => $errorMessage,
                     'details' => $details
                 ], 400);
             }
-
+            
+            // Se chegou aqui, o link foi obtido com sucesso
+            if (isset($result['invite_link']) && $result['invite_link']) {
+                // Atualiza o link no banco se necessário
+                // (opcional, dependendo da lógica de negócio)
+                
+                return response()->json([
+                    'success' => true,
+                    'invite_link' => $result['invite_link'],
+                    'details' => $result['details'] ?? []
+                ]);
+            }
+            
             return response()->json([
-                'success' => true,
-                'message' => 'Link de convite obtido com sucesso!',
-                'invite_link' => $result['invite_link'],
+                'success' => false,
+                'error' => 'Link de convite não foi retornado pela API do Telegram',
                 'details' => $result['details'] ?? []
-            ]);
+            ], 400);
         } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
             return response()->json(['success' => false, 'error' => 'Bot não encontrado'], 404);
         } catch (\Exception $e) {

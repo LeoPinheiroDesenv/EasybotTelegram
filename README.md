@@ -349,6 +349,7 @@ O sistema suporta criação automática de cron jobs no cPanel. Veja a documenta
 ```bash
 php artisan payments:check-pending    # Verifica pagamentos pendentes
 php artisan pix:check-expiration      # Verifica PIX expirados
+php artisan check:group-link-expiration  # Verifica expiração de links de grupo e notifica usuários
 ```
 
 ### Comandos do Telegram

@@ -19,6 +19,12 @@ return Application::configure(basePath: dirname(__DIR__))
             ->withoutOverlapping()
             ->runInBackground();
         
+        // Verifica expiração de links de grupo a cada hora
+        $schedule->command('check:group-link-expiration')
+            ->hourly()
+            ->withoutOverlapping()
+            ->runInBackground();
+        
         // NOTA: O scheduler do Laravel requer acesso ao terminal do servidor para funcionar
         // Como não temos acesso ao terminal em produção, o polling de pagamentos pendentes
         // deve ser feito via chamadas HTTP periódicas ao endpoint /api/payments/check-pending

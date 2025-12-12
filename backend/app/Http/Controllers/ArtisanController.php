@@ -19,6 +19,7 @@ class ArtisanController extends Controller
         'view:clear' => 'Limpar cache de views',
         'pix:crc-diagnostic-report' => 'Gerar relatório de diagnóstico de CRC PIX',
         'pix:check-expiration' => 'Verificar expiração de PIX pendentes e notificar usuários',
+        'check:group-link-expiration' => 'Verificar expiração de links de grupo e notificar usuários',
         'payments:check-pending' => 'Verificar pagamentos pendentes e processar aprovações automaticamente',
     ];
 
@@ -66,6 +67,13 @@ class ArtisanController extends Controller
                     $commandParameters['--bot-id'] = (int) $parameters['bot_id'];
                 }
                 
+                if (isset($parameters['dry_run']) && $parameters['dry_run'] === true) {
+                    $commandParameters['--dry-run'] = true;
+                }
+            }
+            
+            // Comando check:group-link-expiration com parâmetros
+            if ($command === 'check:group-link-expiration') {
                 if (isset($parameters['dry_run']) && $parameters['dry_run'] === true) {
                     $commandParameters['--dry-run'] = true;
                 }
@@ -223,6 +231,17 @@ class ArtisanController extends Controller
                         'type' => 'boolean',
                         'default' => false,
                         'description' => 'Simular sem enviar notificações',
+                        'required' => false,
+                    ],
+                ];
+            }
+            
+            if ($command === 'check:group-link-expiration') {
+                $commandInfo['parameters'] = [
+                    'dry_run' => [
+                        'type' => 'boolean',
+                        'default' => false,
+                        'description' => 'Simular sem enviar notificações (modo dry-run)',
                         'required' => false,
                     ],
                 ];

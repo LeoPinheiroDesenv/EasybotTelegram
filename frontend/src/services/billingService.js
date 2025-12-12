@@ -39,6 +39,14 @@ const billingService = {
   async getDashboardStatistics() {
     const response = await api.get('/billing/dashboard-stats');
     return response.data;
+  },
+
+  /**
+   * Reenvia o link do grupo para o usuário de uma transação
+   */
+  async resendGroupLink(transactionId) {
+    const response = await api.post(`/payments/${transactionId}/resend-group-link`);
+    return response.data;
   }
 };
 

@@ -2,7 +2,10 @@ import React, { useState, useEffect } from 'react';
 import Layout from '../components/Layout';
 import billingService from '../services/billingService';
 import botService from '../services/botService';
+import paymentStatusService from '../services/paymentStatusService';
 import RefreshButton from '../components/RefreshButton';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faPaperPlane } from '@fortawesome/free-solid-svg-icons';
 import { Line } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
@@ -33,10 +36,12 @@ ChartJS.register(
 const Billing = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [monthlyBilling, setMonthlyBilling] = useState(null);
   const [billingData, setBillingData] = useState(null);
   const [chartData, setChartData] = useState(null);
   const [bots, setBots] = useState([]);
+  const [resendingLink, setResendingLink] = useState({});
   
   // Filtros
   const [filters, setFilters] = useState({
@@ -114,6 +119,29 @@ const Billing = () => {
       gateway: ''
     });
     setBillingData(null);
+  };
+
+  const handleResendGroupLink = async (transactionId) => {
+    try {
+      setResendingLink(prev => ({ ...prev, [transactionId]: true }));
+      setError('');
+      setSuccess('');
+      
+      const response = await billingService.resendGroupLink(transactionId);
+      
+      if (response.success) {
+        setSuccess('Link do grupo reenviado com sucesso!');
+        setTimeout(() => setSuccess(''), 5000);
+      } else {
+        setError(response.error || 'Erro ao reenviar link do grupo');
+        setTimeout(() => setError(''), 5000);
+      }
+    } catch (err) {
+      setError(err.response?.data?.error || 'Erro ao reenviar link do grupo');
+      setTimeout(() => setError(''), 5000);
+    } finally {
+      setResendingLink(prev => ({ ...prev, [transactionId]: false }));
+    }
   };
 
   const formatCurrency = (value) => {
@@ -198,6 +226,7 @@ const Billing = () => {
         </div>
 
         {error && <div className="alert alert-error">{error}</div>}
+        {success && <div className="alert alert-success">{success}</div>}
 
         {/* Resumo Mensal */}
         {monthlyBilling && (
@@ -433,6 +462,7 @@ const Billing = () => {
                         <th>Gateway</th>
                         <th>Valor</th>
                         <th>Status</th>
+                        <th>Ações</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -469,6 +499,19 @@ const Billing = () => {
                                 ? '✅ Aprovado' 
                                 : transaction.status}
                             </span>
+                          </td>
+                          <td>
+                            {(transaction.status === 'approved' || transaction.status === 'paid' || transaction.status === 'completed') && (
+                              <button
+                                className="btn btn-sm btn-success"
+                                onClick={() => handleResendGroupLink(transaction.id)}
+                                disabled={resendingLink[transaction.id]}
+                                title="Reenviar link do grupo para o usuário"
+                              >
+                                <FontAwesomeIcon icon={faPaperPlane} spin={resendingLink[transaction.id]} /> 
+                                {resendingLink[transaction.id] ? ' Enviando...' : ' Reenviar Link'}
+                              </button>
+                            )}
                           </td>
                         </tr>
                       ))}
