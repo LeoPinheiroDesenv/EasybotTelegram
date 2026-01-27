@@ -34,6 +34,9 @@ use Illuminate\Support\Facades\Route;
 
 // Public routes
 Route::post('/auth/login', [AuthController::class, 'login']);
+Route::post('/auth/register', [AuthController::class, 'register']);
+Route::post('/auth/register/admin', [AuthController::class, 'registerAdmin']);
+Route::post('/auth/google', [AuthController::class, 'google']);
 Route::post('/auth/verify-2fa', [AuthController::class, 'verifyTwoFactor']);
 Route::post('/auth/password/request-reset', [AuthController::class, 'requestPasswordReset']);
 Route::post('/auth/password/reset', [AuthController::class, 'resetPassword']);
@@ -82,7 +85,7 @@ Route::middleware('auth:api')->group(function () {
     Route::post('/bots/{id}/media/upload', [BotController::class, 'uploadMedia']);
     Route::delete('/bots/{id}/media', [BotController::class, 'deleteMedia']);
     Route::post('/bots/{id}/update-invite-link', [BotController::class, 'updateInviteLink']);
-    
+
     // Bot commands routes
     Route::get('/bots/{botId}/commands', [BotCommandController::class, 'index']);
     Route::post('/bots/{botId}/commands', [BotCommandController::class, 'store']);
@@ -92,27 +95,27 @@ Route::middleware('auth:api')->group(function () {
     Route::get('/bots/{botId}/commands/telegram', [BotCommandController::class, 'getTelegramCommands']);
     Route::delete('/bots/{botId}/commands/telegram', [BotCommandController::class, 'deleteTelegramCommands']);
     Route::delete('/bots/{botId}/commands/telegram/command', [BotCommandController::class, 'deleteTelegramCommand']);
-    
+
     // Redirect buttons routes
     Route::get('/bots/{botId}/redirect-buttons', [RedirectButtonController::class, 'index']);
     Route::post('/bots/{botId}/redirect-buttons', [RedirectButtonController::class, 'store']);
     Route::put('/bots/{botId}/redirect-buttons/{buttonId}', [RedirectButtonController::class, 'update']);
     Route::delete('/bots/{botId}/redirect-buttons/{buttonId}', [RedirectButtonController::class, 'destroy']);
-    
+
     // Bot administrators routes
     Route::get('/bot-administrators', [BotAdministratorController::class, 'index']);
     Route::post('/bot-administrators', [BotAdministratorController::class, 'store']);
     Route::get('/bot-administrators/{id}', [BotAdministratorController::class, 'show']);
     Route::put('/bot-administrators/{id}', [BotAdministratorController::class, 'update']);
     Route::delete('/bot-administrators/{id}', [BotAdministratorController::class, 'destroy']);
-    
+
     // Telegram groups routes
     Route::get('/telegram-groups', [\App\Http\Controllers\TelegramGroupController::class, 'index']);
     Route::post('/telegram-groups', [\App\Http\Controllers\TelegramGroupController::class, 'store']);
     Route::get('/telegram-groups/{id}', [\App\Http\Controllers\TelegramGroupController::class, 'show']);
     Route::put('/telegram-groups/{id}', [\App\Http\Controllers\TelegramGroupController::class, 'update']);
     Route::delete('/telegram-groups/{id}', [\App\Http\Controllers\TelegramGroupController::class, 'destroy']);
-    
+
     // Telegram webhook routes
     Route::get('/telegram/webhook/{botId}/info', [TelegramWebhookController::class, 'getWebhookInfo']);
     Route::post('/telegram/webhook/{botId}/set', [TelegramWebhookController::class, 'setWebhook']);
@@ -135,7 +138,7 @@ Route::middleware('auth:api')->group(function () {
     Route::post('/payment-status/check-expired/{botId?}', [PaymentStatusController::class, 'checkExpiredPayments']);
     Route::post('/payment-status/check-expiring/{botId?}', [PaymentStatusController::class, 'checkExpiringPayments']);
     Route::get('/payment-status/transaction/{transactionId}', [PaymentStatusController::class, 'getTransactionDetails']);
-    
+
     // Payment routes - reenviar link do grupo
     Route::post('/payments/{transactionId}/resend-group-link', [PaymentController::class, 'resendGroupLink']);
     Route::post('/payments/{transactionId}/renew-group-link', [PaymentController::class, 'renewGroupLink']);
@@ -154,6 +157,8 @@ Route::middleware('auth:api')->group(function () {
 
     // Contact routes
     Route::post('/contacts/{id}/block', [ContactController::class, 'block']);
+    Route::post('/contacts/{id}/send-expiration-reminder', [ContactController::class, 'sendExpirationReminder']);
+    Route::post('/contacts/send-group-expiration-reminder', [ContactController::class, 'sendGroupExpirationReminder']);
     Route::get('/contacts/stats', [ContactController::class, 'stats']);
     Route::get('/contacts/latest', [ContactController::class, 'latest']);
     Route::post('/contacts/sync-group-members', [ContactController::class, 'syncGroupMembers']);
@@ -249,7 +254,7 @@ Route::middleware('auth:api')->group(function () {
                 Route::post('/laravel-logs/{filename}/clear', [\App\Http\Controllers\LaravelLogController::class, 'clear']);
                 Route::post('/laravel-logs/test-cpanel', [\App\Http\Controllers\LaravelLogController::class, 'testCpanelConnection']);
             });
-            
+
             // Endpoint master para executar todos os cron jobs automaticamente (público, protegido por token)
             // Este endpoint deve ser chamado a cada minuto pelo cPanel
             Route::post('/cron-jobs/execute-all', [\App\Http\Controllers\CronJobController::class, 'executeAll']);
@@ -266,7 +271,7 @@ Route::post('/payments/webhook/stripe', [PaymentController::class, 'stripeWebhoo
 // Protegido por token secreto configurado no .env (opcional - se não configurado, permite acesso sem autenticação)
 Route::post('/alerts/process-auto', function (Request $request) {
     $secretToken = env('ALERTS_PROCESS_SECRET_TOKEN');
-    
+
     // Se houver token configurado, verifica o token fornecido
     if ($secretToken) {
         // Aceita token em vários formatos: header X-Alerts-Process-Token, Authorization Bearer, ou parâmetro token
@@ -275,11 +280,11 @@ Route::post('/alerts/process-auto', function (Request $request) {
         if ($authHeader && str_starts_with($authHeader, 'Bearer ')) {
             $bearerToken = substr($authHeader, 7);
         }
-        
-        $providedToken = $request->header('X-Alerts-Process-Token') 
-            ?? $bearerToken 
+
+        $providedToken = $request->header('X-Alerts-Process-Token')
+            ?? $bearerToken
             ?? $request->input('token');
-        
+
         if (!$providedToken || $providedToken !== $secretToken) {
             return response()->json([
                 'error' => 'Token inválido ou não fornecido',
@@ -288,7 +293,7 @@ Route::post('/alerts/process-auto', function (Request $request) {
         }
     }
     // Se não houver token configurado, permite acesso sem autenticação (útil para desenvolvimento/testes)
-    
+
     // Processa alertas
     try {
         $controller = app(\App\Http\Controllers\AlertController::class);
@@ -298,7 +303,7 @@ Route::post('/alerts/process-auto', function (Request $request) {
             'error' => $e->getMessage(),
             'trace' => $e->getTraceAsString()
         ]);
-        
+
         return response()->json([
             'error' => 'Erro ao processar alertas',
             'message' => $e->getMessage()
@@ -310,7 +315,7 @@ Route::post('/alerts/process-auto', function (Request $request) {
 // Protegido por token secreto configurado no .env (opcional - se não configurado, permite acesso sem autenticação)
 Route::post('/pix/check-expiration', function (Request $request) {
     $secretToken = env('PIX_CHECK_EXPIRATION_SECRET_TOKEN');
-    
+
     // Se houver token configurado, verifica o token fornecido
     if ($secretToken) {
         // Aceita token em vários formatos: header X-Pix-Check-Token, Authorization Bearer, ou parâmetro token
@@ -319,11 +324,11 @@ Route::post('/pix/check-expiration', function (Request $request) {
         if ($authHeader && str_starts_with($authHeader, 'Bearer ')) {
             $bearerToken = substr($authHeader, 7);
         }
-        
-        $providedToken = $request->header('X-Pix-Check-Token') 
-            ?? $bearerToken 
+
+        $providedToken = $request->header('X-Pix-Check-Token')
+            ?? $bearerToken
             ?? $request->input('token');
-        
+
         if (!$providedToken || $providedToken !== $secretToken) {
             return response()->json([
                 'error' => 'Token inválido ou não fornecido',
@@ -332,31 +337,31 @@ Route::post('/pix/check-expiration', function (Request $request) {
         }
     }
     // Se não houver token configurado, permite acesso sem autenticação (útil para desenvolvimento/testes)
-    
+
     // Executa o comando de verificação de expiração de PIX
     try {
         $botId = $request->input('bot_id');
         $dryRun = $request->boolean('dry_run', false);
-        
+
         $command = 'pix:check-expiration';
         $parameters = [];
-        
+
         if ($botId) {
             $parameters['--bot-id'] = $botId;
         }
-        
+
         if ($dryRun) {
             $parameters['--dry-run'] = true;
         }
-        
+
         \Illuminate\Support\Facades\Artisan::call($command, $parameters);
         $output = \Illuminate\Support\Facades\Artisan::output();
-        
+
         \Illuminate\Support\Facades\Log::info('Verificação de expiração de PIX executada via API', [
             'bot_id' => $botId,
             'dry_run' => $dryRun
         ]);
-        
+
         return response()->json([
             'success' => true,
             'message' => 'Verificação de expiração de PIX executada com sucesso',
@@ -369,7 +374,7 @@ Route::post('/pix/check-expiration', function (Request $request) {
             'error' => $e->getMessage(),
             'trace' => $e->getTraceAsString()
         ]);
-        
+
         return response()->json([
             'error' => 'Erro ao verificar expiração de PIX',
             'message' => $e->getMessage()
@@ -383,7 +388,7 @@ Route::post('/pix/check-expiration', function (Request $request) {
 // Suporta tanto GET quanto POST para facilitar uso em diferentes serviços de cron
 Route::match(['GET', 'POST'], '/payments/check-pending', function (Request $request) {
     $secretToken = env('PAYMENTS_CHECK_PENDING_SECRET_TOKEN');
-    
+
     // Se houver token configurado, verifica o token fornecido
     if ($secretToken) {
         // Aceita token em vários formatos: header X-Payments-Check-Token, Authorization Bearer, ou parâmetro token
@@ -392,11 +397,11 @@ Route::match(['GET', 'POST'], '/payments/check-pending', function (Request $requ
         if ($authHeader && str_starts_with($authHeader, 'Bearer ')) {
             $bearerToken = substr($authHeader, 7);
         }
-        
-        $providedToken = $request->header('X-Payments-Check-Token') 
-            ?? $bearerToken 
+
+        $providedToken = $request->header('X-Payments-Check-Token')
+            ?? $bearerToken
             ?? $request->input('token');
-        
+
         if (!$providedToken || $providedToken !== $secretToken) {
             return response()->json([
                 'error' => 'Token inválido ou não fornecido',
@@ -405,13 +410,13 @@ Route::match(['GET', 'POST'], '/payments/check-pending', function (Request $requ
         }
     }
     // Se não houver token configurado, permite acesso sem autenticação (útil para desenvolvimento/testes)
-    
+
     try {
         $botId = $request->input('bot_id');
         $interval = (int) $request->input('interval', 30);
-        
+
         $paymentService = app(\App\Services\PaymentService::class);
-        
+
         // Busca transações PIX pendentes
         $query = \App\Models\Transaction::where('status', 'pending')
             ->where('payment_method', 'pix')
@@ -446,8 +451,8 @@ Route::match(['GET', 'POST'], '/payments/check-pending', function (Request $requ
         if (!$transactions->isEmpty()) {
             foreach ($transactions as $transaction) {
                 try {
-                    $paymentId = $transaction->gateway_transaction_id 
-                        ?? $transaction->metadata['mercadopago_payment_id'] 
+                    $paymentId = $transaction->gateway_transaction_id
+                        ?? $transaction->metadata['mercadopago_payment_id']
                         ?? null;
 
                     if (!$paymentId) {
@@ -467,27 +472,27 @@ Route::match(['GET', 'POST'], '/payments/check-pending', function (Request $requ
                     // Configura o SDK do Mercado Pago
                     \MercadoPago\MercadoPagoConfig::setAccessToken($gatewayConfig->api_key);
                     $client = new \MercadoPago\Client\Payment\PaymentClient();
-                    
+
                     // Busca o status atual do pagamento
                     $payment = $client->get($paymentId);
-                    
+
                     if ($payment) {
                         $status = $payment->status ?? 'pending';
-                        
+
                         // Atualiza metadata com última verificação
                         $metadata = $transaction->metadata ?? [];
                         $metadata['last_status_check'] = now()->toIso8601String();
                         // Remove flag de "não encontrado" se foi encontrado agora
                         unset($metadata['payment_not_found']);
                         $transaction->update(['metadata' => $metadata]);
-                        
+
                         $checkedCount++;
-                        
+
                         // Se está aprovado, processa
                         if ($status === 'approved') {
                             $paymentService->processPaymentApproval($transaction, $payment, $gatewayConfig);
                             $approvedCount++;
-                            
+
                             \Illuminate\Support\Facades\Log::info('Pagamento aprovado via verificação automática', [
                                 'transaction_id' => $transaction->id,
                                 'payment_id' => $paymentId
@@ -500,9 +505,9 @@ Route::match(['GET', 'POST'], '/payments/check-pending', function (Request $requ
                     $apiResponse = $e->getApiResponse();
                     $statusCode = $apiResponse ? $apiResponse->getStatusCode() : null;
                     $responseContent = $apiResponse ? $apiResponse->getContent() : null;
-                    
+
                     // Verifica se é o erro "Chave não localizada" (payment não encontrado)
-                    $isKeyNotFound = stripos($errorMessage, 'chave não localizada') !== false 
+                    $isKeyNotFound = stripos($errorMessage, 'chave não localizada') !== false
                         || stripos($errorMessage, 'key not found') !== false
                         || stripos($errorMessage, 'not found') !== false
                         || ($statusCode === 404)
@@ -510,7 +515,7 @@ Route::match(['GET', 'POST'], '/payments/check-pending', function (Request $requ
                             stripos($responseContent['message'], 'chave não localizada') !== false ||
                             stripos($responseContent['message'], 'not found') !== false
                         ));
-                    
+
                     if ($isKeyNotFound) {
                         // Pagamento não encontrado - marca transação como inválida
                         \Illuminate\Support\Facades\Log::warning('⚠️ Pagamento não encontrado no Mercado Pago (Chave não localizada)', [
@@ -520,7 +525,7 @@ Route::match(['GET', 'POST'], '/payments/check-pending', function (Request $requ
                             'api_response' => $responseContent,
                             'note' => 'O payment_id pode estar incorreto ou o pagamento foi deletado no Mercado Pago. Considerando transação como inválida.'
                         ]);
-                        
+
                         // Atualiza metadata para indicar que o pagamento não foi encontrado
                         $metadata = $transaction->metadata ?? [];
                         $metadata['payment_not_found'] = true;
@@ -528,19 +533,19 @@ Route::match(['GET', 'POST'], '/payments/check-pending', function (Request $requ
                         $metadata['payment_not_found_error'] = $errorMessage;
                         $metadata['last_status_check'] = now()->toIso8601String();
                         $transaction->update(['metadata' => $metadata]);
-                        
+
                         // Se o pagamento não foi encontrado múltiplas vezes, marca como falhado
                         $notFoundCount = $metadata['payment_not_found_count'] ?? 0;
                         $notFoundCount++;
                         $metadata['payment_not_found_count'] = $notFoundCount;
-                        
+
                         // Se não foi encontrado 3 vezes ou mais, marca como falhado
                         if ($notFoundCount >= 3) {
                             $transaction->update([
                                 'status' => 'failed',
                                 'metadata' => $metadata
                             ]);
-                            
+
                             \Illuminate\Support\Facades\Log::warning('🔄 Transação marcada como falhada após múltiplas tentativas de encontrar pagamento', [
                                 'transaction_id' => $transaction->id,
                                 'payment_id' => $paymentId,
@@ -582,7 +587,7 @@ Route::match(['GET', 'POST'], '/payments/check-pending', function (Request $requ
         // Define quando deve ser chamado novamente
         // 15 segundos se houver pendentes, 60 segundos se não houver
         $nextCheckInSeconds = ($stillHasPending || $hasPendingPayments) ? 15 : 60;
-        
+
         \Illuminate\Support\Facades\Log::info('Verificação de pagamentos pendentes executada via API', [
             'bot_id' => $botId,
             'checked_count' => $checkedCount,
@@ -591,7 +596,7 @@ Route::match(['GET', 'POST'], '/payments/check-pending', function (Request $requ
             'has_pending' => $stillHasPending || $hasPendingPayments,
             'next_check_in_seconds' => $nextCheckInSeconds
         ]);
-        
+
         return response()->json([
             'success' => true,
             'message' => 'Verificação de pagamentos pendentes executada com sucesso',
@@ -608,7 +613,7 @@ Route::match(['GET', 'POST'], '/payments/check-pending', function (Request $requ
             'error' => $e->getMessage(),
             'trace' => $e->getTraceAsString()
         ]);
-        
+
         return response()->json([
             'error' => 'Erro ao verificar pagamentos pendentes',
             'message' => $e->getMessage(),

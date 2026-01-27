@@ -6,6 +6,16 @@ const authService = {
     return response.data;
   },
 
+  loginWithGoogle: async (token) => {
+    const response = await api.post('/auth/google', { token });
+    return response.data;
+  },
+
+  registerAdmin: async (userData) => {
+    const response = await api.post('/auth/register/admin', userData);
+    return response.data;
+  },
+
   verifyTwoFactor: async (userId, token) => {
     const response = await api.post('/auth/verify-2fa', { userId, token });
     return response.data;
@@ -48,4 +58,3 @@ const authService = {
 };
 
 export default authService;
-

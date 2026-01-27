@@ -1,6 +1,7 @@
 import React, { useState, useContext, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../contexts/AuthContext';
+import { useGoogleLogin } from '@react-oauth/google';
 import './Login.css';
 
 const Login = () => {
@@ -11,7 +12,7 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
   const [requiresTwoFactor, setRequiresTwoFactor] = useState(false);
   const [userId, setUserId] = useState(null);
-  const { login, verifyTwoFactor, isAuthenticated } = useContext(AuthContext);
+  const { login, loginWithGoogle, verifyTwoFactor, isAuthenticated } = useContext(AuthContext);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -28,26 +29,22 @@ const Login = () => {
     try {
       const result = await login(email, password, twoFactorToken || null);
       
-      // Se requer 2FA, mostra o campo de código
       if (result && result.requiresTwoFactor) {
         setRequiresTwoFactor(true);
         setUserId(result.userId);
-        setTwoFactorToken(''); // Limpa o campo para o código 2FA
+        setTwoFactorToken('');
         setLoading(false);
         return;
       }
       
-      // Se chegou aqui, login foi bem-sucedido
       if (result && result.token) {
         navigate('/');
         return;
       }
       
-      // Se não tem token nem requiresTwoFactor, algo está errado
       setError('Resposta inválida do servidor');
       setLoading(false);
     } catch (err) {
-      // Verifica se é uma resposta de 2FA (não é erro)
       if (err.response?.data?.requiresTwoFactor) {
         setRequiresTwoFactor(true);
         setUserId(err.response.data.userId);
@@ -74,6 +71,22 @@ const Login = () => {
       setLoading(false);
     }
   };
+
+  const handleGoogleLogin = useGoogleLogin({
+    onSuccess: async (tokenResponse) => {
+      setLoading(true);
+      try {
+        await loginWithGoogle(tokenResponse.access_token);
+        navigate('/');
+      } catch (err) {
+        setError(err.response?.data?.error || 'Erro ao fazer login com o Google.');
+        setLoading(false);
+      }
+    },
+    onError: () => {
+      setError('Falha no login com o Google.');
+    },
+  });
 
   return (
     <div className="login-container">
@@ -120,14 +133,32 @@ const Login = () => {
             <button type="submit" className="btn btn-primary" disabled={loading}>
               {loading ? 'Entrando...' : 'Entrar'}
             </button>
+            <button
+              type="button"
+              onClick={() => handleGoogleLogin()}
+              className="btn btn-secondary"
+              disabled={loading}
+              style={{ marginTop: '10px', width: '100%' }}
+            >
+              Fazer login com o Google
+            </button>
             <div className="forgot-password-link">
               <button
                 type="button"
                 onClick={() => navigate('/forgot-password')}
-                className="btn-link"
+                className="btn btn-info"
                 disabled={loading}
               >
                 Esqueci minha senha
+              </button>
+              <br/><br/>
+              <button
+                type="button"
+                onClick={() => navigate('/register-admin')}
+                className="btn btn-info"
+                disabled={loading}
+              >
+                Cadastrar Administrador
               </button>
             </div>
           </form>
@@ -187,4 +218,3 @@ const Login = () => {
 };
 
 export default Login;
-

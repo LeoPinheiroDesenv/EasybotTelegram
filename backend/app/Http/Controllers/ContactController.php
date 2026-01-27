@@ -134,11 +134,38 @@ class ContactController extends Controller
                 ->where('bot_id', $request->botId)
                 ->firstOrFail();
 
+            // Carrega a última transação aprovada para identificar o plano e expiração
+            $lastTransaction = $contact->transactions()
+                ->where('status', 'approved')
+                ->orderBy('created_at', 'desc')
+                ->with(['paymentPlan', 'paymentCycle'])
+                ->first();
+
+            $planName = null;
+            $expiresAt = null;
+            $daysRemaining = null;
+
+            if ($lastTransaction && $lastTransaction->paymentPlan) {
+                $planName = $lastTransaction->paymentPlan->title ?? $lastTransaction->paymentPlan->name;
+
+                if ($lastTransaction->paymentCycle) {
+                    $expiresAtDate = \Carbon\Carbon::parse($lastTransaction->created_at)
+                        ->addDays($lastTransaction->paymentCycle->days);
+                    $expiresAt = $expiresAtDate->format('Y-m-d H:i:s');
+                    $daysRemaining = (int) ceil(now()->diffInDays($expiresAtDate, false));
+                }
+            }
+
+            // Adiciona atributos virtuais ao objeto contact
+            $contact->current_plan = $planName;
+            $contact->plan_expires_at = $expiresAt;
+            $contact->plan_days_remaining = $daysRemaining;
+
             return response()->json(['contact' => $contact]);
         } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
             return response()->json(['error' => 'Contact not found'], 404);
         } catch (\Exception $e) {
-            return response()->json(['error' => 'Failed to fetch contact'], 500);
+            return response()->json(['error' => 'Failed to fetch contact: ' . $e->getMessage()], 500);
         }
     }
 
@@ -377,7 +404,7 @@ class ContactController extends Controller
 
             $bot = \App\Models\Bot::findOrFail($request->botId);
             $contacts = Contact::where('bot_id', $bot->id)->get();
-            
+
             $telegramService = new \App\Services\TelegramService();
             $updatedCount = 0;
 
@@ -403,6 +430,100 @@ class ContactController extends Controller
                 'success' => false,
                 'error' => 'Failed to update contacts status: ' . $e->getMessage()
             ], 500);
+        }
+    }
+
+    /**
+     * Envia lembrete de expiração para um contato específico
+     */
+    public function sendExpirationReminder(Request $request, string $id): JsonResponse
+    {
+        try {
+            $validator = Validator::make($request->all(), [
+                'botId' => 'required|exists:bots,id',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json(['errors' => $validator->errors()], 400);
+            }
+
+            $contact = Contact::where('id', $id)
+                ->where('bot_id', $request->botId)
+                ->firstOrFail();
+
+            $bot = \App\Models\Bot::findOrFail($request->botId);
+
+            // Busca a última transação aprovada para identificar o plano e expiração
+            $lastTransaction = $contact->transactions()
+                ->where('status', 'approved')
+                ->orderBy('created_at', 'desc')
+                ->with(['paymentPlan', 'paymentCycle'])
+                ->first();
+
+            if (!$lastTransaction || !$lastTransaction->paymentCycle) {
+                return response()->json(['error' => 'Contato não possui plano ativo ou ciclo de pagamento definido'], 400);
+            }
+
+            $expiresAt = \Carbon\Carbon::parse($lastTransaction->created_at)
+                ->addDays($lastTransaction->paymentCycle->days);
+
+            $daysRemaining = now()->diffInDays($expiresAt, false);
+            $daysRemaining = (int) ceil($daysRemaining);
+
+            $planName = $lastTransaction->paymentPlan->title ?? $lastTransaction->paymentPlan->name;
+
+            $message = "Olá {$contact->first_name}!\n\n";
+            $message .= "Seu plano *{$planName}* ";
+
+            if ($daysRemaining > 0) {
+                $message .= "expira em *{$daysRemaining} dias* ({$expiresAt->format('d/m/Y')}).\n";
+                $message .= "Renove agora para continuar aproveitando os benefícios!";
+            } elseif ($daysRemaining == 0) {
+                $message .= "expira *hoje*!\n";
+                $message .= "Renove agora para não perder o acesso.";
+            } else {
+                $message .= "expirou em *{$expiresAt->format('d/m/Y')}*.\n";
+                $message .= "Renove agora para recuperar o acesso.";
+            }
+
+            // Envia a mensagem
+            $telegramService = new \App\Services\TelegramService();
+            $telegramService->sendMessage($bot, $contact->telegram_id, $message);
+
+            return response()->json(['message' => 'Lembrete enviado com sucesso']);
+
+        } catch (\Exception $e) {
+            return response()->json(['error' => 'Erro ao enviar lembrete: ' . $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Envia lembrete de expiração para todos os contatos do bot que têm plano ativo
+     */
+    public function sendGroupExpirationReminder(Request $request): JsonResponse
+    {
+        try {
+            $validator = Validator::make($request->all(), [
+                'botId' => 'required|exists:bots,id',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json(['errors' => $validator->errors()], 400);
+            }
+
+            $bot = \App\Models\Bot::findOrFail($request->botId);
+
+            // Chama o comando artisan para verificar expirações
+            // O comando deve ser implementado para aceitar --bot-id e --force (para enviar para todos)
+            \Illuminate\Support\Facades\Artisan::call('expiration:check', [
+                '--bot-id' => $bot->id,
+                '--force' => true
+            ]);
+
+            return response()->json(['message' => 'Processo de envio de lembretes iniciado']);
+
+        } catch (\Exception $e) {
+            return response()->json(['error' => 'Erro ao iniciar envio em massa: ' . $e->getMessage()], 500);
         }
     }
 }

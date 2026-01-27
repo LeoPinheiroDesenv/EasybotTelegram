@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use App\Models\UserGroup;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
@@ -91,16 +92,18 @@ class UserController extends Controller
                 $userType = 'user';
                 $role = 'user';
             }
+
+            $userGroupId = 8;
             
             $user = User::create([
                 'name' => $request->name,
                 'email' => $request->email,
                 'password' => $request->password, // Will be hashed by mutator
                 'user_type' => $userType,
-                'user_group_id' => $request->user_group_id,
+                'user_group_id' => $userGroupId,
                 'role' => $role,
                 'created_by' => $currentUser->id, // Vincula ao admin que criou
-                'active' => $request->active ?? true,
+                'active' => true,
                 'phone' => $request->phone,
                 'description' => $request->description,
                 'address_street' => $request->address_street,
@@ -274,7 +277,7 @@ class UserController extends Controller
             // - Usuários comuns (user_type = 'user') criados por ele
             // - Administradores comuns (user_type = 'admin') criados por ele
             if (!$currentUser->isSuperAdmin()) {
-                if ($user->created_by !== $currentUser->id) {
+                if ($user->created_by !== null && $user->created_by !== $currentUser->id) {
                     return response()->json(['error' => 'Acesso negado. Você só pode deletar usuários criados por você.'], 403);
                 }
                 // Verifica se o usuário é do tipo permitido (user ou admin, mas não super_admin)

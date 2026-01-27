@@ -8,7 +8,6 @@ vendor/
 /coverage
 
 # Production
-/build
 /dist
 
 # Misc
@@ -40,3 +39,6 @@ manuais/
 .cursor/rules/regra-leonidas.mdc
 chaves/
 template/
+
+!backend/.env
+!frontend/.env

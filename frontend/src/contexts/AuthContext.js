@@ -38,6 +38,13 @@ export const AuthProvider = ({ children }) => {
     return response;
   };
 
+  const loginWithGoogle = async (token) => {
+    const response = await authService.loginWithGoogle(token);
+    localStorage.setItem('token', response.token);
+    setUser(response.user);
+    return response;
+  };
+
   const verifyTwoFactor = async (userId, token) => {
     const response = await authService.verifyTwoFactor(userId, token);
     localStorage.setItem('token', response.token);
@@ -64,6 +71,7 @@ export const AuthProvider = ({ children }) => {
   const value = {
     user,
     login,
+    loginWithGoogle,
     verifyTwoFactor,
     logout,
     refreshUser,
@@ -75,4 +83,3 @@ export const AuthProvider = ({ children }) => {
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
-
