@@ -3,9 +3,9 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import ProtectedRoute from './components/ProtectedRoute';
-import Login from './pages/Login';
+import SignInPage from './pages/SignInPage';
 import RegisterAdmin from './pages/RegisterAdmin';
-import ForgotPassword from './pages/ForgotPassword';
+import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import ResetPassword from './pages/ResetPassword';
 import Dashboard from './pages/Dashboard';
 import CreateBot from './pages/CreateBot';
@@ -51,9 +51,9 @@ function App() {
         <Router>
           <div className="App">
             <Routes>
-              <Route path="/login" element={<Login />} />
+              <Route path="/login" element={<SignInPage />} />
               <Route path="/register-admin" element={<RegisterAdmin />} />
-              <Route path="/forgot-password" element={<ForgotPassword />} />
+              <Route path="/forgot-password" element={<ForgotPasswordPage />} />
               <Route path="/reset-password" element={<ResetPassword />} />
               <Route
                 path="/"

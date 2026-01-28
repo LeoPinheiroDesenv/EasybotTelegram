@@ -52,7 +52,6 @@ const Billing = () => {
   const [filters, setFilters] = useState({
     start_date: '',
     end_date: '',
-    month: '',
     bot_id: '',
     payment_method: '',
     gateway: ''
@@ -63,7 +62,7 @@ const Billing = () => {
   }, []);
 
   useEffect(() => {
-    if (filters.start_date || filters.end_date || filters.month || filters.bot_id || filters.payment_method || filters.gateway) {
+    if (filters.start_date || filters.end_date || filters.bot_id || filters.payment_method || filters.gateway) {
       loadBillingData();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -102,7 +101,7 @@ const Billing = () => {
 
   const handleRefresh = async () => {
     await loadInitialData();
-    if (filters.start_date || filters.end_date || filters.month || filters.bot_id || filters.payment_method || filters.gateway) {
+    if (filters.start_date || filters.end_date || filters.bot_id || filters.payment_method || filters.gateway) {
       await loadBillingData();
     }
   };
@@ -118,7 +117,6 @@ const Billing = () => {
     setFilters({
       start_date: '',
       end_date: '',
-      month: '',
       bot_id: '',
       payment_method: '',
       gateway: ''
@@ -262,29 +260,11 @@ const Billing = () => {
           <h2>Filtros de Consulta</h2>
           <div className="filters-grid">
             <div className="filter-group">
-              <label>Período por Mês</label>
-              <DatePicker
-                selected={filters.month ? new Date(filters.month + '-01T12:00:00') : null}
-                onChange={(date) => {
-                  handleFilterChange('month', date ? date.toISOString().slice(0, 7) : '');
-                  handleFilterChange('start_date', '');
-                  handleFilterChange('end_date', '');
-                }}
-                dateFormat="MM/yyyy"
-                showMonthYearPicker
-                locale="pt-BR"
-                placeholderText="Selecione o mês"
-                className="date-picker-input"
-                isClearable
-              />
-            </div>
-            <div className="filter-group">
               <label>Data Inicial</label>
               <DatePicker
                 selected={filters.start_date ? new Date(filters.start_date + 'T12:00:00') : null}
                 onChange={(date) => {
                   handleFilterChange('start_date', date ? date.toISOString().split('T')[0] : '');
-                  handleFilterChange('month', '');
                 }}
                 dateFormat="dd/MM/yyyy"
                 locale="pt-BR"
@@ -300,7 +280,6 @@ const Billing = () => {
                 selected={filters.end_date ? new Date(filters.end_date + 'T12:00:00') : null}
                 onChange={(date) => {
                   handleFilterChange('end_date', date ? date.toISOString().split('T')[0] : '');
-                  handleFilterChange('month', '');
                 }}
                 dateFormat="dd/MM/yyyy"
                 locale="pt-BR"
