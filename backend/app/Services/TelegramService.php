@@ -24,7 +24,7 @@ class TelegramService
     {
         return (int) env('TELEGRAM_API_TIMEOUT', 30);
     }
-    
+
     /**
      * Cria uma instância HTTP com timeout e retry configurados
      *
@@ -35,7 +35,7 @@ class TelegramService
         return Http::timeout($this->getTimeout())
             ->retry(2, 1000); // 2 tentativas com 1 segundo de delay
     }
-    
+
     /**
      * Valida um token do Telegram Bot
      *
@@ -46,20 +46,20 @@ class TelegramService
     {
         $maxRetries = 3;
         $retryDelay = 2; // segundos entre tentativas
-        
+
         for ($attempt = 1; $attempt <= $maxRetries; $attempt++) {
             try {
                 $response = $this->http()->get("https://api.telegram.org/bot{$token}/getMe");
-                
+
                 if (!$response->successful()) {
                     $errorMessage = $response->json()['description'] ?? 'Token inválido ou inacessível';
-                    
+
                     // Se for erro de timeout e ainda houver tentativas, continua
                     if ($attempt < $maxRetries && str_contains($response->body(), 'timeout')) {
                         sleep($retryDelay);
                         continue;
                     }
-                    
+
                     return [
                         'valid' => false,
                         'error' => $errorMessage
@@ -67,7 +67,7 @@ class TelegramService
                 }
 
                 $data = $response->json();
-                
+
                 if (!$data['ok']) {
                     return [
                         'valid' => false,
@@ -89,7 +89,7 @@ class TelegramService
                     sleep($retryDelay);
                     continue;
                 }
-                
+
                 LogFacade::error('Erro ao conectar com a API do Telegram após ' . $maxRetries . ' tentativas', [
                     'error' => $e->getMessage(),
                     'token' => substr($token, 0, 10) . '...'
@@ -109,7 +109,7 @@ class TelegramService
                     sleep($retryDelay);
                     continue;
                 }
-                
+
                 LogFacade::error('Erro ao validar token do Telegram', [
                     'error' => $e->getMessage(),
                     'token' => substr($token, 0, 10) . '...',
@@ -122,7 +122,7 @@ class TelegramService
                 ];
             }
         }
-        
+
         return [
             'valid' => false,
             'error' => 'Não foi possível conectar com a API do Telegram após ' . $maxRetries . ' tentativas. Verifique sua conexão com a internet.'
@@ -131,7 +131,7 @@ class TelegramService
 
     /**
      * Inicializa um bot do Telegram
-     * 
+     *
      * IMPORTANTE: Este método apenas valida e marca o bot como ativado.
      * Para receber atualizações, você DEVE:
      * - Usar polling: executar 'php artisan telegram:polling --bot-id={id}' em terminal separado
@@ -173,13 +173,13 @@ class TelegramService
             $webhookConfigured = false;
             $webhookUrl = null;
             $webhookError = null;
-            
+
             if (!$hasWebhook) {
                 $webhookResult = $this->configureWebhook($bot);
                 $webhookConfigured = $webhookResult['success'] ?? false;
                 $webhookUrl = $webhookResult['webhook_url'] ?? null;
                 $webhookError = $webhookResult['error'] ?? null;
-                
+
                 if ($webhookConfigured) {
                     $this->logBotAction($bot, 'Webhook configurado automaticamente durante inicialização', 'info', [
                         'webhook_url' => $webhookUrl
@@ -214,7 +214,7 @@ class TelegramService
             ];
         } catch (Exception $e) {
             $this->logBotAction($bot, 'Erro ao inicializar bot: ' . $e->getMessage(), 'error');
-            
+
             return [
                 'success' => false,
                 'error' => 'Erro ao inicializar bot: ' . $e->getMessage()
@@ -233,11 +233,11 @@ class TelegramService
         try {
             $response = $this->http()
                 ->get("https://api.telegram.org/bot{$token}/getWebhookInfo");
-            
+
             if ($response->successful() && $response->json()['ok']) {
                 return $response->json()['result'] ?? [];
             }
-            
+
             return [];
         } catch (Exception $e) {
             return [];
@@ -256,12 +256,12 @@ class TelegramService
             // Gera URL do webhook - usa variável de ambiente se disponível, senão usa APP_URL
             $baseUrl = env('TELEGRAM_WEBHOOK_URL') ?? config('app.url');
             $webhookUrl = $baseUrl . "/api/telegram/webhook/{$bot->id}";
-            
+
             // Converte HTTP para HTTPS se necessário (Telegram requer HTTPS)
             if (str_starts_with($webhookUrl, 'http://')) {
                 $webhookUrl = str_replace('http://', 'https://', $webhookUrl);
             }
-            
+
             // Verifica se URL começa com https (obrigatório pelo Telegram)
             if (!str_starts_with($webhookUrl, 'https://')) {
                 return [
@@ -269,7 +269,7 @@ class TelegramService
                     'error' => 'Webhook requer HTTPS. Configure TELEGRAM_WEBHOOK_URL no .env com URL HTTPS.'
                 ];
             }
-            
+
             // Valida porta (Telegram aceita apenas 443, 80, 88, 8443)
             $parsedUrl = parse_url($webhookUrl);
             $port = $parsedUrl['port'] ?? (str_starts_with($webhookUrl, 'https://') ? 443 : 80);
@@ -279,7 +279,7 @@ class TelegramService
                     'error' => 'Porta inválida. Telegram aceita apenas portas: 443, 80, 88, 8443. Porta atual: ' . $port
                 ];
             }
-            
+
             // Remove webhook existente primeiro (se houver)
             try {
                 $this->http()
@@ -289,7 +289,7 @@ class TelegramService
             } catch (Exception $e) {
                 // Ignora erros ao remover webhook antigo
             }
-            
+
             // Prepara dados para setWebhook
             $allowedUpdates = [
                 'message',
@@ -307,7 +307,7 @@ class TelegramService
                 'chat_member',
                 'chat_join_request'
             ];
-            
+
             $webhookData = [
                 'url' => $webhookUrl,
                 'allowed_updates' => json_encode($allowedUpdates)
@@ -337,7 +337,7 @@ class TelegramService
                 'bot_id' => $bot->id,
                 'error' => $e->getMessage()
             ]);
-            
+
             return [
                 'success' => false,
                 'error' => 'Erro ao configurar webhook: ' . $e->getMessage()
@@ -355,7 +355,7 @@ class TelegramService
     {
         try {
             $bot->update(['activated' => false]);
-            
+
             $this->logBotAction($bot, 'Bot parado', 'info');
 
             return [
@@ -364,7 +364,7 @@ class TelegramService
             ];
         } catch (Exception $e) {
             $this->logBotAction($bot, 'Erro ao parar bot: ' . $e->getMessage(), 'error');
-            
+
             return [
                 'success' => false,
                 'error' => 'Erro ao parar bot: ' . $e->getMessage()
@@ -382,7 +382,7 @@ class TelegramService
     {
         try {
             $validation = $this->validateToken($bot->token);
-            
+
             $status = [
                 'bot_id' => $bot->id,
                 'active' => $bot->active,
@@ -401,7 +401,7 @@ class TelegramService
                 // Verifica permissão crítica: can_read_all_group_messages
                 $canReadAllMessages = $botInfo['can_read_all_group_messages'] ?? false;
                 $permissions['can_read_all_group_messages'] = $canReadAllMessages;
-                
+
                 if (!$canReadAllMessages) {
                     $warnings[] = [
                         'type' => 'critical',
@@ -459,7 +459,7 @@ class TelegramService
         // Valida token primeiro
         $tokenValidation = $this->validateToken($token);
         $result['token_valid'] = $tokenValidation['valid'];
-        
+
         if (!$tokenValidation['valid']) {
             $result['errors'][] = 'Token inválido: ' . ($tokenValidation['error'] ?? 'Token não pôde ser validado');
             return $result;
@@ -477,7 +477,7 @@ class TelegramService
             $groupValidation = $this->validateGroup($token, $groupId, $tokenValidation['bot']);
             $result['group_valid'] = $groupValidation['valid'];
             $result['group_info'] = $groupValidation['group_info'] ?? null;
-            
+
             if (!$groupValidation['valid']) {
                 $result['errors'][] = 'Grupo inválido: ' . ($groupValidation['error'] ?? 'Grupo não pôde ser validado');
             }
@@ -505,11 +505,11 @@ class TelegramService
             ]);
 
             $responseData = $response->json() ?? [];
-            
+
             if (!$response->successful()) {
                 // Verifica se o erro é devido a migração de grupo para supergrupo
                 $migration = $this->detectGroupMigration($responseData);
-                
+
                 if ($migration) {
                     return [
                         'valid' => false,
@@ -519,19 +519,19 @@ class TelegramService
                         'old_chat_id' => $groupId
                     ];
                 }
-                
+
                 $errorMessage = $responseData['description'] ?? 'Erro ao acessar grupo';
-                
+
                 return [
                     'valid' => false,
                     'error' => $errorMessage
                 ];
             }
-            
+
             if (!($responseData['ok'] ?? false)) {
                 // Verifica se o erro é devido a migração de grupo para supergrupo
                 $migration = $this->detectGroupMigration($responseData);
-                
+
                 if ($migration) {
                     return [
                         'valid' => false,
@@ -541,7 +541,7 @@ class TelegramService
                         'old_chat_id' => $groupId
                     ];
                 }
-                
+
                 return [
                     'valid' => false,
                     'error' => $responseData['description'] ?? 'Grupo não encontrado ou inacessível'
@@ -578,7 +578,7 @@ class TelegramService
 
             // Verifica se o bot é membro do grupo
             $botMemberInfo = $this->getChatMember($token, $groupId, $botId);
-            
+
             if (!$botMemberInfo['is_member']) {
                 return [
                     'valid' => false,
@@ -640,11 +640,11 @@ class TelegramService
             ]);
 
             $responseData = $response->json() ?? [];
-            
+
             if (!$response->successful() || !($responseData['ok'] ?? false)) {
                 // Verifica se o erro é devido a migração de grupo para supergrupo
                 $migration = $this->detectGroupMigration($responseData);
-                
+
                 if ($migration) {
                     // Retorna informação sobre migração para que o chamador possa atualizar
                     return [
@@ -655,7 +655,7 @@ class TelegramService
                         'old_chat_id' => $groupId
                     ];
                 }
-                
+
                 return [
                     'is_member' => false,
                     'status' => 'not_member'
@@ -718,7 +718,7 @@ class TelegramService
         try {
             // Normaliza o chat_id
             $normalizedChatId = $this->normalizeChatId($chatId);
-            
+
             // Obtém o ID do bot se não fornecido
             if ($botId === null) {
                 try {
@@ -735,23 +735,23 @@ class TelegramService
 
             // Verifica se o bot é membro e tem permissões
             $botMemberInfo = $this->getChatMember($token, $normalizedChatId, $botId);
-            
+
             // Verifica se o grupo foi migrado para supergrupo
             if (isset($botMemberInfo['migrated']) && $botMemberInfo['migrated'] === true) {
                 $newChatId = $botMemberInfo['new_chat_id'] ?? null;
-                
+
                 if ($newChatId) {
                     LogFacade::info('🔄 Grupo migrado detectado em getChatInviteLink, usando novo chat_id', [
                         'old_chat_id' => $normalizedChatId,
                         'new_chat_id' => $newChatId
                     ]);
-                    
+
                     // Atualiza o chat_id e tenta novamente
                     $normalizedChatId = $newChatId;
                     $botMemberInfo = $this->getChatMember($token, $normalizedChatId, $botId);
                 }
             }
-            
+
             // Se o status retornado é 'member', tenta verificar novamente para garantir que não há cache
             // Às vezes a API pode retornar status desatualizado
             $initialStatus = $botMemberInfo['status'] ?? 'unknown';
@@ -760,11 +760,11 @@ class TelegramService
                     'chat_id' => $normalizedChatId,
                     'bot_id' => $botId
                 ]);
-                
+
                 // Aguarda um pouco e verifica novamente (pode ser um problema de sincronização)
                 usleep(500000); // 0.5 segundos
                 $botMemberInfoRetry = $this->getChatMember($token, $normalizedChatId, $botId);
-                
+
                 // Se o novo status for diferente (especialmente se for admin), usa o novo
                 $retryStatus = $botMemberInfoRetry['status'] ?? 'unknown';
                 if (in_array($retryStatus, ['administrator', 'creator']) && $retryStatus !== $initialStatus) {
@@ -777,7 +777,7 @@ class TelegramService
                     $botMemberInfo = $botMemberInfoRetry;
                 }
             }
-            
+
             if (!$botMemberInfo['is_member']) {
                 return [
                     'success' => false,
@@ -849,18 +849,18 @@ class TelegramService
                 ]);
 
                 $responseData = $response->json() ?? [];
-                
+
                 // Verifica se o erro é devido a migração de grupo para supergrupo
                 if (!$response->successful() || !($responseData['ok'] ?? false)) {
                     $migration = $this->detectGroupMigration($responseData);
-                    
+
                     if ($migration) {
                         $newChatId = $migration['new_chat_id'];
                         LogFacade::info('🔄 Grupo migrado detectado em exportChatInviteLink, usando novo chat_id', [
                             'old_chat_id' => $normalizedChatId,
                             'new_chat_id' => $newChatId
                         ]);
-                        
+
                         // Atualiza o chat_id e tenta novamente
                         $normalizedChatId = $newChatId;
                         $response = $this->http()->post("https://api.telegram.org/bot{$token}/exportChatInviteLink", [
@@ -886,7 +886,7 @@ class TelegramService
                 // Se exportChatInviteLink falhou, tenta createChatInviteLink
                 $errorMessage = $responseData['description'] ?? 'Erro desconhecido';
                 $errorCode = $responseData['error_code'] ?? null;
-                
+
                 // Se o bot é administrador mas exportChatInviteLink falhou, loga informação adicional
                 if ($isAdmin) {
                     LogFacade::warning('exportChatInviteLink falhou para administrador, tentando createChatInviteLink', [
@@ -919,18 +919,18 @@ class TelegramService
                 ]);
 
                 $responseData = $response->json() ?? [];
-                
+
                 // Verifica se o erro é devido a migração de grupo para supergrupo
                 if (!$response->successful() || !($responseData['ok'] ?? false)) {
                     $migration = $this->detectGroupMigration($responseData);
-                    
+
                     if ($migration) {
                         $newChatId = $migration['new_chat_id'];
                         LogFacade::info('🔄 Grupo migrado detectado em createChatInviteLink, usando novo chat_id', [
                             'old_chat_id' => $normalizedChatId,
                             'new_chat_id' => $newChatId
                         ]);
-                        
+
                         // Atualiza o chat_id e tenta novamente
                         $normalizedChatId = $newChatId;
                         $response = $this->http()->post("https://api.telegram.org/bot{$token}/createChatInviteLink", [
@@ -957,16 +957,16 @@ class TelegramService
                 $errorMessage = $responseData['description'] ?? 'Erro ao criar link de convite';
                 $errorCode = $responseData['error_code'] ?? null;
                 $errorDescription = $responseData['description'] ?? '';
-                
+
                 // Se o bot é administrador mas ainda assim falhou, fornece mensagem mais específica
                 if ($isAdmin || $status === 'member') {
                     // Verifica se o erro é relacionado a permissões
-                    $isPermissionError = stripos($errorDescription, 'not enough rights') !== false || 
+                    $isPermissionError = stripos($errorDescription, 'not enough rights') !== false ||
                                         stripos($errorDescription, 'permission') !== false ||
                                         stripos($errorDescription, 'can_invite_users') !== false ||
                                         stripos($errorDescription, 'not an admin') !== false ||
                                         stripos($errorDescription, 'not administrator') !== false;
-                    
+
                     if ($isPermissionError) {
                         if ($isAdmin) {
                             $errorMessage = 'O bot é administrador, mas não tem a permissão "Convidar usuários" habilitada. ' .
@@ -983,7 +983,7 @@ class TelegramService
                             $chatInfo = $this->http()->get("https://api.telegram.org/bot{$token}/getChat", [
                                 'chat_id' => $normalizedChatId
                             ]);
-                            
+
                             $chatData = $chatInfo->json() ?? [];
                             if ($chatInfo->successful() && ($chatData['ok'] ?? false)) {
                                 LogFacade::info('Grupo existe e é acessível, mas não foi possível obter link', [
@@ -995,7 +995,7 @@ class TelegramService
                         } catch (Exception $e) {
                             // Ignora erro ao verificar chat
                         }
-                        
+
                         if ($isAdmin) {
                             $errorMessage = 'O bot é administrador, mas não conseguiu obter o link de convite. ' .
                                            'Verifique se o bot tem a permissão "Convidar usuários" habilitada nas configurações do grupo. ' .
@@ -1054,22 +1054,22 @@ class TelegramService
     {
         // Remove espaços
         $chatId = trim($chatId);
-        
+
         // Se começa com @, é um username (canal público)
         if (str_starts_with($chatId, '@')) {
             return ltrim($chatId, '@');
         }
-        
+
         // Remove @ se houver no meio
         $chatId = str_replace('@', '', $chatId);
-        
+
         // Se é numérico
         if (is_numeric($chatId)) {
             // Se já começa com -, retorna como está
             if (str_starts_with($chatId, '-')) {
                 return $chatId;
             }
-            
+
             // Se não começa com -, adiciona
             // Supergrupos geralmente começam com 100
             if (str_starts_with($chatId, '100')) {
@@ -1079,7 +1079,7 @@ class TelegramService
                 return '-' . $chatId;
             }
         }
-        
+
         // Se não é numérico e não é username, retorna como está
         return $chatId;
     }
@@ -1096,10 +1096,10 @@ class TelegramService
     {
         try {
             $normalizedChatId = $this->normalizeChatId($groupId);
-            
+
             // Primeiro, verifica se o usuário já é membro do grupo
             $memberInfo = $this->getChatMember($token, $normalizedChatId, $userId);
-            
+
             if ($memberInfo['is_member'] ?? false) {
                 return [
                     'success' => true,
@@ -1107,7 +1107,7 @@ class TelegramService
                     'already_member' => true
                 ];
             }
-            
+
             // Verifica se o usuário é o dono do grupo (não pode ser adicionado/removido)
             if (($memberInfo['status'] ?? '') === 'creator') {
                 return [
@@ -1116,7 +1116,7 @@ class TelegramService
                     'already_member' => true
                 ];
             }
-            
+
             // Tenta adicionar usando inviteChatMember (requer que o bot seja admin com permissão can_invite_users)
             $response = $this->http()->post("https://api.telegram.org/bot{$token}/inviteChatMember", [
                 'chat_id' => $normalizedChatId,
@@ -1126,9 +1126,9 @@ class TelegramService
             if (!$response->successful() || !$response->json()['ok']) {
                 $errorData = $response->json();
                 $errorMessage = $errorData['description'] ?? 'Erro ao adicionar usuário ao grupo';
-                
+
                 // Se o erro for sobre não poder remover o dono, significa que o usuário já é o dono
-                if (str_contains($errorMessage, "can't remove chat owner") || 
+                if (str_contains($errorMessage, "can't remove chat owner") ||
                     str_contains($errorMessage, "chat owner")) {
                     return [
                         'success' => true,
@@ -1136,21 +1136,21 @@ class TelegramService
                         'already_member' => true
                     ];
                 }
-                
+
                 // Se inviteChatMember falhar, tenta unbanChatMember (para desbanir se estiver banido)
                 $unbanResponse = $this->http()->post("https://api.telegram.org/bot{$token}/unbanChatMember", [
                     'chat_id' => $normalizedChatId,
                     'user_id' => $userId,
                     'only_if_banned' => true // Só desbane se estiver banido
                 ]);
-                
+
                 if (!$unbanResponse->successful() || !$unbanResponse->json()['ok']) {
                     return [
                         'success' => false,
                         'error' => $errorMessage
                     ];
                 }
-                
+
                 return [
                     'success' => true,
                     'message' => 'Usuário desbanido e adicionado ao grupo com sucesso'
@@ -1181,10 +1181,10 @@ class TelegramService
     {
         try {
             $normalizedChatId = $this->normalizeChatId($groupId);
-            
+
             // Primeiro, verifica se o usuário é membro do grupo
             $memberInfo = $this->getChatMember($token, $normalizedChatId, $userId);
-            
+
             if (!($memberInfo['is_member'] ?? false)) {
                 return [
                     'success' => true,
@@ -1192,7 +1192,7 @@ class TelegramService
                     'already_removed' => true
                 ];
             }
-            
+
             // Verifica se o usuário é o dono do grupo (não pode ser removido)
             if (($memberInfo['status'] ?? '') === 'creator') {
                 return [
@@ -1200,7 +1200,7 @@ class TelegramService
                     'error' => 'Não é possível remover o dono do grupo'
                 ];
             }
-            
+
             $response = $this->http()->post("https://api.telegram.org/bot{$token}/banChatMember", [
                 'chat_id' => $normalizedChatId,
                 'user_id' => $userId,
@@ -1210,16 +1210,16 @@ class TelegramService
             if (!$response->successful() || !$response->json()['ok']) {
                 $errorData = $response->json();
                 $errorMessage = $errorData['description'] ?? 'Erro ao remover usuário do grupo';
-                
+
                 // Se o erro for sobre não poder remover o dono
-                if (str_contains($errorMessage, "can't remove chat owner") || 
+                if (str_contains($errorMessage, "can't remove chat owner") ||
                     str_contains($errorMessage, "chat owner")) {
                     return [
                         'success' => false,
                         'error' => 'Não é possível remover o dono do grupo'
                     ];
                 }
-                
+
                 return [
                     'success' => false,
                     'error' => $errorMessage
@@ -1268,7 +1268,7 @@ class TelegramService
             } elseif (isset($update['inline_query'])) {
                 $updateType = 'inline_query';
             }
-            
+
             // Processa mensagem (chat privado ou grupo)
             if (isset($update['message'])) {
                 $this->processMessage($bot, $update['message']);
@@ -1341,7 +1341,7 @@ class TelegramService
         // IMPORTANTE: Solicitação de dados pessoais (email, telefone, idioma) só deve acontecer em chats privados
         if ($chatType === 'private') {
             $contact = $this->saveOrUpdateContact($bot, $from);
-            
+
             // Processa contato compartilhado (telefone compartilhado via botão)
             // Só processa em chats privados, não em grupos
             if (isset($message['contact'])) {
@@ -1370,7 +1370,7 @@ class TelegramService
         // O Telegram pode não enviar a entity bot_command em conversas existentes
         $isCommand = false;
         $command = null;
-        
+
         // Primeiro, tenta usar entities se disponível (mais preciso)
         if (isset($message['entities'])) {
             foreach ($message['entities'] as $entity) {
@@ -1386,7 +1386,7 @@ class TelegramService
                 }
             }
         }
-        
+
         // Se não encontrou command entity, verifica se começa com / (fallback)
         // Em chats privados, sempre processa comandos que começam com /
         if (!$isCommand && $text) {
@@ -1403,7 +1403,7 @@ class TelegramService
                 ]);
             }
         }
-        
+
         // Processa comandos (em chats privados, sempre processa qualquer comando)
         if ($isCommand && $command) {
             // Remove @username do comando se houver
@@ -1452,7 +1452,7 @@ class TelegramService
         // E verifica se é membro do grupo para atualizar status
         if ($from) {
             $contact = $this->saveOrUpdateContact($bot, $from);
-            
+
             // Verifica se o contato é membro do grupo e atualiza status
             if (!empty($bot->telegram_group_id)) {
                 try {
@@ -1475,7 +1475,7 @@ class TelegramService
             // Extrai o comando do texto
             $commandParts = explode(' ', trim($text));
             $command = $commandParts[0];
-            
+
             // Log detalhado para debug
             $this->logBotAction($bot, "Processando comando em grupo", 'info', [
                 'chat_id' => $chatId,
@@ -1485,7 +1485,7 @@ class TelegramService
                 'has_entities' => isset($message['entities']),
                 'entities' => $message['entities'] ?? []
             ]);
-            
+
             // Obtém o username do bot (cache para evitar múltiplas chamadas)
             $botUsername = null;
             $botIdFromToken = null;
@@ -1501,11 +1501,11 @@ class TelegramService
                     'error' => $e->getMessage()
                 ]);
             }
-            
+
             // Verifica se o comando menciona algum bot pelo texto
             $commandMentionsOurBot = false;
             $commandMentionsOtherBot = false;
-            
+
             if (str_contains($command, '@')) {
                 if ($botUsername && str_contains($command, '@' . $botUsername)) {
                     $commandMentionsOurBot = true;
@@ -1514,17 +1514,17 @@ class TelegramService
                     $commandMentionsOtherBot = true;
                 }
             }
-            
+
             // Verifica entities para detecção mais precisa
             $entityMentionsOurBot = false;
             $entityMentionsOtherBot = false;
             $hasCommandEntity = false;
-            
+
             if (isset($message['entities']) && is_array($message['entities'])) {
                 foreach ($message['entities'] as $entity) {
                     if (($entity['type'] ?? '') === 'bot_command') {
                         $hasCommandEntity = true;
-                        
+
                         // Se a entity tem 'user', significa que menciona um bot específico
                         // Isso é a forma mais confiável de detectar qual bot foi mencionado
                         if (isset($entity['user']) && isset($entity['user']['id'])) {
@@ -1547,16 +1547,16 @@ class TelegramService
                                 }
                             }
                         }
-                        
+
                         // Se não tem 'user', verifica pelo texto da entity
                         // Isso é um fallback para casos onde a entity não tem user.id
                         if (!$entityMentionsOurBot && !$entityMentionsOtherBot) {
                             $entityOffset = $entity['offset'] ?? 0;
                             $entityLength = $entity['length'] ?? 0;
-                            
+
                             if ($entityOffset >= 0 && $entityLength > 0 && $entityOffset + $entityLength <= strlen($text)) {
                                 $entityText = substr($text, $entityOffset, $entityLength);
-                                
+
                                 if (str_contains($entityText, '@')) {
                                     if ($botUsername && str_contains($entityText, '@' . $botUsername)) {
                                         $entityMentionsOurBot = true;
@@ -1578,15 +1578,15 @@ class TelegramService
                     }
                 }
             }
-            
-            // Se não encontrou entity de comando, mas o texto começa com /, 
+
+            // Se não encontrou entity de comando, mas o texto começa com /,
             // significa que é um comando genérico (sem menção a bot específico)
             if (!$hasCommandEntity && str_starts_with(trim($text), '/')) {
                 $this->logBotAction($bot, "Comando sem entity de bot_command (comando genérico)", 'info', [
                     'command' => $command
                 ]);
             }
-            
+
             // Decide se deve processar o comando
             // REGRA PRINCIPAL: Se o bot recebeu a mensagem de comando em um grupo, significa que:
             // 1. O bot foi mencionado explicitamente (ex: /start@botname), OU
@@ -1594,7 +1594,7 @@ class TelegramService
             // Em ambos os casos, devemos processar o comando, EXCETO se mencionar outro bot
             $shouldProcess = false;
             $processReason = '';
-            
+
             // Caso 1: Comando menciona nosso bot explicitamente (via texto ou entity)
             if ($commandMentionsOurBot || $entityMentionsOurBot) {
                 $shouldProcess = true;
@@ -1611,7 +1611,7 @@ class TelegramService
             else {
                 $processReason = 'menciona_outro_bot';
             }
-            
+
             // Log da decisão
             $this->logBotAction($bot, "Decisão de processamento: {$processReason}", 'info', [
                 'chat_id' => $chatId,
@@ -1624,7 +1624,7 @@ class TelegramService
                 'entity_mentions_other_bot' => $entityMentionsOtherBot,
                 'bot_username' => $botUsername
             ]);
-            
+
             if ($shouldProcess) {
                 // Remove @username do comando antes de processar
                 $cleanCommand = preg_replace('/@\w+/', '', $command);
@@ -1713,18 +1713,18 @@ class TelegramService
     protected function processCommand(Bot $bot, int $chatId, array $from, string $command, string $chatType = 'private'): void
     {
         $command = trim($command);
-        
+
         // Remove @username se houver no comando
         $command = preg_replace('/@\w+/', '', $command);
-        
+
         // Remove a barra para obter o nome do comando
         $commandName = ltrim($command, '/');
         $commandName = trim($commandName);
-        
+
         // Normaliza para minúsculas para comparação
         $commandLower = strtolower($command);
         $commandNameLower = strtolower($commandName);
-        
+
         // Log para debug
         $this->logBotAction($bot, "Processando comando: '{$command}' -> nome: '{$commandName}'", 'info', [
             'chat_id' => $chatId,
@@ -1732,13 +1732,13 @@ class TelegramService
             'command_original' => $command,
             'command_name' => $commandName
         ]);
-        
+
         // Busca ou cria contato para registrar ações
         $contact = $this->saveOrUpdateContact($bot, $from);
         $actionService = new ContactActionService();
 
         // Comandos padrão do sistema (verifica múltiplos formatos)
-        if ($commandLower === '/start' || $commandNameLower === 'start' || 
+        if ($commandLower === '/start' || $commandNameLower === 'start' ||
             $command === '/start' || $command === 'start') {
             $this->logBotAction($bot, "Comando /start detectado, executando...", 'info');
             $actionService->logCommand($bot, $contact, 'start', [
@@ -1748,8 +1748,8 @@ class TelegramService
             $this->handleStartCommand($bot, $chatId, $from, $chatType);
             return;
         }
-        
-        if ($commandLower === '/help' || $commandLower === '/comandos' || 
+
+        if ($commandLower === '/help' || $commandLower === '/comandos' ||
             $commandNameLower === 'help' || $commandNameLower === 'comandos') {
             $actionService->logCommand($bot, $contact, 'help', [
                 'chat_id' => $chatId,
@@ -1768,6 +1768,16 @@ class TelegramService
             return;
         }
 
+        if ($commandLower === '/meuplano' || $commandNameLower === 'meuplano' ||
+            $commandLower === '/status' || $commandNameLower === 'status') {
+            $actionService->logCommand($bot, $contact, 'meuplano', [
+                'chat_id' => $chatId,
+                'command' => $commandName
+            ]);
+            $this->handleMyPlanCommand($bot, $chatId, $from);
+            return;
+        }
+
         // Busca comandos personalizados do bot
         $customCommand = BotCommand::where('bot_id', $bot->id)
             ->where('command', $commandName)
@@ -1777,7 +1787,7 @@ class TelegramService
         if ($customCommand) {
             // Incrementa contador de uso
             $customCommand->incrementUsage();
-            
+
             // Registra ação
             $actionService->logCommand($bot, $contact, $commandName, [
                 'chat_id' => $chatId,
@@ -1785,10 +1795,10 @@ class TelegramService
                 'command_id' => $customCommand->id,
                 'is_custom' => true
             ]);
-            
+
             // Envia resposta do comando personalizado
             $this->sendMessage($bot, $chatId, $customCommand->response);
-            
+
             $this->logBotAction($bot, "Comando personalizado executado: {$command}", 'info', [
                 'command_id' => $customCommand->id
             ]);
@@ -1803,7 +1813,7 @@ class TelegramService
         }
     }
 
-    
+
     /**
      * Processa comando /start
      *
@@ -1820,16 +1830,16 @@ class TelegramService
                 'user_id' => $from['id'],
                 'chat_type' => $chatType
             ]);
-            
+
             // IMPORTANTE: Verifica se é um chat privado antes de solicitar dados
             // Comandos em grupos não devem solicitar dados pessoais
             $isPrivateChat = ($chatType === 'private');
-            
+
             // Busca ou cria contato (apenas para chats privados)
             $contact = null;
             if ($isPrivateChat) {
                 $contact = $this->saveOrUpdateContact($bot, $from);
-                
+
                 // Recarrega o contato para garantir que temos os dados mais recentes do banco
                 $contact->refresh();
             }
@@ -1846,10 +1856,10 @@ class TelegramService
 
             // Envia mensagem inicial
             $message = $bot->initial_message ?? 'Bem-vindo!';
-            
+
             // Monta o teclado com botões de redirecionamento e botão de ativação
             $keyboardButtons = [];
-            
+
             // Adiciona botão de ativação se configurado
             if ($bot->activate_cta && $bot->button_message) {
                 $keyboardButtons[] = [
@@ -1859,13 +1869,13 @@ class TelegramService
                     ]
                 ];
             }
-            
+
             // Busca botões de redirecionamento do bot
             $redirectButtons = \App\Models\RedirectButton::where('bot_id', $bot->id)
                 ->orderBy('order')
                 ->orderBy('id')
                 ->get();
-            
+
             // Adiciona botões de redirecionamento ao teclado
             if ($redirectButtons->isNotEmpty()) {
                 $redirectRow = [];
@@ -1886,7 +1896,7 @@ class TelegramService
                     }
                 }
             }
-            
+
             $keyboard = null;
             if (!empty($keyboardButtons)) {
                 $keyboard = [
@@ -1907,7 +1917,7 @@ class TelegramService
                 $needsEmail = $bot->request_email && !$contact->email;
                 $needsPhone = $bot->request_phone && !$contact->phone;
                 $needsLanguage = $bot->request_language && !$contact->language;
-                
+
                 // Se o bot está configurado para solicitar dados, solicita após mensagem inicial
                 // Verifica na ordem: email -> telefone -> idioma
                 if ($needsEmail) {
@@ -1948,7 +1958,7 @@ class TelegramService
                 'user_id' => $from['id'] ?? null,
                 'trace' => $e->getTraceAsString()
             ]);
-            
+
             // Tenta enviar mensagem de erro ao usuário
             try {
                 $this->sendMessage($bot, $chatId, 'Desculpe, ocorreu um erro ao processar seu comando. Por favor, tente novamente.');
@@ -1972,7 +1982,8 @@ class TelegramService
             $helpText .= "/start - Iniciar conversa com o bot\n";
             $helpText .= "/help - Ver esta mensagem de ajuda\n";
             $helpText .= "/comandos - Listar comandos disponíveis\n";
-            $helpText .= "/planos - Ver planos de pagamento disponíveis\n\n";
+            $helpText .= "/planos - Ver planos de pagamento disponíveis\n";
+            $helpText .= "/meuplano - Verificar status do meu plano atual\n\n";
 
             // Busca comandos personalizados ativos
             $customCommands = BotCommand::where('bot_id', $bot->id)
@@ -2022,19 +2033,19 @@ class TelegramService
             }
 
             $message = "💳 <b>Planos Disponíveis:</b>\n\n";
-            
+
             $keyboardButtons = [];
             foreach ($paymentPlans as $plan) {
                 $price = number_format($plan->price, 2, ',', '.');
                 $message .= "📦 <b>{$plan->title}</b>\n";
                 $message .= "💰 R$ {$price}\n";
-                
+
                 if ($plan->message) {
                     $message .= "📝 " . substr($plan->message, 0, 100) . "\n";
                 }
-                
+
                 $message .= "\n";
-                
+
                 // Adiciona botão para cada plano
                 $keyboardButtons[] = [[
                     'text' => "📦 {$plan->title} - R$ {$price}",
@@ -2057,6 +2068,60 @@ class TelegramService
     }
 
     /**
+     * Processa comando /meuplano
+     */
+    protected function handleMyPlanCommand(Bot $bot, int $chatId, array $from): void
+    {
+        try {
+            $contact = Contact::where('bot_id', $bot->id)
+                ->where('telegram_id', $from['id'])
+                ->first();
+
+            if (!$contact) {
+                $this->sendMessage($bot, $chatId, 'Você ainda não possui cadastro. Use /start para iniciar.');
+                return;
+            }
+
+            // Busca a última transação aprovada
+            $lastApprovedTransaction = \App\Models\Transaction::where('contact_id', $contact->id)
+                ->whereIn('status', ['approved', 'paid', 'completed'])
+                ->orderBy('created_at', 'desc')
+                ->with(['paymentPlan', 'paymentCycle'])
+                ->first();
+
+            if ($lastApprovedTransaction && $lastApprovedTransaction->paymentCycle) {
+                $expiresAt = \Carbon\Carbon::parse($lastApprovedTransaction->created_at)
+                    ->addDays($lastApprovedTransaction->paymentCycle->days);
+
+                $daysRemaining = (int) ceil(now()->diffInDays($expiresAt, false));
+                $paymentPlan = $lastApprovedTransaction->paymentPlan;
+
+                if ($daysRemaining >= 0) {
+                    $message = "✅ <b>Seu Plano Atual:</b>\n\n";
+                    $message .= "📦 <b>Plano:</b> " . ($paymentPlan->title ?? 'N/A') . "\n";
+                    $message .= "📅 <b>Expira em:</b> " . $expiresAt->format('d/m/Y') . "\n";
+                    $message .= "⏳ <b>Dias restantes:</b> {$daysRemaining} dia(s)\n\n";
+                    $message .= "Para renovar ou alterar, use /planos";
+                } else {
+                    $message = "❌ <b>Seu plano expirou!</b>\n\n";
+                    $message .= "📦 <b>Último Plano:</b> " . ($paymentPlan->title ?? 'N/A') . "\n";
+                    $message .= "📅 <b>Expirou em:</b> " . $expiresAt->format('d/m/Y') . "\n\n";
+                    $message .= "Use /planos para renovar seu acesso.";
+                }
+            } else {
+                $message = "❌ <b>Você não possui nenhum plano ativo.</b>\n\n";
+                $message .= "Use /planos para ver as opções disponíveis e assinar.";
+            }
+
+            $this->sendMessage($bot, $chatId, $message);
+
+        } catch (\Exception $e) {
+            $this->logBotAction($bot, 'Erro ao processar /meuplano: ' . $e->getMessage(), 'error');
+            $this->sendMessage($bot, $chatId, 'Erro ao verificar seu plano. Tente novamente.');
+        }
+    }
+
+    /**
      * Configura o menu fixo de comandos no Telegram
      * O menu fixo exibirá todos os comandos registrados, incluindo /planos
      *
@@ -2069,7 +2134,7 @@ class TelegramService
             // Configura o menu button para exibir os comandos disponíveis
             // Isso faz com que o botão "Menu" no chat mostre todos os comandos registrados
             // O Laravel HTTP client já faz o JSON encoding automaticamente quando usamos asJson()
-            
+
             // Configura o menu button globalmente (para todos os chats privados)
             // O tipo 'commands' faz com que o botão Menu mostre os comandos registrados via setMyCommands
             $response = $this->http()
@@ -2138,24 +2203,24 @@ class TelegramService
 
             // Obtém métodos de pagamento habilitados no bot
             $botPaymentMethods = is_array($bot->payment_method) ? $bot->payment_method : ($bot->payment_method ? [$bot->payment_method] : ['credit_card']);
-            
+
             // Cria botões apenas para métodos habilitados
             $keyboardButtons = [];
-            
+
             if (in_array('pix', $botPaymentMethods)) {
                 $keyboardButtons[] = [[
                     'text' => '💰 Pagar com PIX',
                     'callback_data' => "payment_{$planId}_pix"
                 ]];
             }
-            
+
             if (in_array('credit_card', $botPaymentMethods)) {
                 $keyboardButtons[] = [[
                     'text' => '💳 Pagar com Cartão de Crédito',
                     'callback_data' => "payment_{$planId}_card"
                 ]];
             }
-            
+
             // Se nenhum método estiver habilitado, mostra mensagem de erro
             if (empty($keyboardButtons)) {
                 $this->http()->post("https://api.telegram.org/bot{$bot->token}/answerCallbackQuery", [
@@ -2223,7 +2288,7 @@ class TelegramService
 
             // Valida se o bot tem o método de pagamento configurado
             $botPaymentMethods = is_array($bot->payment_method) ? $bot->payment_method : ($bot->payment_method ? [$bot->payment_method] : []);
-            
+
             if ($method === 'pix' && !in_array('pix', $botPaymentMethods)) {
                 $this->http()->post("https://api.telegram.org/bot{$bot->token}/answerCallbackQuery", [
                     'callback_query_id' => $callbackQueryId,
@@ -2232,7 +2297,7 @@ class TelegramService
                 ]);
                 return;
             }
-            
+
             if ($method === 'card' && !in_array('credit_card', $botPaymentMethods)) {
                 $this->http()->post("https://api.telegram.org/bot{$bot->token}/answerCallbackQuery", [
                     'callback_query_id' => $callbackQueryId,
@@ -2255,7 +2320,7 @@ class TelegramService
                 // Busca ou cria contato e registra início de pagamento
                 $contact = $this->saveOrUpdateContact($bot, $from);
                 $actionService = new ContactActionService();
-                
+
                 // Gera QR Code PIX
                 $paymentService = new PaymentService();
                 $pixResult = $paymentService->generatePixQrCode($bot, $plan, $contact);
@@ -2271,7 +2336,7 @@ class TelegramService
                     ]);
                     return;
                 }
-                
+
                 // O código PIX já vem correto do PaymentService (exatamente como o Mercado Pago retornou)
                 // NÃO devemos normalizar, corrigir ou modificar
 
@@ -2304,7 +2369,7 @@ class TelegramService
                     // CRÍTICO: O código PIX já vem do PaymentService EXATAMENTE como o Mercado Pago retornou
                     // NÃO devemos limpar, modificar ou alterar o código - usa EXATAMENTE como recebido
                     $pixCode = $pixResult['pix_code'];
-                    
+
                     // Log do código que será enviado ao usuário (EXATO do Mercado Pago)
                     $this->logBotAction($bot, "✅ Código PIX que será enviado ao usuário (EXATO do Mercado Pago)", 'info', [
                         'chat_id' => $chatId,
@@ -2313,22 +2378,22 @@ class TelegramService
                         'pix_code_full' => $pixCode,
                         'note' => 'Código usado EXATAMENTE como recebido do Mercado Pago - SEM MODIFICAÇÕES'
                     ]);
-                    
+
                     // Adiciona informações na mensagem principal
                     $message .= "📱 <b>Escaneie o QR Code abaixo para pagar:</b>\n\n";
                     $message .= "💡 <i>Ou use o código PIX copia e cola abaixo</i>\n\n";
                     $message .= "⏰ Este QR Code expira em 30 minutos.";
-                    
+
                     // Envia mensagem informativa primeiro
                     $this->sendMessage($bot, $chatId, $message);
-                    
+
                     // Aguarda um pequeno delay para garantir ordem das mensagens
                     usleep(500000); // 0.5 segundos
-                    
+
                     // Envia o código PIX EXATAMENTE como recebido (sem modificações)
                     // Apenas remove quebras de linha para exibição (não altera o código em si)
                     $pixCodeForDisplay = str_replace(["\r\n", "\r", "\n"], '', $pixCode);
-                    
+
                     // Envia o código PIX em uma mensagem isolada usando HTML
                     try {
                         $response = $this->http()->post("https://api.telegram.org/bot{$bot->token}/sendMessage", [
@@ -2336,7 +2401,7 @@ class TelegramService
                             'text' => "<pre><code>{$pixCodeForDisplay}</code></pre>",
                             'parse_mode' => 'HTML'
                         ]);
-                        
+
                         if ($response->successful()) {
                             LogFacade::info('✅ Código PIX enviado ao usuário', [
                                 'chat_id' => $chatId,
@@ -2358,7 +2423,7 @@ class TelegramService
                             ]);
                         }
                     }
-                    
+
                     // Define $message como vazio para não enviar novamente abaixo
                     $message = '';
                 } else {
@@ -2366,7 +2431,7 @@ class TelegramService
                     $message .= "📱 <b>Escaneie o QR Code abaixo para pagar:</b>\n\n";
                     $message .= "⏰ Este QR Code expira em 30 minutos.";
                 }
-                
+
                 // Envia mensagem apenas se não foi enviada acima (quando tem código PIX)
                 if (!empty($message)) {
                     $this->sendMessage($bot, $chatId, $message);
@@ -2376,31 +2441,31 @@ class TelegramService
                 try {
                     // O QR Code vem como base64 string do PaymentService
                     $qrCodeImageData = $pixResult['qr_code_image'] ?? null;
-                    
+
                     if (empty($qrCodeImageData)) {
                         throw new Exception('QR Code image data está vazio');
                     }
-                    
+
                     // O QR Code já foi gerado usando o código PIX correto do Mercado Pago
                     // Não precisa validar novamente - apenas envia
-                    
+
                     // Decodifica o base64 para obter os dados binários da imagem
                     $decoded = base64_decode($qrCodeImageData, true);
                     if ($decoded === false) {
                         // Se não for base64 válido, assume que já está decodificado
                         $decoded = $qrCodeImageData;
                     }
-                    
+
                     // Valida se os dados decodificados são uma imagem válida
                     if (empty($decoded) || strlen($decoded) < 100) {
                         throw new Exception('QR Code image data inválido ou muito pequeno');
                     }
-                    
+
                     // Verifica se é PNG (começa com PNG signature)
                     $isPng = substr($decoded, 0, 8) === "\x89PNG\r\n\x1a\n";
                     // Verifica se é SVG (começa com <svg ou <?xml)
                     $isSvg = strpos($decoded, '<svg') !== false || strpos($decoded, '<?xml') !== false;
-                    
+
                     if (!$isPng && !$isSvg) {
                         // Se não for PNG nem SVG, tenta usar como PNG mesmo assim
                         // (pode ser que a biblioteca tenha retornado dados binários sem header)
@@ -2408,16 +2473,16 @@ class TelegramService
                             'data_start' => bin2hex(substr($decoded, 0, 20))
                         ]);
                     }
-                    
+
                     $fileExtension = $isPng ? 'png' : ($isSvg ? 'svg' : 'png');
                     $tempFile = tempnam(sys_get_temp_dir(), 'pix_qr_') . '.' . $fileExtension;
-                    
+
                     // Salva os dados binários no arquivo temporário
                     $bytesWritten = file_put_contents($tempFile, $decoded);
                     if ($bytesWritten === false || $bytesWritten === 0) {
                         throw new Exception('Erro ao salvar QR Code em arquivo temporário');
                     }
-                    
+
                     LogFacade::debug('QR Code salvo em arquivo temporário', [
                         'file' => $tempFile,
                         'size' => $bytesWritten,
@@ -2445,7 +2510,7 @@ class TelegramService
                         ]);
                         throw new Exception('Erro ao enviar foto: ' . $errorBody);
                     }
-                    
+
                     LogFacade::info('QR Code enviado com sucesso para Telegram', [
                         'chat_id' => $chatId,
                         'plan_id' => $planId
@@ -2567,7 +2632,7 @@ class TelegramService
 
         // IMPORTANTE: Este método só deve ser chamado para chats privados
         // A verificação do tipo de chat deve ser feita antes de chamar este método
-        
+
         // Busca contato para verificar se precisa coletar dados
         $contact = Contact::where('bot_id', $bot->id)
             ->where('telegram_id', $from['id'])
@@ -2582,21 +2647,21 @@ class TelegramService
         // IMPORTANTE: Só solicita dados em chats privados (não em grupos)
         if ($contact) {
             $actionService = new ContactActionService();
-            
+
             // Verifica se precisa coletar email
             if ($bot->request_email && !$contact->email) {
                 if (filter_var($text, FILTER_VALIDATE_EMAIL)) {
                     $contact->email = $text;
                     $contact->save();
-                    
+
                     // Registra coleta de email
                     $actionService->logDataCollection($bot, $contact, 'email', $text);
-                    
+
                     $this->sendMessage($bot, $chatId, '✅ Email registrado com sucesso!');
-                    
+
                     // Recarrega o contato para ter os dados atualizados
                     $contact->refresh();
-                    
+
                     // Verifica se ainda precisa coletar outros dados
                     // IMPORTANTE: Verifica telefone primeiro se configurado
                     if ($bot->request_phone && !$contact->phone) {
@@ -2617,19 +2682,19 @@ class TelegramService
                         $this->sendMessage($bot, $chatId, '🌐 Por favor, escolha um idioma (pt, en, es, fr):');
                         return;
                     }
-                    
+
                     // Remove teclado se todos os dados foram coletados
                     $this->removeKeyboard($bot, $chatId);
-                    
+
                     // Verifica se todos os dados necessários foram coletados
                     $allDataCollected = (!$bot->request_email || $contact->email) &&
                                        (!$bot->request_phone || $contact->phone) &&
                                        (!$bot->request_language || $contact->language);
-                    
+
                     if ($allDataCollected) {
                         // Mensagem de confirmação final
                         $this->sendMessage($bot, $chatId, '✅ Obrigado! Seus dados foram registrados com sucesso.');
-                        
+
                         // Verifica se tem plano ativo e lista planos se necessário
                         $this->checkAndShowPlansIfNeeded($bot, $chatId, $contact);
                     }
@@ -2646,37 +2711,37 @@ class TelegramService
                 $phone = preg_replace('/[^\d+]/', '', $text);
                 // Remove + se estiver no início para normalizar
                 $phone = ltrim($phone, '+');
-                
+
                 if (strlen($phone) >= 10) {
                     $contact->phone = $phone;
                     $contact->save();
-                    
+
                     // Registra coleta de telefone
                     $actionService->logDataCollection($bot, $contact, 'phone', $phone);
-                    
+
                     $this->sendMessage($bot, $chatId, '✅ Telefone registrado com sucesso!');
-                    
+
                     // Recarrega o contato
                     $contact->refresh();
-                    
+
                     // Remove o teclado
                     $this->removeKeyboard($bot, $chatId);
-                    
+
                     // Verifica se ainda precisa coletar idioma
                     if ($bot->request_language && !$contact->language) {
                         $this->sendMessage($bot, $chatId, '🌐 Por favor, escolha um idioma (pt, en, es, fr):');
                         return;
                     }
-                    
+
                     // Verifica se todos os dados necessários foram coletados
                     $allDataCollected = (!$bot->request_email || $contact->email) &&
                                        (!$bot->request_phone || $contact->phone) &&
                                        (!$bot->request_language || $contact->language);
-                    
+
                     if ($allDataCollected) {
                         // Mensagem de confirmação final
                         $this->sendMessage($bot, $chatId, '✅ Obrigado! Seus dados foram registrados com sucesso.');
-                        
+
                         // Verifica se tem plano ativo e lista planos se necessário
                         $this->checkAndShowPlansIfNeeded($bot, $chatId, $contact);
                     }
@@ -2693,24 +2758,24 @@ class TelegramService
                 if (in_array(strtolower($text), $validLanguages)) {
                     $contact->language = strtolower($text);
                     $contact->save();
-                    
+
                     // Registra coleta de idioma
                     $actionService->logDataCollection($bot, $contact, 'language', strtolower($text));
-                    
+
                     $this->sendMessage($bot, $chatId, '✅ Idioma registrado com sucesso!');
-                    
+
                     // Remove teclado se todos os dados foram coletados
                     $this->removeKeyboard($bot, $chatId);
-                    
+
                     // Verifica se todos os dados necessários foram coletados
                     $allDataCollected = (!$bot->request_email || $contact->email) &&
                                        (!$bot->request_phone || $contact->phone) &&
                                        (!$bot->request_language || $contact->language);
-                    
+
                     if ($allDataCollected) {
                         // Mensagem de confirmação final
                         $this->sendMessage($bot, $chatId, '✅ Obrigado! Seus dados foram registrados com sucesso.');
-                        
+
                         // Verifica se tem plano ativo e lista planos se necessário
                         $this->checkAndShowPlansIfNeeded($bot, $chatId, $contact);
                     }
@@ -2825,7 +2890,7 @@ class TelegramService
             }
 
             $response = $this->http()->post("https://api.telegram.org/bot{$bot->token}/sendMessage", $data);
-            
+
             if (!$response->successful()) {
                 $errorData = $response->json();
                 $this->logBotAction($bot, "Erro ao enviar mensagem: " . ($errorData['description'] ?? $response->body()), 'error', [
@@ -2860,7 +2925,7 @@ class TelegramService
             try {
                 // Detecta tipo de mídia pela extensão
                 $extension = strtolower(pathinfo(parse_url($url, PHP_URL_PATH), PATHINFO_EXTENSION));
-                
+
                 $data = [
                     'chat_id' => $chatId
                 ];
@@ -2902,13 +2967,13 @@ class TelegramService
                 'last_interaction_at' => now()
             ]
         );
-        
+
         // Sempre atualiza o status e última interação (updateOrCreate já faz isso, mas garantimos)
         $contact->update([
             'telegram_status' => 'active',
             'last_interaction_at' => now()
         ]);
-        
+
         return $contact;
     }
 
@@ -2934,6 +2999,10 @@ class TelegramService
                 [
                     'command' => 'planos',
                     'description' => 'Ver planos de pagamento disponíveis'
+                ],
+                [
+                    'command' => 'meuplano',
+                    'description' => 'Verificar status do meu plano atual'
                 ]
             ];
 
@@ -2981,12 +3050,12 @@ class TelegramService
                     'commands' => $commands,
                     'scope' => 'all_private_chats'
                 ]);
-                
+
                 // Configura menu button para exibir os comandos
                 // Isso garante que o botão "Menu" mostre todos os comandos registrados
                 // IMPORTANTE: O menu só mostrará os comandos se eles estiverem registrados via setMyCommands
                 $this->setPlansMenuButton($bot);
-                
+
                 return true;
             } else {
                 $error = $response->json()['description'] ?? 'Erro desconhecido';
@@ -3028,34 +3097,34 @@ class TelegramService
                 ]);
                 return;
             }
-            
+
             if (!$contact) {
                 $contact = $this->saveOrUpdateContact($bot, $from);
             }
 
             $actionService = new ContactActionService();
-            
+
             // Extrai o número de telefone do contato compartilhado
             $phoneNumber = $contactData['phone_number'] ?? null;
-            
+
             if ($phoneNumber) {
                 // Remove caracteres não numéricos (exceto + no início)
                 $phone = preg_replace('/[^\d+]/', '', $phoneNumber);
                 if (strlen($phone) >= 10) {
                     $contact->phone = $phone;
                     $contact->save();
-                    
+
                     // Registra coleta de telefone
                     $actionService->logDataCollection($bot, $contact, 'phone', $phone);
-                    
+
                     $this->sendMessage($bot, $chatId, '✅ Telefone registrado com sucesso!');
-                    
+
                     // Recarrega o contato
                     $contact->refresh();
-                    
+
                     // Remove o teclado
                     $this->removeKeyboard($bot, $chatId);
-                    
+
                     // Verifica se ainda precisa coletar outros dados
                     if ($bot->request_email && !$contact->email) {
                         $this->sendMessage($bot, $chatId, '📧 Por favor, envie seu email:');
@@ -3066,7 +3135,7 @@ class TelegramService
                         $allDataCollected = (!$bot->request_email || $contact->email) &&
                                            (!$bot->request_phone || $contact->phone) &&
                                            (!$bot->request_language || $contact->language);
-                        
+
                         if ($allDataCollected) {
                             $this->checkAndShowPlansIfNeeded($bot, $chatId, $contact);
                         }
@@ -3214,18 +3283,18 @@ class TelegramService
         try {
             // Remove a barra se houver
             $commandName = ltrim($commandName, '/');
-            
+
             // Obtém lista atual de comandos do Telegram
             $currentCommands = $this->getMyCommands($bot);
-            
+
             // Filtra removendo o comando específico
             $filteredCommands = array_filter($currentCommands, function($cmd) use ($commandName) {
                 return ($cmd['command'] ?? '') !== $commandName;
             });
-            
+
             // Reindexa o array
             $filteredCommands = array_values($filteredCommands);
-            
+
             // Re-registra os comandos restantes
             $response = $this->http()
                 ->asJson()
@@ -3362,25 +3431,25 @@ class TelegramService
     {
         $description = $responseData['description'] ?? '';
         $parameters = $responseData['parameters'] ?? [];
-        
+
         // Verifica se o erro indica migração de grupo para supergrupo
         if (strpos($description, 'group chat was upgraded to a supergroup chat') !== false) {
             // O Telegram retorna o novo chat_id nos parâmetros
             $newChatId = $parameters['migrate_to_chat_id'] ?? null;
-            
+
             if ($newChatId) {
                 LogFacade::info('🔄 Grupo migrado para supergrupo detectado', [
                     'old_chat_id' => $parameters['chat_id'] ?? 'unknown',
                     'new_chat_id' => $newChatId
                 ]);
-                
+
                 return [
                     'migrated' => true,
                     'new_chat_id' => (string)$newChatId
                 ];
             }
         }
-        
+
         return null;
     }
 
@@ -3388,17 +3457,17 @@ class TelegramService
     {
         try {
             $normalizedChatId = $this->normalizeChatId($chatId);
-            
+
             $response = $this->http()->get("https://api.telegram.org/bot{$token}/getChatAdministrators", [
                 'chat_id' => $normalizedChatId
             ]);
 
             $responseData = $response->json() ?? [];
-            
+
             if (!$response->successful() || !($responseData['ok'] ?? false)) {
                 // Verifica se o erro é devido a migração de grupo para supergrupo
                 $migration = $this->detectGroupMigration($responseData);
-                
+
                 if ($migration) {
                     // Retorna informação sobre a migração para que o chamador possa atualizar
                     return [
@@ -3410,7 +3479,7 @@ class TelegramService
                         'old_chat_id' => $normalizedChatId
                     ];
                 }
-                
+
                 return [
                     'success' => false,
                     'administrators' => [],
@@ -3419,7 +3488,7 @@ class TelegramService
             }
 
             $administrators = $responseData['result'] ?? [];
-            
+
             return [
                 'success' => true,
                 'administrators' => $administrators,
@@ -3445,17 +3514,17 @@ class TelegramService
     {
         try {
             $normalizedChatId = $this->normalizeChatId($chatId);
-            
+
             $response = $this->http()->get("https://api.telegram.org/bot{$token}/getChatMemberCount", [
                 'chat_id' => $normalizedChatId
             ]);
 
             $responseData = $response->json() ?? [];
-            
+
             if (!$response->successful() || !($responseData['ok'] ?? false)) {
                 // Verifica se o erro é devido a migração de grupo para supergrupo
                 $migration = $this->detectGroupMigration($responseData);
-                
+
                 if ($migration) {
                     return [
                         'success' => false,
@@ -3466,7 +3535,7 @@ class TelegramService
                         'old_chat_id' => $normalizedChatId
                     ];
                 }
-                
+
                 return [
                     'success' => false,
                     'member_count' => 0,
@@ -3475,7 +3544,7 @@ class TelegramService
             }
 
             $memberCount = $responseData['result'] ?? 0;
-            
+
             return [
                 'success' => true,
                 'member_count' => $memberCount,
@@ -3511,25 +3580,25 @@ class TelegramService
 
             // Obtém administradores do grupo
             $adminsResult = $this->getChatAdministrators($bot->token, $bot->telegram_group_id);
-            
+
             // Verifica se o grupo foi migrado para supergrupo
             if (isset($adminsResult['migrated']) && $adminsResult['migrated'] === true) {
                 $newChatId = $adminsResult['new_chat_id'] ?? null;
-                
+
                 if ($newChatId) {
                     LogFacade::info('🔄 Atualizando telegram_group_id do bot após migração para supergrupo', [
                         'bot_id' => $bot->id,
                         'old_chat_id' => $bot->telegram_group_id,
                         'new_chat_id' => $newChatId
                     ]);
-                    
+
                     // Atualiza o telegram_group_id do bot no banco de dados
                     $bot->update(['telegram_group_id' => $newChatId]);
                     $bot->refresh();
-                    
+
                     // Tenta novamente com o novo chat_id
                     $adminsResult = $this->getChatAdministrators($bot->token, $newChatId);
-                    
+
                     if (!$adminsResult['success']) {
                         return [
                             'success' => false,
@@ -3540,7 +3609,7 @@ class TelegramService
                             'new_chat_id' => $newChatId
                         ];
                     }
-                    
+
                     LogFacade::info('✅ Sincronização continuada após migração para supergrupo', [
                         'bot_id' => $bot->id,
                         'new_chat_id' => $newChatId
@@ -3554,7 +3623,7 @@ class TelegramService
                     ];
                 }
             }
-            
+
             if (!$adminsResult['success']) {
                 return [
                     'success' => false,
@@ -3590,7 +3659,7 @@ class TelegramService
                             'telegram_status' => 'active' // Membros do grupo são ativos
                         ]
                     );
-                    
+
                     // Se o contato já existia, atualiza o status para ativo
                     if (!$contact->wasRecentlyCreated) {
                         $contact->update(['telegram_status' => 'active']);
@@ -3654,33 +3723,33 @@ class TelegramService
                 ->first();
 
             $hasActivePlan = false;
-            
+
             if ($lastApprovedTransaction) {
                 $paymentCycle = $lastApprovedTransaction->paymentCycle;
                 if ($paymentCycle) {
                     // Calcula data de expiração baseada na data de criação + dias do ciclo
                     $expiresAt = \Carbon\Carbon::parse($lastApprovedTransaction->created_at)
                         ->addDays($paymentCycle->days ?? 30);
-                    
+
                     // Verifica se ainda não expirou
                     $hasActivePlan = \Carbon\Carbon::now()->lessThanOrEqualTo($expiresAt);
-                    
+
                     if ($hasActivePlan) {
                         $paymentPlan = $lastApprovedTransaction->paymentPlan;
                         $daysRemaining = \Carbon\Carbon::now()->diffInDays($expiresAt, false);
-                        
+
                         $this->logBotAction($bot, "Contato tem plano ativo", 'info', [
                             'contact_id' => $contact->id,
                             'plan_id' => $paymentPlan->id ?? null,
                             'days_remaining' => $daysRemaining
                         ]);
-                        
+
                         $message = "✅ <b>Você já possui um plano ativo!</b>\n\n";
                         $message .= "📦 <b>Plano:</b> " . ($paymentPlan->title ?? 'N/A') . "\n";
                         $message .= "⏰ <b>Expira em:</b> " . $expiresAt->format('d/m/Y') . "\n";
                         $message .= "📅 <b>Dias restantes:</b> {$daysRemaining} dia(s)\n\n";
                         $message .= "Obrigado por ser nosso cliente!";
-                        
+
                         $this->sendMessage($bot, $chatId, $message);
                         // Continua para exibir os planos disponíveis mesmo tendo plano ativo
                     }
@@ -3692,7 +3761,7 @@ class TelegramService
                 'contact_id' => $contact->id,
                 'has_active_plan' => $hasActivePlan
             ]);
-            
+
             $this->handlePlansCommand($bot, $chatId, [
                 'id' => $contact->telegram_id,
                 'first_name' => $contact->first_name,
@@ -3704,7 +3773,7 @@ class TelegramService
                 'chat_id' => $chatId,
                 'trace' => $e->getTraceAsString()
             ]);
-            
+
             // Em caso de erro, tenta listar os planos mesmo assim
             try {
                 $this->handlePlansCommand($bot, $chatId, [
@@ -3732,33 +3801,33 @@ class TelegramService
             $chat = $myChatMember['chat'] ?? null;
             $newChatMember = $myChatMember['new_chat_member'] ?? null;
             $oldChatMember = $myChatMember['old_chat_member'] ?? null;
-            
+
             if (!$chat || !$newChatMember) {
                 return;
             }
-            
+
             $chatId = $chat['id'];
             $chatType = $chat['type'] ?? 'unknown';
             $newStatus = $newChatMember['status'] ?? 'unknown';
             $oldStatus = $oldChatMember['status'] ?? 'unknown';
-            
+
             $this->logBotAction($bot, "Evento my_chat_member recebido", 'info', [
                 'chat_id' => $chatId,
                 'chat_type' => $chatType,
                 'old_status' => $oldStatus,
                 'new_status' => $newStatus
             ]);
-            
+
             // Verifica se o bot foi promovido a administrador
             if ($newStatus === 'administrator' && $oldStatus !== 'administrator') {
                 $this->logBotAction($bot, "Bot foi promovido a administrador", 'info', [
                     'chat_id' => $chatId,
                     'chat_type' => $chatType
                 ]);
-                
+
                 // Busca os direitos padrão configurados
                 $defaultRights = $this->getMyDefaultAdministratorRights($bot->token, $chatType === 'channel');
-                
+
                 if ($defaultRights && is_array($defaultRights)) {
                     // Aplica os direitos padrão usando promoteChatMember
                     $this->applyAdministratorRights($bot, $chatId, $defaultRights);
@@ -3790,12 +3859,12 @@ class TelegramService
             if ($forChannels) {
                 $data['for_channels'] = true;
             }
-            
+
             $result = $this->http()
                 ->post("https://api.telegram.org/bot{$token}/getMyDefaultAdministratorRights", $data);
-            
+
             $responseData = $result->json();
-            
+
             if ($result->successful() && ($responseData['ok'] ?? false)) {
                 return $responseData['result'] ?? null;
             }
@@ -3819,14 +3888,14 @@ class TelegramService
     {
         try {
             $botId = $this->getBotIdFromToken($bot->token);
-            
+
             // Prepara os dados para promoteChatMember
             $data = [
                 'chat_id' => $chatId,
                 'user_id' => $botId,
                 'is_anonymous' => $rights['is_anonymous'] ?? false,
             ];
-            
+
             // Adiciona apenas as permissões que são true
             // O Telegram interpreta a ausência de uma permissão como false
             foreach ($rights as $key => $value) {
@@ -3834,19 +3903,19 @@ class TelegramService
                     $data[$key] = true;
                 }
             }
-            
+
             $this->logBotAction($bot, "Aplicando direitos de administrador", 'info', [
                 'chat_id' => $chatId,
                 'rights' => $data,
                 'rights_count' => count($data)
             ]);
-            
+
             $result = $this->http()
                 ->asJson()
                 ->post("https://api.telegram.org/bot{$bot->token}/promoteChatMember", $data);
-            
+
             $responseData = $result->json();
-            
+
             if ($result->successful() && ($responseData['ok'] ?? false)) {
                 $this->logBotAction($bot, "Direitos de administrador aplicados com sucesso", 'info', [
                     'chat_id' => $chatId,
@@ -3891,7 +3960,7 @@ class TelegramService
 
             // Verifica se é membro do grupo
             $memberInfo = $this->getChatMember($bot->token, $bot->telegram_group_id, $contact->telegram_id);
-            
+
             if ($memberInfo['is_member'] ?? false) {
                 $contact->update(['telegram_status' => 'active']);
             } else {
@@ -3912,4 +3981,3 @@ class TelegramService
         }
     }
 }
-

@@ -62,8 +62,21 @@ const contactService = {
       params: { botId }
     });
     return response.data;
+  },
+
+  async sendExpirationReminder(id, botId) {
+    const response = await api.post(`/contacts/${id}/send-expiration-reminder`, null, {
+      params: { botId }
+    });
+    return response.data;
+  },
+
+  async sendGroupExpirationReminder(botId) {
+    const response = await api.post('/contacts/send-group-expiration-reminder', null, {
+      params: { botId }
+    });
+    return response.data;
   }
 };
 
 export default contactService;
-

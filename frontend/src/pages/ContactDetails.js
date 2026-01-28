@@ -113,6 +113,38 @@ const ContactDetails = () => {
     }
   };
 
+  const handleSendReminder = async () => {
+    const confirmed = await confirm({
+      message: 'Deseja enviar um lembrete de expiração para este contato?',
+      type: 'info',
+    });
+    
+    if (!confirmed) return;
+
+    try {
+      await contactService.sendExpirationReminder(id, botId);
+      alert('Lembrete enviado com sucesso!');
+    } catch (err) {
+      setError(err.response?.data?.error || 'Erro ao enviar lembrete');
+    }
+  };
+
+  const handleSendGroupReminder = async () => {
+    const confirmed = await confirm({
+      message: 'ATENÇÃO: Isso enviará lembretes para TODOS os contatos do bot que têm planos ativos ou expirando. Deseja continuar?',
+      type: 'warning',
+    });
+    
+    if (!confirmed) return;
+
+    try {
+      await contactService.sendGroupExpirationReminder(botId);
+      alert('Processo de envio em massa iniciado!');
+    } catch (err) {
+      setError(err.response?.data?.error || 'Erro ao iniciar envio em massa');
+    }
+  };
+
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
     const date = new Date(dateString);
@@ -261,10 +293,23 @@ const ContactDetails = () => {
                 <label>Última Atualização</label>
                 <p>{formatDate(contact.updated_at)}</p>
               </div>
-              {contact.expires_at && (
-                <div className="info-item">
+              
+              {/* Informações do Plano */}
+              <div className="info-item highlight-item">
+                <label>Plano Atual</label>
+                <p>{contact.current_plan || 'Nenhum plano ativo'}</p>
+              </div>
+              {contact.plan_expires_at && (
+                <div className="info-item highlight-item">
                   <label>Expira em</label>
-                  <p>{formatDate(contact.expires_at)}</p>
+                  <p>
+                    {formatDate(contact.plan_expires_at)} 
+                    {contact.plan_days_remaining !== null && (
+                      <span className={`days-remaining ${contact.plan_days_remaining <= 3 ? 'urgent' : ''}`}>
+                        ({contact.plan_days_remaining} dias restantes)
+                      </span>
+                    )}
+                  </p>
                 </div>
               )}
             </div>
@@ -379,6 +424,23 @@ const ContactDetails = () => {
               >
                 {contact.is_blocked ? 'Desbloquear' : 'Bloquear'}
               </button>
+              
+              {contact.current_plan && (
+                <button
+                  onClick={handleSendReminder}
+                  className="btn-action btn-reminder"
+                >
+                  Enviar Lembrete de Expiração
+                </button>
+              )}
+              
+              <button
+                onClick={handleSendGroupReminder}
+                className="btn-action btn-group-reminder"
+                style={{ backgroundColor: '#ff9800', color: 'white' }}
+              >
+                Enviar Lembrete para Todos (Em Massa)
+              </button>
             </div>
           </div>
         </div>
@@ -388,4 +450,3 @@ const ContactDetails = () => {
 };
 
 export default ContactDetails;
-
