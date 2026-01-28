@@ -2,11 +2,13 @@ import React, { useState, useEffect } from 'react';
 import Layout from '../components/Layout';
 import billingService from '../services/billingService';
 import botService from '../services/botService';
-import paymentStatusService from '../services/paymentStatusService';
 import RefreshButton from '../components/RefreshButton';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPaperPlane } from '@fortawesome/free-solid-svg-icons';
 import { Line } from 'react-chartjs-2';
+import DatePicker, { registerLocale } from "react-datepicker";
+import "react-datepicker/dist/react-datepicker.css";
+import ptBR from 'date-fns/locale/pt-BR';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -20,6 +22,9 @@ import {
   Filler
 } from 'chart.js';
 import './Billing.css';
+
+// Registra o locale pt-BR para o DatePicker
+registerLocale('pt-BR', ptBR);
 
 ChartJS.register(
   CategoryScale,
@@ -258,36 +263,51 @@ const Billing = () => {
           <div className="filters-grid">
             <div className="filter-group">
               <label>Período por Mês</label>
-              <input
-                type="month"
-                value={filters.month}
-                onChange={(e) => {
-                  handleFilterChange('month', e.target.value);
+              <DatePicker
+                selected={filters.month ? new Date(filters.month + '-01T12:00:00') : null}
+                onChange={(date) => {
+                  handleFilterChange('month', date ? date.toISOString().slice(0, 7) : '');
                   handleFilterChange('start_date', '');
                   handleFilterChange('end_date', '');
                 }}
+                dateFormat="MM/yyyy"
+                showMonthYearPicker
+                locale="pt-BR"
+                placeholderText="Selecione o mês"
+                className="date-picker-input"
+                isClearable
               />
             </div>
             <div className="filter-group">
               <label>Data Inicial</label>
-              <input
-                type="date"
-                value={filters.start_date}
-                onChange={(e) => {
-                  handleFilterChange('start_date', e.target.value);
+              <DatePicker
+                selected={filters.start_date ? new Date(filters.start_date + 'T12:00:00') : null}
+                onChange={(date) => {
+                  handleFilterChange('start_date', date ? date.toISOString().split('T')[0] : '');
                   handleFilterChange('month', '');
                 }}
+                dateFormat="dd/MM/yyyy"
+                locale="pt-BR"
+                placeholderText="Selecione a data"
+                className="date-picker-input"
+                isClearable
+                maxDate={filters.end_date ? new Date(filters.end_date + 'T12:00:00') : null}
               />
             </div>
             <div className="filter-group">
               <label>Data Final</label>
-              <input
-                type="date"
-                value={filters.end_date}
-                onChange={(e) => {
-                  handleFilterChange('end_date', e.target.value);
+              <DatePicker
+                selected={filters.end_date ? new Date(filters.end_date + 'T12:00:00') : null}
+                onChange={(date) => {
+                  handleFilterChange('end_date', date ? date.toISOString().split('T')[0] : '');
                   handleFilterChange('month', '');
                 }}
+                dateFormat="dd/MM/yyyy"
+                locale="pt-BR"
+                placeholderText="Selecione a data"
+                className="date-picker-input"
+                isClearable
+                minDate={filters.start_date ? new Date(filters.start_date + 'T12:00:00') : null}
               />
             </div>
             <div className="filter-group">
@@ -562,4 +582,3 @@ const Billing = () => {
 };
 
 export default Billing;
-

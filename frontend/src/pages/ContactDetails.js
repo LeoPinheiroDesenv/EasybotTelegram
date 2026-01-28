@@ -299,6 +299,12 @@ const ContactDetails = () => {
                 <label>Plano Atual</label>
                 <p>{contact.current_plan || 'Nenhum plano ativo'}</p>
               </div>
+              {contact.plan_payment_date && (
+                <div className="info-item highlight-item">
+                  <label>Data do Pagamento</label>
+                  <p>{formatDate(contact.plan_payment_date)}</p>
+                </div>
+              )}
               {contact.plan_expires_at && (
                 <div className="info-item highlight-item">
                   <label>Expira em</label>

@@ -135,8 +135,9 @@ class ContactController extends Controller
                 ->firstOrFail();
 
             // Carrega a última transação aprovada para identificar o plano e expiração
+            // CORREÇÃO: Inclui status 'paid' e 'completed' além de 'approved'
             $lastTransaction = $contact->transactions()
-                ->where('status', 'approved')
+                ->whereIn('status', ['approved', 'paid', 'completed'])
                 ->orderBy('created_at', 'desc')
                 ->with(['paymentPlan', 'paymentCycle'])
                 ->first();
@@ -144,13 +145,23 @@ class ContactController extends Controller
             $planName = null;
             $expiresAt = null;
             $daysRemaining = null;
+            $paymentDate = null;
 
             if ($lastTransaction && $lastTransaction->paymentPlan) {
                 $planName = $lastTransaction->paymentPlan->title ?? $lastTransaction->paymentPlan->name;
 
+                // Tenta pegar a data de processamento do metadata, senão usa updated_at (que é quando o status mudou para pago)
+                $paymentDateRaw = $lastTransaction->metadata['processed_at'] ?? $lastTransaction->updated_at;
+                $paymentDate = \Carbon\Carbon::parse($paymentDateRaw)->format('Y-m-d H:i:s');
+
                 if ($lastTransaction->paymentCycle) {
-                    $expiresAtDate = \Carbon\Carbon::parse($lastTransaction->created_at)
-                        ->addDays($lastTransaction->paymentCycle->days);
+                    // A expiração deve ser calculada a partir da data do pagamento, não da criação da transação
+                    // Se a transação foi criada dia 1 e paga dia 2, o plano de 30 dias deve ir até dia 32 (aprox)
+                    // Mas o sistema atual usa created_at. Vamos ajustar para usar a data de pagamento se disponível.
+
+                    $startDate = \Carbon\Carbon::parse($paymentDateRaw);
+                    $expiresAtDate = $startDate->copy()->addDays($lastTransaction->paymentCycle->days);
+
                     $expiresAt = $expiresAtDate->format('Y-m-d H:i:s');
                     $daysRemaining = (int) ceil(now()->diffInDays($expiresAtDate, false));
                 }
@@ -160,6 +171,7 @@ class ContactController extends Controller
             $contact->current_plan = $planName;
             $contact->plan_expires_at = $expiresAt;
             $contact->plan_days_remaining = $daysRemaining;
+            $contact->plan_payment_date = $paymentDate;
 
             return response()->json(['contact' => $contact]);
         } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
@@ -454,8 +466,9 @@ class ContactController extends Controller
             $bot = \App\Models\Bot::findOrFail($request->botId);
 
             // Busca a última transação aprovada para identificar o plano e expiração
+            // CORREÇÃO: Inclui status 'paid' e 'completed' além de 'approved'
             $lastTransaction = $contact->transactions()
-                ->where('status', 'approved')
+                ->whereIn('status', ['approved', 'paid', 'completed'])
                 ->orderBy('created_at', 'desc')
                 ->with(['paymentPlan', 'paymentCycle'])
                 ->first();
@@ -464,7 +477,10 @@ class ContactController extends Controller
                 return response()->json(['error' => 'Contato não possui plano ativo ou ciclo de pagamento definido'], 400);
             }
 
-            $expiresAt = \Carbon\Carbon::parse($lastTransaction->created_at)
+            // Usa a data de pagamento (updated_at) se disponível, senão created_at
+            $startDate = $lastTransaction->updated_at ?? $lastTransaction->created_at;
+
+            $expiresAt = \Carbon\Carbon::parse($startDate)
                 ->addDays($lastTransaction->paymentCycle->days);
 
             $daysRemaining = now()->diffInDays($expiresAt, false);

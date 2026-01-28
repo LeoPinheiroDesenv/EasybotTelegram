@@ -27,26 +27,12 @@ services:
       dockerfile: Dockerfile
     container_name: bottelegram_backend
     restart: "no"
-    environment:
-      APP_ENV: ${APP_ENV:-local}
-      APP_DEBUG: ${APP_DEBUG:-true}
-      DB_CONNECTION: mysql
-      DB_HOST: mysql
-      DB_PORT: 3306
-      DB_DATABASE: ${DB_NAME:-bottelegram_db}
-      DB_USERNAME: ${DB_USER:-bottelegram_user}
-      DB_PASSWORD: ${DB_PASSWORD:-bottelegram123}
-      JWT_SECRET: ${JWT_SECRET:-your-secret-key-change-in-production}
-      CACHE_STORE: array
-      MERCADOPAGO_ACCESS_TOKEN: ${MERCADOPAGO_ACCESS_TOKEN:-}
-      MERCADOPAGO_WEBHOOK_URL: ${MERCADOPAGO_WEBHOOK_URL:-}
-      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
-      STRIPE_PUBLIC_KEY: ${STRIPE_PUBLIC_KEY:-}
-      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+    # Variáveis de ambiente são carregadas do arquivo .env montado
     ports:
       - "8000:8000"
     volumes:
       - ./backend:/var/www
+      - ./backend/.env.local:/var/www/.env
       - /var/www/vendor
       - /var/www/node_modules
     depends_on:
@@ -61,8 +47,6 @@ services:
       dockerfile: Dockerfile
     container_name: bottelegram_frontend
     restart: "no"
-    # REACT_APP_API_URL deve ser definida no arquivo .env na pasta frontend
-    # Não definir aqui para evitar sobrescrever o .env
     ports:
       - "3000:3000"
     volumes:
@@ -79,4 +63,3 @@ networks:
 
 volumes:
   mysql_data:
-

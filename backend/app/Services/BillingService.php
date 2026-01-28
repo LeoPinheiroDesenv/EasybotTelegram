@@ -24,7 +24,7 @@ class BillingService
         // Monta query base
         $query = Transaction::join('bots', 'transactions.bot_id', '=', 'bots.id')
             ->whereIn('transactions.status', ['approved', 'paid', 'completed'])
-            ->whereBetween('transactions.created_at', [$startOfMonth, $endOfMonth]);
+            ->whereBetween('transactions.updated_at', [$startOfMonth, $endOfMonth]); // Usa updated_at para refletir data de pagamento
 
         // Super admin vê todos os recebimentos, outros apenas os seus
         if (!$user->isSuperAdmin()) {
@@ -75,36 +75,36 @@ class BillingService
             $query->where('bots.user_id', $user->id);
         }
 
-        // Filtro por período
-        if (isset($filters['start_date']) && isset($filters['end_date'])) {
-            $query->whereBetween('transactions.created_at', [
+        // Filtro por período (usando updated_at para refletir a data do pagamento)
+        if (!empty($filters['start_date']) && !empty($filters['end_date'])) {
+            $query->whereBetween('transactions.updated_at', [
                 Carbon::parse($filters['start_date'])->startOfDay(),
                 Carbon::parse($filters['end_date'])->endOfDay()
             ]);
-        } elseif (isset($filters['month'])) {
+        } elseif (!empty($filters['month'])) {
             $month = Carbon::parse($filters['month']);
-            $query->whereBetween('transactions.created_at', [
+            $query->whereBetween('transactions.updated_at', [
                 $month->copy()->startOfMonth(),
                 $month->copy()->endOfMonth()
             ]);
         }
 
         // Filtro por bot
-        if (isset($filters['bot_id'])) {
+        if (!empty($filters['bot_id'])) {
             $query->where('transactions.bot_id', $filters['bot_id']);
         }
 
         // Filtro por método de pagamento
-        if (isset($filters['payment_method'])) {
+        if (!empty($filters['payment_method'])) {
             $query->where('transactions.payment_method', $filters['payment_method']);
         }
 
         // Filtro por gateway
-        if (isset($filters['gateway'])) {
+        if (!empty($filters['gateway'])) {
             $query->where('transactions.gateway', $filters['gateway']);
         }
 
-        $transactions = $query->orderBy('transactions.created_at', 'desc')->get();
+        $transactions = $query->orderBy('transactions.updated_at', 'desc')->get();
 
         $total = $transactions->sum('amount');
 
@@ -134,9 +134,9 @@ class BillingService
             })
             ->map(function ($group) {
                 $first = $group->first();
-                $maxDate = $group->max('created_at');
-                $minDate = $group->min('created_at');
-                
+                $maxDate = $group->max('updated_at');
+                $minDate = $group->min('updated_at');
+
                 return [
                     'contact_id' => $first->contact_id ?? null,
                     'contact_name' => $first->contact->first_name ?? $first->contact->username ?? 'Sem nome',
@@ -184,7 +184,9 @@ class BillingService
                     'currency' => $transaction->currency ?? 'BRL',
                     'status' => $transaction->status,
                     'created_at' => $transaction->created_at->format('Y-m-d H:i:s'),
-                    'created_at_formatted' => $transaction->created_at->format('d/m/Y H:i')
+                    'updated_at' => $transaction->updated_at->format('Y-m-d H:i:s'),
+                    'created_at_formatted' => $transaction->created_at->format('d/m/Y H:i'),
+                    'updated_at_formatted' => $transaction->updated_at->format('d/m/Y H:i')
                 ];
             }),
             'subscriptions' => $bySubscription,
@@ -227,7 +229,7 @@ class BillingService
             $botQuery->where('user_id', $user->id);
         }
         $botIds = $botQuery->pluck('id')->toArray();
-        
+
         if (empty($botIds)) {
             // Se não há bots, retorna array vazio com meses
             for ($i = 0; $i < $months; $i++) {
@@ -257,12 +259,12 @@ class BillingService
             // Usa whereIn com bot_ids ao invés de whereHas
             $total = Transaction::whereIn('bot_id', $botIds)
                 ->whereIn('status', ['approved', 'paid', 'completed'])
-                ->whereBetween('created_at', [$monthStart, $monthEnd])
+                ->whereBetween('updated_at', [$monthStart, $monthEnd]) // Usa updated_at
                 ->sum('amount');
-                
+
             $count = Transaction::whereIn('bot_id', $botIds)
                 ->whereIn('status', ['approved', 'paid', 'completed'])
-                ->whereBetween('created_at', [$monthStart, $monthEnd])
+                ->whereBetween('updated_at', [$monthStart, $monthEnd]) // Usa updated_at
                 ->count();
 
             // Formata mês em português
@@ -340,27 +342,27 @@ class BillingService
 
         // Recebimentos do mês atual
         $currentMonthTotal = (clone $baseQuery)
-            ->whereBetween('created_at', [$startOfMonth, $endOfMonth])
+            ->whereBetween('updated_at', [$startOfMonth, $endOfMonth]) // Usa updated_at
             ->sum('amount');
 
         // Recebimentos do mês anterior
         $lastMonthTotal = (clone $baseQuery)
-            ->whereBetween('created_at', [$lastMonthStart, $lastMonthEnd])
+            ->whereBetween('updated_at', [$lastMonthStart, $lastMonthEnd]) // Usa updated_at
             ->sum('amount');
 
         // Calcula percentual de crescimento
-        $growthPercentage = $lastMonthTotal > 0 
+        $growthPercentage = $lastMonthTotal > 0
             ? round((($currentMonthTotal - $lastMonthTotal) / $lastMonthTotal) * 100, 1)
             : ($currentMonthTotal > 0 ? 100 : 0);
 
         // Total de transações do mês
         $currentMonthTransactions = (clone $baseQuery)
-            ->whereBetween('created_at', [$startOfMonth, $endOfMonth])
+            ->whereBetween('updated_at', [$startOfMonth, $endOfMonth]) // Usa updated_at
             ->count();
 
         // Total de transações do mês anterior
         $lastMonthTransactions = (clone $baseQuery)
-            ->whereBetween('created_at', [$lastMonthStart, $lastMonthEnd])
+            ->whereBetween('updated_at', [$lastMonthStart, $lastMonthEnd]) // Usa updated_at
             ->count();
 
         // Total geral (todos os tempos)
@@ -371,13 +373,13 @@ class BillingService
 
         // Assinaturas ativas (contatos com pagamento aprovado nos últimos 30 dias)
         $activeSubscriptions = (clone $baseQuery)
-            ->where('created_at', '>=', $now->copy()->subDays(30))
+            ->where('updated_at', '>=', $now->copy()->subDays(30)) // Usa updated_at
             ->distinct('contact_id')
             ->count('contact_id');
 
         // Recebimentos por método de pagamento (mês atual)
         $byPaymentMethod = (clone $baseQuery)
-            ->whereBetween('created_at', [$startOfMonth, $endOfMonth])
+            ->whereBetween('updated_at', [$startOfMonth, $endOfMonth]) // Usa updated_at
             ->selectRaw('payment_method, COUNT(*) as count, SUM(amount) as total')
             ->groupBy('payment_method')
             ->get()
@@ -391,7 +393,7 @@ class BillingService
 
         // Recebimentos por gateway (mês atual)
         $byGateway = (clone $baseQuery)
-            ->whereBetween('created_at', [$startOfMonth, $endOfMonth])
+            ->whereBetween('updated_at', [$startOfMonth, $endOfMonth]) // Usa updated_at
             ->selectRaw('gateway, COUNT(*) as count, SUM(amount) as total')
             ->groupBy('gateway')
             ->get()
@@ -407,7 +409,7 @@ class BillingService
         $byBot = [];
         if (!empty($botIds)) {
             $byBot = (clone $baseQuery)
-                ->whereBetween('created_at', [$startOfMonth, $endOfMonth])
+                ->whereBetween('updated_at', [$startOfMonth, $endOfMonth]) // Usa updated_at
                 ->with('bot')
                 ->selectRaw('bot_id, COUNT(*) as count, SUM(amount) as total')
                 ->groupBy('bot_id')
@@ -425,7 +427,7 @@ class BillingService
         // Últimas transações (10 mais recentes)
         $recentTransactions = (clone $baseQuery)
             ->with(['contact', 'bot', 'paymentPlan', 'paymentCycle'])
-            ->orderBy('created_at', 'desc')
+            ->orderBy('updated_at', 'desc') // Usa updated_at
             ->limit(10)
             ->get()
             ->map(function ($transaction) {
@@ -451,7 +453,9 @@ class BillingService
                     'currency' => $transaction->currency ?? 'BRL',
                     'status' => $transaction->status,
                     'created_at' => $transaction->created_at->format('Y-m-d H:i:s'),
-                    'created_at_formatted' => $transaction->created_at->format('d/m/Y H:i')
+                    'updated_at' => $transaction->updated_at->format('Y-m-d H:i:s'),
+                    'created_at_formatted' => $transaction->created_at->format('d/m/Y H:i'),
+                    'updated_at_formatted' => $transaction->updated_at->format('d/m/Y H:i')
                 ];
             });
 
@@ -463,11 +467,11 @@ class BillingService
             $dayEnd = $date->copy()->endOfDay();
 
             $dayTotal = (clone $baseQuery)
-                ->whereBetween('created_at', [$dayStart, $dayEnd])
+                ->whereBetween('updated_at', [$dayStart, $dayEnd]) // Usa updated_at
                 ->sum('amount');
 
             $dayCount = (clone $baseQuery)
-                ->whereBetween('created_at', [$dayStart, $dayEnd])
+                ->whereBetween('updated_at', [$dayStart, $dayEnd]) // Usa updated_at
                 ->count();
 
             $dailyStats[] = [
@@ -491,7 +495,7 @@ class BillingService
                 'total_transactions' => [
                     'current' => $currentMonthTransactions,
                     'last_month' => $lastMonthTransactions,
-                    'growth_percentage' => $lastMonthTransactions > 0 
+                    'growth_percentage' => $lastMonthTransactions > 0
                         ? round((($currentMonthTransactions - $lastMonthTransactions) / $lastMonthTransactions) * 100, 1)
                         : ($currentMonthTransactions > 0 ? 100 : 0),
                     'label' => 'Transações'
@@ -521,4 +525,3 @@ class BillingService
         ];
     }
 }
-

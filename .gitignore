@@ -41,4 +41,8 @@ chaves/
 template/
 
 !backend/.env
+!backend/.env.local
+!backend/.env.producao
 !frontend/.env
+!frontend/.env.local
+!frontend/.env.producao

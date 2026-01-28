@@ -46,10 +46,10 @@ class CheckExpirationCommand extends Command
             // Busca contatos com transações aprovadas
             $contacts = Contact::where('bot_id', $bot->id)
                 ->whereHas('transactions', function($q) {
-                    $q->where('status', 'approved');
+                    $q->whereIn('status', ['approved', 'paid', 'completed']);
                 })
                 ->with(['transactions' => function($q) {
-                    $q->where('status', 'approved')
+                    $q->whereIn('status', ['approved', 'paid', 'completed'])
                       ->orderBy('created_at', 'desc')
                       ->with(['paymentPlan', 'paymentCycle']);
                 }])

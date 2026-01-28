@@ -9,10 +9,21 @@ define('LARAVEL_START', microtime(true));
 // Register the Composer autoloader...
 require __DIR__.'/vendor/autoload.php';
 
-// Bootstrap Laravel and handle the command...
+// Bootstrap Laravel...
 /** @var Application $app */
 $app = require_once __DIR__.'/bootstrap/app.php';
 
+// Custom Environment Loading for CLI
+// Se o arquivo .env padrão não existir, tenta carregar alternativas
+if (!file_exists(__DIR__.'/.env')) {
+    if (file_exists(__DIR__.'/.env.production')) {
+        $app->loadEnvironmentFrom('.env.production');
+    } elseif (file_exists(__DIR__.'/.env.local')) {
+        $app->loadEnvironmentFrom('.env.local');
+    }
+}
+
+// Handle the command...
 $status = $app->handleCommand(new ArgvInput);
 
 exit($status);
