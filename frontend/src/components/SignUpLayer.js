@@ -1,5 +1,5 @@
 import { Icon } from "@iconify/react";
-import React from "react";
+import React, { useState } from "react";
 import { Link } from "react-router-dom";
 
 const SignUpLayer = ({
@@ -16,18 +16,21 @@ const SignUpLayer = ({
   error,
   success,
 }) => {
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
   return (
     <section className="auth bg-base d-flex flex-wrap">
       <div className="auth-left d-lg-block d-none">
         <div className="d-flex align-items-center flex-column h-100 justify-content-center">
-          <img src="assets/images/auth/auth-img.png" alt="" />
+          <img src="/assets/images/auth/auth-img.png" alt="" />
         </div>
       </div>
       <div className="auth-right py-32 px-24 d-flex flex-column justify-content-center">
         <div className="max-w-464-px mx-auto w-100">
           <div>
             <Link to="/" className="mb-40 max-w-290-px">
-              <img src="assets/images/logo.png" alt="" />
+              <img src="/assets/images/logo.png" alt="" />
             </Link>
             <h4 className="mb-12">Cadastrar Novo Administrador</h4>
             <p className="mb-32 text-secondary-light text-lg">
@@ -70,7 +73,7 @@ const SignUpLayer = ({
                     <Icon icon="solar:lock-password-outline" />
                   </span>
                   <input
-                    type="password"
+                    type={showPassword ? "text" : "password"}
                     className="form-control h-56-px bg-neutral-50 radius-12"
                     placeholder="Senha"
                     value={password}
@@ -79,6 +82,11 @@ const SignUpLayer = ({
                     disabled={loading}
                   />
                 </div>
+                <span
+                  className={`toggle-password ri-eye-${showPassword ? 'off-' : ''}line cursor-pointer position-absolute end-0 top-50 translate-middle-y me-16 text-secondary-light`}
+                  onClick={() => setShowPassword(!showPassword)}
+                  style={{ cursor: 'pointer', zIndex: 10 }}
+                />
               </div>
             </div>
             <div className="mb-20">
@@ -88,7 +96,7 @@ const SignUpLayer = ({
                     <Icon icon="solar:lock-password-outline" />
                   </span>
                   <input
-                    type="password"
+                    type={showConfirmPassword ? "text" : "password"}
                     className="form-control h-56-px bg-neutral-50 radius-12"
                     placeholder="Confirmar Senha"
                     value={passwordConfirmation}
@@ -97,6 +105,11 @@ const SignUpLayer = ({
                     disabled={loading}
                   />
                 </div>
+                <span
+                  className={`toggle-password ri-eye-${showConfirmPassword ? 'off-' : ''}line cursor-pointer position-absolute end-0 top-50 translate-middle-y me-16 text-secondary-light`}
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  style={{ cursor: 'pointer', zIndex: 10 }}
+                />
               </div>
             </div>
             

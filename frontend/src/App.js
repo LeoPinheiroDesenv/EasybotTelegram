@@ -3,7 +3,7 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import ProtectedRoute from './components/ProtectedRoute';
-import SignInPage from './pages/SignInPage';
+import Login from './pages/Login';
 import RegisterAdmin from './pages/RegisterAdmin';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import ResetPassword from './pages/ResetPassword';
@@ -51,7 +51,7 @@ function App() {
         <Router>
           <div className="App">
             <Routes>
-              <Route path="/login" element={<SignInPage />} />
+              <Route path="/login" element={<Login />} />
               <Route path="/register-admin" element={<RegisterAdmin />} />
               <Route path="/forgot-password" element={<ForgotPasswordPage />} />
               <Route path="/reset-password" element={<ResetPassword />} />

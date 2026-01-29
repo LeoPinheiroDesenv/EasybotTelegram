@@ -1,8 +1,4 @@
 <?php
-
-
-
-
 use Illuminate\Foundation\Application;
 use Illuminate\Http\Request;
 
@@ -19,7 +15,7 @@ require __DIR__.'/../vendor/autoload.php';
 // Custom Environment Loading based on Host
 $envFile = '.env';
 if (isset($_SERVER['HTTP_HOST'])) {
-    if (str_contains($_SERVER['HTTP_HOST'], 'localhost') || str_contains($_SERVER['HTTP_HOST'], '127.0.0.1')) {
+    if (str_contains($_SERVER['HTTP_HOST'], 'localhost') || str_contains($_SERVER['HTTP_HOST'], '172.19.0.2:8000')) {
         if (file_exists(__DIR__ . '/../.env.local')) {
             $envFile = '.env.local';
         }

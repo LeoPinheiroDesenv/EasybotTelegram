@@ -471,7 +471,6 @@ const UpdateBot = () => {
                   display: 'flex', 
                   alignItems: 'center', 
                   gap: '8px',
-                  backgroundColor: '#9333ea',
                   color: 'white',
                   border: 'none',
                   padding: '10px 20px',

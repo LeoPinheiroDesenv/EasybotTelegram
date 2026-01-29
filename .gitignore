@@ -13,10 +13,6 @@ vendor/
 # Misc
 .DS_Store
 .env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
 
 # Logs
 npm-debug.log*
@@ -40,6 +36,5 @@ manuais/
 chaves/
 template/
 
-!backend/.env
 !frontend/.env
 !template_modelo/

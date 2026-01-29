@@ -23,7 +23,7 @@ if (!file_exists(__DIR__.'/.env')) {
     }
 }
 
-// Handle the command...
+// Handle the command...'''
 $status = $app->handleCommand(new ArgvInput);
 
 exit($status);
