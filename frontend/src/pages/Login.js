@@ -1,7 +1,8 @@
 import React, { useState, useContext, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../contexts/AuthContext';
-import './Login.css';
+import { useGoogleLogin } from '@react-oauth/google';
+import SignInLayer from '../components/SignInLayer';
 
 const Login = () => {
   const [email, setEmail] = useState('');
@@ -11,7 +12,7 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
   const [requiresTwoFactor, setRequiresTwoFactor] = useState(false);
   const [userId, setUserId] = useState(null);
-  const { login, verifyTwoFactor, isAuthenticated } = useContext(AuthContext);
+  const { login, loginWithGoogle, verifyTwoFactor, isAuthenticated } = useContext(AuthContext);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -71,83 +72,39 @@ const Login = () => {
     }
   };
 
+  const handleGoogleLogin = useGoogleLogin({
+    onSuccess: async (tokenResponse) => {
+      setLoading(true);
+      try {
+        await loginWithGoogle(tokenResponse.access_token);
+        navigate('/');
+      } catch (err) {
+        setError(err.response?.data?.error || 'Erro ao fazer login com o Google.');
+        setLoading(false);
+      }
+    },
+    onError: () => {
+      setError('Falha no login com o Google.');
+    },
+  });
+
   return (
-    <div className="login-container">
-      <div className="login-card">
-        <h2 className="login-title">Login</h2>
-        {!requiresTwoFactor ? (
-          <form onSubmit={handleSubmit}>
-            <div className="form-group">
-              <label htmlFor="email">Email:</label>
-              <input
-                type="email"
-                id="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                placeholder="seu@email.com"
-                disabled={loading}
-              />
-            </div>
-            <div className="form-group">
-              <label htmlFor="password">Senha:</label>
-              <input
-                type="password"
-                id="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                placeholder="••••••••"
-                disabled={loading}
-              />
-            </div>
-            {error && <div className="error">{error}</div>}
-            <button type="submit" className="btn btn-primary" disabled={loading}>
-              {loading ? 'Entrando...' : 'Entrar'}
-            </button>
-            <div className="forgot-password-link">
-              <button
-                type="button"
-                onClick={() => navigate('/forgot-password')}
-                className="btn-link"
-                disabled={loading}
-              >
-                Esqueci minha senha
-              </button>
-              <button
-                type="button"
-                onClick={() => navigate('/register-admin')}
-                className="btn-link"
-                disabled={loading}
-              >
-                Cadastrar Administrador
-              </button>
-            </div>
-          </form>
-        ) : (
-          <form onSubmit={handleVerifyTwoFactor}>
-            <div className="form-group">
-              <label htmlFor="twoFactorToken">Código de Verificação (2FA):</label>
-              <input
-                type="text"
-                id="twoFactorToken"
-                value={twoFactorToken}
-                onChange={(e) => setTwoFactorToken(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                required
-                placeholder="000000"
-                maxLength="6"
-                autoFocus
-                disabled={loading}
-              />
-            </div>
-            {error && <div className="error">{error}</div>}
-            <button type="submit" className="btn btn-primary" disabled={loading || twoFactorToken.length !== 6}>
-              {loading ? 'Verificando...' : 'Verificar e Entrar'}
-            </button>
-          </form>
-        )}
-      </div>
-    </div>
+    <SignInLayer
+      email={email}
+      setEmail={setEmail}
+      password={password}
+      setPassword={setPassword}
+      twoFactorToken={twoFactorToken}
+      setTwoFactorToken={setTwoFactorToken}
+      handleSubmit={handleSubmit}
+      handleVerifyTwoFactor={handleVerifyTwoFactor}
+      handleGoogleLogin={handleGoogleLogin}
+      loading={loading}
+      error={error}
+      requiresTwoFactor={requiresTwoFactor}
+      setRequiresTwoFactor={setRequiresTwoFactor}
+      setError={setError}
+    />
   );
 };
 

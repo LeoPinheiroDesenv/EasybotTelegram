@@ -4,6 +4,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faInfoCircle, faTimes } from '@fortawesome/free-solid-svg-icons';
 import Layout from '../components/Layout';
 import botService from '../services/botService';
+import warningMessageService from '../services/warningMessageService';
 import { useManageBot } from '../contexts/ManageBotContext';
 import './UpdateBot.css';
 
@@ -38,12 +39,26 @@ const UpdateBot = () => {
   const [updatingLink, setUpdatingLink] = useState(false);
   const [inviteLink, setInviteLink] = useState(null);
   const [showLinkModal, setShowLinkModal] = useState(false);
+  const [warningMessages, setWarningMessages] = useState([]);
 
   useEffect(() => {
-    loadBot();
+    const loadAllData = async () => {
+      await loadBot();
+      await loadWarningMessages();
+    }
+    loadAllData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [actualBotId]);
 
+  const loadWarningMessages = async () => {
+    try {
+      const messages = await warningMessageService.getWarningMessages(actualBotId);
+      setWarningMessages(messages);
+    } catch (err) {
+      console.error('Erro ao carregar mensagens de aviso:', err);
+    }
+  };
+  
   const loadBot = async () => {
     try {
       setLoadingData(true);
@@ -290,8 +305,6 @@ const UpdateBot = () => {
     }
   };
 
-
-
   const handleValidate = async () => {
     if (!formData.token) {
       setError('Por favor, preencha o token do bot antes de validar.');
@@ -335,6 +348,62 @@ const UpdateBot = () => {
     }
   };
 
+  const handleAddWarningMessage = () => {
+    setWarningMessages([
+      ...warningMessages,
+      {
+        id: null,
+        days: 1,
+        time_type: 'before',
+        message: '',
+      },
+    ]);
+  };
+
+  const handleWarningMessageChange = (index, field, value) => {
+    const newMessages = [...warningMessages];
+    newMessages[index][field] = value;
+    setWarningMessages(newMessages);
+  };
+
+  const handleSaveWarningMessage = async (index) => {
+    const message = warningMessages[index];
+    try {
+      if (message.id) {
+        await warningMessageService.updateWarningMessage(actualBotId, message.id, message);
+      } else {
+        const newMessage = await warningMessageService.createWarningMessage(actualBotId, message);
+        const newMessages = [...warningMessages];
+        newMessages[index] = newMessage;
+        setWarningMessages(newMessages);
+      }
+      setSuccess('Mensagem de aviso salva com sucesso!');
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Erro ao salvar mensagem de aviso');
+    }
+  };
+
+  const handleDeleteWarningMessage = async (index) => {
+    const message = warningMessages[index];
+    if (message.id) {
+      try {
+        await warningMessageService.deleteWarningMessage(actualBotId, message.id);
+        const newMessages = [...warningMessages];
+        newMessages.splice(index, 1);
+        setWarningMessages(newMessages);
+        setSuccess('Mensagem de aviso excluída com sucesso!');
+        setTimeout(() => setSuccess(''), 3000);
+      } catch (err) {
+        setError(err.response?.data?.error || 'Erro ao excluir mensagem de aviso');
+      }
+    } else {
+      const newMessages = [...warningMessages];
+      newMessages.splice(index, 1);
+      setWarningMessages(newMessages);
+    }
+  };
+
   if (loadingData) {
     const loadingContent = (
       <div className="update-bot-page">
@@ -362,7 +431,7 @@ const UpdateBot = () => {
                 
               <button
                 onClick={handleSetWebhook}
-                className="btn btn-primary"
+                className="btn btn-primary radius-8 px-14 py-6 text-sm"
                 disabled={loading || settingWebhook}
                 style={{ flex: 1, minWidth: '250px', backgroundColor: '#3b82f6', color: 'white'}}
               >
@@ -371,7 +440,7 @@ const UpdateBot = () => {
                 
                 <button 
                   onClick={handleInitialize}
-                  className="btn btn-primary"
+                  className="btn btn-primary radius-8 px-14 py-6 text-sm"
                   disabled={loading || initializing}
                   style={{ flex: 1, minWidth: '200px' }}
                 >
@@ -667,7 +736,56 @@ const UpdateBot = () => {
             )}
           </div>
 
-          {/* Botões de verificação e configuração */}
+          {/* Mensagens de Aviso de Expiração */}
+          <div className="update-section">
+            <h2 className="section-title">Mensagens de Aviso de Expiração</h2>
+            <p className="section-description" style={{ marginBottom: '16px', color: '#666', fontSize: '14px' }}>
+              Configure mensagens automáticas para serem enviadas aos usuários antes ou depois da expiração do plano.
+            </p>
+            {warningMessages.map((message, index) => (
+              <div key={index} className="warning-message-item">
+                <div className="form-grid">
+                  <div className="form-field-card">
+                    <label>Dias</label>
+                    <input
+                      type="number"
+                      value={message.days}
+                      onChange={(e) => handleWarningMessageChange(index, 'days', e.target.value)}
+                    />
+                  </div>
+                  <div className="form-field-card">
+                    <label>Tipo</label>
+                    <select
+                      value={message.time_type}
+                      onChange={(e) => handleWarningMessageChange(index, 'time_type', e.target.value)}
+                    >
+                      <option value="before">Antes de expirar</option>
+                      <option value="after">Depois de expirar</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="form-field-card">
+                  <label>Mensagem</label>
+                  <textarea
+                    value={message.message}
+                    onChange={(e) => handleWarningMessageChange(index, 'message', e.target.value)}
+                    rows="3"
+                  ></textarea>
+                </div>
+                <div className="action-buttons">
+                  <button onClick={() => handleSaveWarningMessage(index)} className="btn btn-save">
+                    Salvar
+                  </button>
+                  <button onClick={() => handleDeleteWarningMessage(index)} className="btn btn-danger">
+                    Excluir
+                  </button>
+                </div>
+              </div>
+            ))}
+            <button onClick={handleAddWarningMessage} className="btn btn-primary" style={{ marginTop: '20px' }}>
+              Adicionar Mensagem
+            </button>
+          </div>
 
           {/* Action buttons */}
           <div className="action-buttons">
@@ -690,7 +808,6 @@ const UpdateBot = () => {
         </div>
         </div>
       </div>
-
       {/* Modal de Link de Convite */}
       {showLinkModal && inviteLink && (
         <div className="modal-overlay" onClick={closeLinkModal}>
@@ -939,4 +1056,3 @@ const UpdateBot = () => {
 };
 
 export default UpdateBot;
-

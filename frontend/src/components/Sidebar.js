@@ -152,12 +152,12 @@ const Sidebar = ({ isOpen, onClose }) => {
         <div className="sidebar-content">
         <div className="sidebar-logo">
           <div className="logo-circles">
-            <span className="circle circle-1"></span>
-            <span className="circle circle-2"></span>
-            <span className="circle circle-3"></span>
+            <Link to='/' className='mb-40 max-w-290-px'>
+              <img src='/assets/images/logo.png' alt='' />
+            </Link>
           </div>
             <div className="logo-text">
-            <div className="logo-title">Easy</div>
+
             <div className="logo-subtitle">
               {location.pathname === '/bot/create' ? 'Criar novo bot' : 
                location.pathname.includes('/bot/manage/') || 
@@ -178,7 +178,7 @@ const Sidebar = ({ isOpen, onClose }) => {
                location.pathname.startsWith('/settings/payment-gateways') ? 'Gateways de Pagamento' :
                location.pathname.startsWith('/settings/security') ? 'Segurança (2FA)' :
                location.pathname.startsWith('/settings/storage') ? 'Storage' :
-               'Página inicial'}
+               ''}
             </div>
           </div>
         </div>
@@ -296,30 +296,14 @@ const Sidebar = ({ isOpen, onClose }) => {
           )}
 
           {hasMenuAccess('results') && (
-            <div className="sidebar-menu-group">
-              <div
-                className={`sidebar-item ${isResultsActive ? 'active' : ''} ${resultsMenuOpen ? 'expanded' : ''}`}
-                onClick={() => setResultsMenuOpen(!resultsMenuOpen)}
-              >
-                <span className="sidebar-icon">{getIcon('chart')}</span>
-                <span className="sidebar-label">Resultados</span>
-                <span className="sidebar-chevron">
-                  {resultsMenuOpen ? getIcon('chevronDown') : getIcon('chevron')}
-                </span>
-              </div>
-              
-              {resultsMenuOpen && (
-                <div className="sidebar-submenu">
-                  <Link
-                    to="/results/contacts"
-                    className={`sidebar-submenu-item ${location.pathname === '/results/contacts' ? 'active' : ''}`}
-                    onClick={onClose}
-                  >
-                    Contatos
-                  </Link>
-                </div>
-              )}
-            </div>
+            <Link
+              to="/results/contacts"
+              className={`sidebar-item ${location.pathname === '/results/contacts' ? 'active' : ''}`}
+              onClick={onClose}
+            >
+              <span className="sidebar-icon">{getIcon('chart')}</span>
+              <span className="sidebar-label">Contatos</span>
+            </Link>
           )}
 
           {hasMenuAccess('marketing') && (

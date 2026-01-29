@@ -15,7 +15,7 @@
 .create-bot-title {
   font-size: 48px;
   font-weight: 700;
-  color: #9333ea;
+  color: #059669;
   margin-bottom: 12px;
   line-height: 1.2;
 }
@@ -43,7 +43,7 @@
 .section-title {
   font-size: 24px;
   font-weight: 600;
-  color: #9333ea;
+  color: #059669;
   margin-bottom: 24px;
 }
 
@@ -71,7 +71,7 @@
 
 .form-group input:focus {
   outline: none;
-  border-color: #9333ea;
+  border-color: #059669;
   box-shadow: 0 0 0 3px rgba(147, 51, 234, 0.1);
 }
 
@@ -131,7 +131,7 @@
 }
 
 .btn-validate {
-  background-color: #9333ea;
+  background-color: #059669;
   color: #ffffff;
   flex: 1;
 }
@@ -176,7 +176,7 @@
 
 .btn-support {
   background-color: #f3e8ff;
-  color: #9333ea;
+  color: #059669;
   border: 1px solid #e9d5ff;
   margin-top: 12px;
   width: 100%;

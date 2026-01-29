@@ -171,14 +171,6 @@ function App() {
               </Route>
               {/* Rotas antigas mantidas para compatibilidade */}
               <Route
-                path="/bot/welcome/:botId"
-                element={
-                  <ProtectedRoute>
-                    <WelcomeMessage />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
                 path="/results/contacts"
                 element={
                   <ProtectedRoute>

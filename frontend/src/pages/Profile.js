@@ -311,11 +311,7 @@ const Profile = () => {
     <Layout>
       <div className="profile-page">
         <div className="profile-container">
-          <div className="profile-header">
-            <h1>Meu Perfil</h1>
-            <p>Gerencie suas informações pessoais</p>
-          </div>
-
+          
           {error && <div className="alert alert-error">{error}</div>}
           {success && <div className="alert alert-success">{success}</div>}
 

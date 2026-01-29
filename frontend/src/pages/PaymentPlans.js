@@ -201,22 +201,16 @@ const PaymentPlans = () => {
           <>
             <div className="payment-plans-content">
               <div className="payment-plans-header">
-                <div className="header-text">
-                  <h1>Gerencie suas cobranças de qualquer lugar</h1>
-                  <p>Elabore planos, administre e estruture seus pagamentos. Escolha prazos e montantes</p>
-                </div>
+                
                 <div className="header-actions">
-                  <button onClick={loadData} className="btn btn-update" disabled={loading}>
-                    <FontAwesomeIcon icon={faSync} />
+                  <button onClick={loadData} className="btn btn-primary radius-8 px-14 py-6 text-sm" disabled={loading}>
                     Atualizar
                   </button>
-                  <button onClick={handleCreate} className="btn btn-primary">
-                    <FontAwesomeIcon icon={faPlus} />
+                  <button onClick={handleCreate} className="btn btn-primary radius-8 px-14 py-6 text-sm">
                     Criar Plano
                   </button>
-                  <button onClick={() => {/* TODO: Implementar edição de mensagem PIX */}} className="btn btn-edit-pix">
-                    <FontAwesomeIcon icon={faEditIcon} />
-                    Editar Mensagem Pix
+                  <button onClick={() => {/* TODO: Implementar edição de mensagem PIX */}} className="btn btn-info radius-8 px-30 py-8 text-sm">
+                    Mensagem Pix
                   </button>
                 </div>
               </div>

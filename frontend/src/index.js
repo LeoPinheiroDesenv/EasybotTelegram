@@ -3,6 +3,8 @@ import ReactDOM from 'react-dom/client';
 import {config} from '@fortawesome/fontawesome-svg-core';
 import '@fortawesome/fontawesome-svg-core/styles.css';
 import 'bootstrap/dist/css/bootstrap.min.css';
+import './assets/css/remixicon.css';
+import './assets/css/style.css';
 import './index.css';
 import App from './App';
 import {DevSupport} from "@react-buddy/ide-toolbox";

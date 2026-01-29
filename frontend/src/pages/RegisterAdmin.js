@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import authService from '../services/authService';
-import './RegisterAdmin.css';
+import SignUpLayer from '../components/SignUpLayer';
 
 const RegisterAdmin = () => {
   const [name, setName] = useState('');
@@ -43,72 +43,20 @@ const RegisterAdmin = () => {
   };
 
   return (
-    <div className="register-container">
-      <div className="register-card">
-        <h2 className="register-title">Cadastrar Novo Administrador</h2>
-        <form onSubmit={handleSubmit}>
-          <div className="form-group">
-            <label htmlFor="name">Nome completo:</label>
-            <input
-              type="text"
-              id="name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
-              disabled={loading}
-            />
-          </div>
-          <div className="form-group">
-            <label htmlFor="email">Email:</label>
-            <input
-              type="email"
-              id="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              disabled={loading}
-            />
-          </div>
-          <div className="form-group">
-            <label htmlFor="password">Senha:</label>
-            <input
-              type="password"
-              id="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              disabled={loading}
-            />
-          </div>
-          <div className="form-group">
-            <label htmlFor="passwordConfirmation">Confirmar senha:</label>
-            <input
-              type="password"
-              id="passwordConfirmation"
-              value={passwordConfirmation}
-              onChange={(e) => setPasswordConfirmation(e.target.value)}
-              required
-              disabled={loading}
-            />
-          </div>
-          {error && <div className="error">{error}</div>}
-          {success && <div className="success">{success}</div>}
-          <button type="submit" className="btn btn-primary" disabled={loading}>
-            {loading ? 'Cadastrando...' : 'Cadastrar'}
-          </button>
-          <div className="login-link">
-            <button
-              type="button"
-              onClick={() => navigate('/login')}
-              className="btn-link"
-              disabled={loading}
-            >
-              Voltar para o Login
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+    <SignUpLayer
+      name={name}
+      setName={setName}
+      email={email}
+      setEmail={setEmail}
+      password={password}
+      setPassword={setPassword}
+      passwordConfirmation={passwordConfirmation}
+      setPasswordConfirmation={setPasswordConfirmation}
+      handleSubmit={handleSubmit}
+      loading={loading}
+      error={error}
+      success={success}
+    />
   );
 };
 

@@ -117,21 +117,21 @@
 
 .media-preview-file svg {
   font-size: 48px;
-  color: #9333ea;
+  color: #059669;
 }
 
 .media-link {
-  color: #9333ea;
+  color: #059669;
   text-decoration: none;
   font-weight: 500;
   padding: 8px 16px;
-  border: 1px solid #9333ea;
+  border: 1px solid #059669;
   border-radius: 4px;
   transition: all 0.2s;
 }
 
 .media-link:hover {
-  background-color: #9333ea;
+  background-color: #059669;
   color: #ffffff;
 }
 
@@ -147,7 +147,7 @@
   justify-content: center;
   gap: 10px;
   padding: 14px 24px;
-  background-color: #9333ea;
+  background-color: #059669;
   color: #ffffff;
   border: none;
   border-radius: 8px;
@@ -159,7 +159,7 @@
 }
 
 .btn-media:hover {
-  background-color: #7e22ce;
+  background-color: #059669;
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(147, 51, 234, 0.3);
 }
@@ -227,7 +227,7 @@
 
 .message-input:focus {
   outline: none;
-  border-color: #9333ea;
+  border-color: #059669;
   box-shadow: 0 0 0 3px rgba(147, 51, 234, 0.1);
 }
 
@@ -275,7 +275,7 @@ textarea.message-input {
 }
 
 .toggle-switch.active {
-  background-color: #9333ea;
+  background-color: #059669;
 }
 
 .toggle-slider {
@@ -313,18 +313,18 @@ textarea.message-input {
 }
 
 .btn-primary {
-  background-color: #9333ea;
+  background-color: #059669;
   color: #ffffff;
 }
 
 .btn-primary:hover:not(:disabled) {
-  background-color: #7e22ce;
+  background-color: #059669;
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(147, 51, 234, 0.3);
 }
 
 .btn-save {
-  background-color: #9333ea;
+  background-color: #059669;
   color: #ffffff;
   padding: 14px 40px;
   font-size: 16px;
@@ -332,7 +332,7 @@ textarea.message-input {
 }
 
 .btn-save:hover:not(:disabled) {
-  background-color: #7e22ce;
+  background-color: #059669;
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(147, 51, 234, 0.3);
 }

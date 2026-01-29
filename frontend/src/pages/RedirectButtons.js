@@ -168,11 +168,11 @@ const RedirectButtons = () => {
                   <p>Botões extras que aparecerão no bot, redirecionando o usuário para outro lugar. Você pode adicionar até {MAX_BUTTONS} botões.</p>
                 </div>
                 <div className="header-actions">
-                  <button onClick={loadRedirectButtons} className="btn btn-update" disabled={loading}>
+                  <button onClick={loadRedirectButtons} className="btn btn-info radius-8 px-14 py-6 text-sm" disabled={loading}>
                     <FontAwesomeIcon icon={faSync} />
                     Atualizar
                   </button>
-                  <button onClick={handleCreate} className="btn btn-primary" disabled={redirectButtons.length >= MAX_BUTTONS}>
+                  <button onClick={handleCreate} className="btn btn-primary radius-8 px-14 py-6 text-sm" disabled={redirectButtons.length >= MAX_BUTTONS}>
                     <FontAwesomeIcon icon={faPlus} />
                     Adicionar Botão
                   </button>

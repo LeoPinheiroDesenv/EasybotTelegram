@@ -4,6 +4,7 @@ import Layout from '../components/Layout';
 import paymentStatusService from '../services/paymentStatusService';
 import botService from '../services/botService';
 import RefreshButton from '../components/RefreshButton';
+import MoonLoader from "react-spinners/MoonLoader";
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
   faCheckCircle, 
@@ -279,7 +280,10 @@ const PaymentStatus = () => {
     return (
       <Layout>
         <div className="payment-status-page">
-          <div className="loading-container">Carregando status de pagamentos...</div>
+          <div className="loading-container" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '400px' }}>
+            <MoonLoader color="#487fff" size={40} />
+            <p style={{ marginTop: '16px', color: '#6b7280' }}>Carregando status de pagamentos...</p>
+          </div>
         </div>
       </Layout>
     );
@@ -289,28 +293,26 @@ const PaymentStatus = () => {
     <Layout>
       <div className="payment-status-page">
         <div className="payment-status-header">
-          <div className="header-content">
-            <h1>Status de Pagamentos</h1>
-            {bot && <span className="bot-name">{bot.name}</span>}
-          </div>
+          
           <div className="header-actions">
             <RefreshButton onRefresh={loadStatuses} />
             <button
-              className="btn btn-secondary"
+              className="btn btn-info radius-8 px-14 py-6 text-sm"
               onClick={handleCheckExpiring}
               disabled={processingExpiring}
               title="Verificar pagamentos próximos de expirar"
             >
-              <FontAwesomeIcon icon={faBell} /> Verificar Expirando
+              <FontAwesomeIcon icon={faBell} /> 
+              {processingExpiring ? <MoonLoader color="#ffffff" size={12} /> : 'Verificar Expirando'}
             </button>
             <button
-              className="btn btn-warning"
+              className="btn btn-danger radius-8 px-14 py-6 text-sm"
               onClick={handleCheckExpired}
               disabled={processingExpired}
               title="Verificar e processar pagamentos expirados"
             >
               <FontAwesomeIcon icon={faUserMinus} /> 
-              {processingExpired ? 'Processando...' : 'Verificar Expirados'}
+              {processingExpired ? <MoonLoader color="#ffffff" size={12} /> : 'Verificar Expirados'}
             </button>
           </div>
         </div>
@@ -506,7 +508,10 @@ const PaymentStatus = () => {
               </div>
               <div className="modal-body">
                 {loadingDetails ? (
-                  <div className="loading-container">Carregando detalhes...</div>
+                  <div className="loading-container" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px' }}>
+                    <MoonLoader color="#487fff" size={30} />
+                    <p style={{ marginTop: '16px', color: '#6b7280' }}>Carregando detalhes...</p>
+                  </div>
                 ) : transactionDetails ? (
                   <div className="transaction-details">
                     <div className="details-section">
@@ -701,4 +706,3 @@ const PaymentStatus = () => {
 };
 
 export default PaymentStatus;
-

@@ -135,7 +135,7 @@ const PaymentCycles = () => {
       <DialogComponent />
       <div className="payment-cycles-page">
         <div className="page-header">
-          <h1 className="page-title">Ciclos de Pagamento</h1>
+          
           {isAdmin && (
             <button className="btn btn-primary" onClick={() => handleOpenModal()}>
               + Novo Ciclo

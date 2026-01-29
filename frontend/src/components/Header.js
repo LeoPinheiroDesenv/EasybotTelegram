@@ -85,10 +85,26 @@ const Header = ({ onMenuClick }) => {
 
   const getPageTitle = () => {
     const path = location.pathname;
-    if (path === '/') return 'Dashboard';
+    if (path === '/') return 'Dashboard - Financeiro';
+    if (path === '/billing') return 'Faturamento';
+    if (path.startsWith('/payment-status/')) return 'Status de Pagamentos';
     if (path === '/bot/create') return 'Criar novo bot';
     if (path === '/bot/update') return 'Atualizar bot';
     if (path.startsWith('/bot/update/')) return 'Atualizar bot';
+    if (path.startsWith('/bot/list')) return 'Meus bots';
+    if (path.startsWith('/settings/profile')) return 'Meu Perfil';
+    if (path.startsWith('/settings/payment-cycles')) return 'Ciclos de Pagamento';
+    if (path.startsWith('/settings/payment-gateways')) return 'Gateways de Pagamento';
+    if (path.startsWith('/settings/security')) return 'Segurança (2FA)';
+    if (path.startsWith('/settings/storage')) return 'Storage';
+    if (path.startsWith('/settings/artisan')) return 'Comandos Artisan';
+    if (path.startsWith('/settings/cron-jobs')) return 'Cron Jobs';
+    if (path.startsWith('/settings/laravel-logs')) return 'Logs do Laravel';
+    if (path === '/users') return 'Usuários';
+    if (path === '/user-groups') return 'Grupos de Usuários';
+    if (path === '/logs') return 'Logs';
+    if (path === '/ftp') return 'Gerenciador FTP';
+
     if (path.includes('/bot/manage/') || 
         path.startsWith('/bot/welcome/') ||
         path.startsWith('/bot/payment-plans/') ||
@@ -112,11 +128,47 @@ const Header = ({ onMenuClick }) => {
     return 'Página Inicial';
   };
 
+  const getPageSubtitle = () => {
+    const path = location.pathname;
+    if (path === '/') return 'Visão geral dos seus recebimentos e transações';
+    if (path === '/billing') return 'Consulte e gerencie seus pagamentos';
+    if (path.startsWith('/payment-status/')) return 'Detalhes do status do pagamento';
+    if (path === '/bot/create') return 'Preencha os detalhes para criar um novo bot';
+    if (path.startsWith('/bot/update/')) return 'Atualize os detalhes do seu bot';
+    if (path.startsWith('/bot/list')) return 'Veja e gerencie todos os seus bots';
+    if (path === '/results/contacts') return 'Visualize e gerencie seus contatos';
+    if (path === '/settings/payment-cycles') return 'Gerencie os ciclos de pagamento';
+    if (path === '/settings/payment-gateways') return 'Gerencie os gateways de pagamento';
+    if (path === '/settings/security') return 'Configure a autenticação de dois fatores para maior segurança';
+    if (path === '/settings/storage') return 'Gerencie seus arquivos e armazenamento';
+    if (path === '/settings/artisan') return 'Execute comandos Artisan diretamente do painel';
+    if (path === '/settings/cron-jobs') return 'Configure e monitore seus trabalhos cron';
+    if (path === '/settings/laravel-logs') return 'Visualize e gerencie os logs do Laravel';
+    if (path === '/users') return 'Gerencie os usuários da sua plataforma';
+    if (path === '/user-groups') return 'Organize usuários em grupos para melhor gerenciamento';
+    if (path === '/logs') return 'Revise as atividades e eventos do sistema';
+    if (path === '/ftp') return 'Acesse e gerencie seus arquivos via FTP';
+
+
+    if (path.startsWith('/settings/profile')) return 'Atualize suas informações pessoais e preferências';
+    if (path.includes('/bot/manage/') ||
+        path.startsWith('/bot/welcome/') ||
+        path.startsWith('/bot/payment-plans/') ||
+        path.startsWith('/bot/redirect/') ||
+        path.startsWith('/bot/commands/') ||
+        path.startsWith('/bot/administrators/') ||
+        path.startsWith('/bot/telegram-groups/') ||
+        (path.includes('/bot/') && path.includes('/botfather'))) {
+      return 'Gerencie as configurações e funcionalidades do seu bot';
+    }
+    return 'Informações e ações da página atual';
+  };
+
   const handleBotSelect = async (botId) => {
     localStorage.setItem('selectedBotId', botId.toString());
     setShowBotMenu(false);
     await loadCurrentBot(); // Atualiza o bot exibido no header
-    navigate(`/bot/update/${botId}`);
+    navigate(`/bot/manage/${botId}/settings`);
     // Dispara evento customizado para atualizar outros componentes
     window.dispatchEvent(new Event('botSelected'));
   };
@@ -133,27 +185,14 @@ const Header = ({ onMenuClick }) => {
         <button className="mobile-menu-btn" onClick={onMenuClick} aria-label="Menu">
           <FontAwesomeIcon icon={faBars} />
         </button>
-        <div className="header-logo">
-          <div className="logo-circles">
-            <span className="circle circle-1"></span>
-            <span className="circle circle-2"></span>
-            <span className="circle circle-3"></span>
-          </div>
-          <div className="logo-text">
-            <div className="logo-title">Easy</div>
-            <div className="logo-subtitle">Página inicial</div>
-          </div>
-          <div className="header-title">
-          <div style={{ marginLeft: '20px' }}>
-          <span className=""></span>
-            <h1>
-                {getPageTitle()}
-                </h1>
-          </div>
-        </div>
-        </div>
-      </div>
 
+        <div>
+          <h1 className="dashboard-main-title">{getPageTitle()}</h1>
+          <p className="dashboard-subtitle">{getPageSubtitle()}</p>
+        </div>
+
+
+      </div>
       <div className="header-right">
         {loadingCurrentBot ? (
           <div className="current-bot-info loading">
@@ -227,14 +266,14 @@ const Header = ({ onMenuClick }) => {
                       {bots.map((bot) => (
                         <button
                           key={bot.id}
-                          className={`bot-menu-item ${location.pathname === `/bot/update/${bot.id}` ? 'active' : ''}`}
+                          className={`bot-menu-item ${location.pathname === `/bot/manage/${bot.id}/settings` ? 'active' : ''}`}
                           onClick={() => handleBotSelect(bot.id)}
                         >
                           <div className="bot-menu-icon">
                             <FontAwesomeIcon icon={faRobot} style={{ color: '#9333ea' }} />
                           </div>
                           <span className="bot-menu-name">{bot.name}</span>
-                          {location.pathname === `/bot/update/${bot.id}` && (
+                          {location.pathname === `/bot/manage/${bot.id}/settings` && (
                             <span className="bot-menu-active">Ativo</span>
                           )}
                         </button>

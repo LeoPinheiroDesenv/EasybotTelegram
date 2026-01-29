@@ -251,7 +251,7 @@ const BotCommands = () => {
               <div className="bot-commands-actions">
                 <button
                   onClick={loadCommands}
-                  className="btn btn-update"
+                  className="btn btn-info radius-8 px-14 py-6 text-sm"
                   disabled={loading}
                 >
                   <FontAwesomeIcon icon={faSync} />
@@ -259,7 +259,7 @@ const BotCommands = () => {
                 </button>
                 <button
                   onClick={handleRegisterCommands}
-                  className="btn btn-register"
+                  className="btn btn-info radius-8 px-14 py-6 text-sm"
                   disabled={registering || commands.length === 0}
                 >
                   <FontAwesomeIcon icon={faSync} spin={registering} />
@@ -272,11 +272,11 @@ const BotCommands = () => {
                       loadTelegramCommands();
                     }
                   }}
-                  className="btn btn-secondary"
+                  className="btn btn-warning radius-8 px-14 py-6 text-sm"
                 >
                   {showTelegramCommands ? 'Ocultar' : 'Ver'} Comandos no Telegram
                 </button>
-                <button onClick={handleCreate} className="btn btn-primary">
+                <button onClick={handleCreate} className="btn btn-info radius-8 px-14 py-6 text-sm">
                   <FontAwesomeIcon icon={faPlus} />
                   Adicionar Comando
                 </button>

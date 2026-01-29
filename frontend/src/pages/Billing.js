@@ -9,6 +9,8 @@ import { Line } from 'react-chartjs-2';
 import DatePicker, { registerLocale } from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import ptBR from 'date-fns/locale/pt-BR';
+import MoonLoader from "react-spinners/MoonLoader";
+
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -213,8 +215,13 @@ const Billing = () => {
     return (
       <Layout>
         <div className="billing-page">
-          <div className="loading-container">Carregando dados de faturamento...</div>
+          <div className="dashboard-loading" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '400px' }}>
+            <MoonLoader color="#487fff" size={40} />
+            <p style={{ marginTop: '16px', color: '#6b7280' }}>Carregando dados de faturamento...</p>
+          </div>
         </div>
+
+
       </Layout>
     );
   }
@@ -222,12 +229,7 @@ const Billing = () => {
   return (
     <Layout>
       <div className="billing-page">
-        <div className="billing-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h1>Faturamento</h1>
-          <RefreshButton onRefresh={handleRefresh} loading={loading} className="compact" />
-          <p>Visualize e gerencie seus pagamentos e faturamento</p>
-        </div>
-
+        
         {error && <div className="alert alert-error">{error}</div>}
         {success && <div className="alert alert-success">{success}</div>}
 

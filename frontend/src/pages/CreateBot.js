@@ -71,12 +71,7 @@ const CreateBot = () => {
     <Layout>
       <div className="create-bot-page">
         <div className="create-bot-content">
-          <div className="create-bot-header">
-            <h1 className="create-bot-title">Crie um novo bot agora mesmo</h1>
-            <p className="create-bot-subtitle">
-              Aumente as vendas dos seus produtos ou serviços pelo Telegram agora mesmo!
-            </p>
-          </div>
+          
 
           <div className="create-bot-grid">
             <div className="create-bot-form-section">

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout';
 import botService from '../services/botService';
 import billingService from '../services/billingService';
+import MoonLoader from "react-spinners/MoonLoader";
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -83,7 +84,10 @@ const Dashboard = () => {
     return (
       <Layout>
         <div className="dashboard-finance-container">
-          <div className="dashboard-loading">Carregando dashboard...</div>
+          <div className="dashboard-loading" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '400px' }}>
+            <MoonLoader color="#487fff" size={40} />
+            <p style={{ marginTop: '16px', color: '#6b7280' }}>Carregando dashboard...</p>
+          </div>
         </div>
       </Layout>
     );
@@ -218,20 +222,34 @@ const Dashboard = () => {
     <Layout>
       <div className="dashboard-finance-container">
         <div className="dashboard-header-section">
-          <div>
-            <h1 className="dashboard-main-title">Dashboard - Financeiro</h1>
-            <p className="dashboard-subtitle">Visão geral dos seus recebimentos e transações</p>
-          </div>
-          <button className="btn-refresh" onClick={loadDashboardData}>
-            🔄 Atualizar
+
+          <button className="refresh-button" title="Atualizar dados" onClick={loadDashboardData}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                 stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"></path>
+              <path d="M21 3v5h-5"></path>
+              <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"></path>
+              <path d="M3 21v-5h5"></path>
+            </svg>
+            Atualizar
           </button>
+
+
         </div>
 
         {hasNoBots && (
-          <div className="alert alert-info" style={{ marginBottom: '24px', padding: '16px', backgroundColor: '#dbeafe', border: '1px solid #93c5fd', borderRadius: '8px', color: '#1e40af' }}>
-            <strong>💡 Informação:</strong> Você ainda não criou nenhum bot. Crie um bot para começar a receber pagamentos e visualizar estatísticas aqui.
-            <button 
-              onClick={() => navigate('/bot/create')} 
+            <div className="alert alert-info" style={{
+              marginBottom: '24px',
+              padding: '16px',
+              backgroundColor: '#dbeafe',
+              border: '1px solid #93c5fd',
+              borderRadius: '8px',
+              color: '#1e40af'
+            }}>
+              <strong>💡 Informação:</strong> Você ainda não criou nenhum bot. Crie um bot para começar a receber
+              pagamentos e visualizar estatísticas aqui.
+              <button
+                  onClick={() => navigate('/bot/create')}
               className="btn btn-primary" 
               style={{ marginLeft: '12px', marginTop: '8px' }}
             >

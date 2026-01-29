@@ -263,11 +263,7 @@ const PaymentGatewayConfigs = () => {
       <DialogComponent />
       <div className="payment-gateway-configs-page">
         <div className="payment-gateway-configs-content">
-          <div className="page-header">
-            <h1>Configurações de Gateway de Pagamento</h1>
-            <p>Configure as credenciais do Mercado Pago e Stripe para testes e produção</p>
-          </div>
-
+          
           {error && <div className="alert alert-error">{error}</div>}
           {success && <div className="alert alert-success">{success}</div>}
 

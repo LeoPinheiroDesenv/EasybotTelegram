@@ -5,6 +5,8 @@ import { faRobot, faPlus, faEdit, faCheckCircle, faTimesCircle } from '@fortawes
 import Layout from '../components/Layout';
 import botService from '../services/botService';
 import RefreshButton from '../components/RefreshButton';
+import MoonLoader from "react-spinners/MoonLoader";
+
 import './BotList.css';
 
 const BotList = () => {
@@ -43,8 +45,12 @@ const BotList = () => {
     return (
       <Layout>
         <div className="bot-list-page">
-          <div className="loading-container">Carregando bots...</div>
+          <div className="dashboard-loading" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '400px' }}>
+            <MoonLoader color="#487fff" size={40} />
+            <p style={{ marginTop: '16px', color: '#6b7280' }}>Carregando bots...</p>
+          </div>
         </div>
+
       </Layout>
     );
   }
@@ -53,10 +59,7 @@ const BotList = () => {
     <Layout>
       <div className="bot-list-page">
         <div className="bot-list-header">
-          <div className="header-content">
-            <h1>Meus Bots</h1>
-            <p>Gerencie todos os seus bots do Telegram</p>
-          </div>
+          
           <div className="header-actions">
             <RefreshButton onRefresh={loadBots} loading={loading} />
             <button onClick={handleCreateBot} className="btn btn-primary btn-create">

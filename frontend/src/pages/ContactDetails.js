@@ -5,6 +5,7 @@ import contactService from '../services/contactService';
 import botService from '../services/botService';
 import groupManagementService from '../services/groupManagementService';
 import useConfirm from '../hooks/useConfirm';
+import MoonLoader from "react-spinners/MoonLoader";
 import './ContactDetails.css';
 
 const ContactDetails = () => {
@@ -176,7 +177,10 @@ const ContactDetails = () => {
     return (
       <Layout>
         <div className="contact-details-page">
-          <div className="loading-container">Carregando...</div>
+          <div className="loading-container" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '400px' }}>
+            <MoonLoader color="#487fff" size={40} />
+            <p style={{ marginTop: '16px', color: '#6b7280' }}>Carregando...</p>
+          </div>
         </div>
       </Layout>
     );
@@ -331,7 +335,7 @@ const ContactDetails = () => {
                   className="btn-check-status"
                   disabled={loadingMemberStatus}
                 >
-                  {loadingMemberStatus ? 'Verificando...' : 'Verificar Status no Grupo'}
+                  {loadingMemberStatus ? <MoonLoader color="#ffffff" size={16} /> : 'Verificar Status no Grupo'}
                 </button>
                 {memberStatus && memberStatus.success !== false && (
                   <div className="member-status-info">
@@ -367,7 +371,7 @@ const ContactDetails = () => {
                 className="btn-load-history"
                 disabled={loadingHistory}
               >
-                {loadingHistory ? 'Carregando...' : 'Carregar Histórico'}
+                {loadingHistory ? <MoonLoader color="#ffffff" size={16} /> : 'Carregar Histórico'}
               </button>
               {contactHistory !== null && (
                 <div className="history-list">

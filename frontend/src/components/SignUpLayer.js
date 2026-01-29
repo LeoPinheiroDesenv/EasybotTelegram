@@ -1,6 +1,7 @@
 import { Icon } from "@iconify/react";
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
+import MoonLoader from "react-spinners/MoonLoader";
 
 const SignUpLayer = ({
   name,
@@ -118,10 +119,10 @@ const SignUpLayer = ({
 
             <button
               type="submit"
-              className="btn btn-primary text-sm btn-sm px-12 py-16 w-100 radius-12 mt-32"
+              className="btn btn-primary text-sm btn-sm px-12 py-16 w-100 radius-12 mt-32 d-flex justify-content-center align-items-center"
               disabled={loading}
             >
-              {loading ? "Cadastrando..." : "Cadastrar"}
+              {loading ? <MoonLoader color="#ffffff" size={20} /> : "Cadastrar"}
             </button>
             
             <div className="mt-32 text-center text-sm">

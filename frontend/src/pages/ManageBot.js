@@ -151,14 +151,7 @@ const ManageBot = () => {
       <AlertDialog />
       <div className="manage-bot-wrapper">
         <div className="manage-bot-container">
-          <div className="manage-bot-header">
-            <h1>Gerenciar Bot</h1>
-            {bot && (
-              <div className="bot-info">
-                <span className="bot-name">{bot.name}</span>
-              </div>
-            )}
-          </div>
+          
 
           <div className="manage-bot-tabs">
             {tabs.map((tab) => (
